@@ -1,9 +1,20 @@
 <script lang="ts">
-	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import SEO from '@/components/seo.svelte';
+	import Sonner from '@/components/ui/sonner/sonner.svelte';
+	import './layout.css';
 
 	let { children } = $props();
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<link rel="icon" href={favicon} />
+</svelte:head>
+
+<SEO
+	title="Latest Financial News & AI Insights"
+	description="Stay updated with the latest financial news, market trends, and AI-powered analysis. Polygram delivers expert coverage on stocks, investments, and global finance."
+	image="/images/financial-news/ai-insights.webp"
+/>
 {@render children()}
+<Sonner richColors />
