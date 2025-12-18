@@ -68,6 +68,7 @@
 		"eslint-plugin-svelte": "^3.13.1",
 		"eslint-plugin-unicorn": "^62.0.0",
 		"firebase": "^12.7.0",
+		"firebase-admin": "^13.6.0",
 		"formsnap": "^2.0.1",
 		"globals": "^16.5.0",
 		"layerchart": "2.0.0-next.43",

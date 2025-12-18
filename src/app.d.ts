@@ -1,4 +1,6 @@
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import 'unplugin-icons/types/svelte';
+
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
@@ -8,7 +10,9 @@ declare global {
 	}
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			fbUser: DecodedIdToken | null;
+		}
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}
