@@ -8,7 +8,9 @@
 	import { firekitAuth, firekitUser } from 'svelte-firekit';
 	import DeviconGoogle from '~icons/devicon/google';
 	import SvgLoader from '~icons/svg-spinners/gooey-balls-2';
+
 	let loading = $state(false);
+
 	async function onclick() {
 		try {
 			// Sign in with Google
@@ -21,6 +23,12 @@
 			console.error('Authentication failed:', error);
 		}
 	}
+
+	$effect(() => {
+		if (firekitUser.uid) {
+			goto('/dashboard');
+		}
+	});
 </script>
 
 <div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
