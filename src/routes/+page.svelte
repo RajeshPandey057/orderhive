@@ -14,24 +14,13 @@
 			// Sign in with Google
 			loading = true;
 			if (firekitUser.initialized && !firekitUser.uid) {
-				alert(JSON.stringify(await firekitAuth.signInWithGoogle()));
+				await firekitAuth.signInWithGoogle();
+				goto('/dashboard');
 			}
 		} catch (error) {
 			console.error('Authentication failed:', error);
 		}
 	}
-	$effect(() => {
-		if (firekitUser.uid) {
-			console.log('User Info:', {
-				uid: firekitUser.uid,
-				email: firekitUser.email,
-				displayName: firekitUser.displayName
-			});
-			goto('/dashboard');
-		} else {
-			console.log('No user is currently logged in.');
-		}
-	});
 </script>
 
 <div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
