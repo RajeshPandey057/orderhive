@@ -1,5 +1,7 @@
 <script lang="ts">
+	import DealPercentage from '$lib/components/deal-percentage.svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -13,6 +15,7 @@
 	import Building from '~icons/lucide/building';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Upload from '~icons/lucide/cloud-upload';
+	import FileText from '~icons/lucide/file-text';
 	import Hammer from '~icons/lucide/hammer';
 	import Home from '~icons/lucide/home';
 	import Pencil from '~icons/lucide/pencil';
@@ -20,6 +23,7 @@
 	import Save from '~icons/lucide/save';
 	import PriceTag from '~icons/lucide/tag';
 	import Traffic from '~icons/lucide/traffic-cone';
+	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
 	import { createSale } from './sales.remote';
 
@@ -29,6 +33,37 @@
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
 	let dealStage = $state<'eoi' | 'booking'>('eoi');
+	let paymentValue = $state<number | string>('');
+	let eligibleFirstHalf = $state(false);
+	let eligibleSecondHalf = $state(false);
+	let eligibleFull = $state(false);
+
+	// Track uploaded files
+	let uploadedFiles = $state<Record<string, File | null>>({
+		passportFile: null,
+		nationalIdFile: null,
+		bookingFormFile: null,
+		paymentReceiptFile: null
+	});
+
+	const handleFileUpload = (fieldName: string, event: Event) => {
+		const input = event.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			uploadedFiles[fieldName] = input.files[0];
+		}
+	};
+
+	const removeFile = (fieldName: string) => {
+		uploadedFiles[fieldName] = null;
+		const input = document.getElementById(fieldName) as HTMLInputElement;
+		if (input) input.value = '';
+	};
+
+	const formatFileSize = (bytes: number): string => {
+		if (bytes < 1024) return bytes + 'b';
+		if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'kb';
+		return (bytes / (1024 * 1024)).toFixed(1) + 'mb';
+	};
 
 	const addJointBuyer = () => {
 		jointBuyers = [...jointBuyers, { key: nextJointKey++ }];
@@ -56,7 +91,11 @@
 			createSale.fields.dealStage.set(dealStage);
 		}
 	});
-
+	$effect(() => {
+		if (paymentValue) {
+			createSale.fields.paymentValue.set(Number(paymentValue));
+		}
+	});
 	const dealTypes = [
 		{ value: 'off-plan', label: 'Off Plan' },
 		{ value: 'on-plan', label: 'On Plan' },
@@ -100,7 +139,7 @@
 				<Plus />
 				<p class="text-sm">Add Sale</p>
 			</Sheet.Trigger>
-			<Sheet.Content side="right" class="w-150 max-w-150 overflow-y-auto sm:w-150 sm:max-w-150">
+			<Sheet.Content side="right" class="w-200 max-w-200 overflow-y-auto sm:w-200 sm:max-w-200">
 				<form
 					enctype="multipart/form-data"
 					{...createSale.enhance(async ({ form, submit }) => {
@@ -192,20 +231,49 @@
 												>
 													1
 												</span>
+
 												<Field.Field class="w-full">
-													<label
-														for="passportFile"
-														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-													>
-														<Upload class="h-5 w-5 text-gray-600" />
-														<span class="text-sm font-medium">Upload Passport</span>
-													</label>
+													{#if uploadedFiles.passportFile}
+														<h3 class="text-sm font-medium">Passport</h3>
+
+														<div
+															class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+														>
+															<div class="flex items-center gap-3">
+																<FileText class="h-10 w-10 text-orange-500" />
+																<div class="flex flex-col">
+																	<span class="text-sm font-medium"
+																		>{uploadedFiles.passportFile.name}</span
+																	>
+																	<span class="text-xs text-muted-foreground"
+																		>{formatFileSize(uploadedFiles.passportFile.size)}</span
+																	>
+																</div>
+															</div>
+															<button
+																type="button"
+																onclick={() => removeFile('passportFile')}
+																class="text-destructive hover:text-destructive/80"
+															>
+																<Trash2 class="h-5 w-5" />
+															</button>
+														</div>
+													{:else}
+														<label
+															for="passportFile"
+															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+														>
+															<Upload class="h-5 w-5 text-gray-600" />
+															<span class="text-sm font-medium">Upload Passport</span>
+														</label>
+													{/if}
 													<Input
 														id="passportFile"
 														class="sr-only"
 														{...createSale.fields.passportFile.as('file')}
 														files={undefined}
 														accept=".pdf,image/*"
+														onchange={(e) => handleFileUpload('passportFile', e)}
 													/>
 													{#each createSale.fields.passportFile.issues() as issue, i (i)}
 														<Field.Error class="text-sm text-destructive">
@@ -222,21 +290,49 @@
 													2
 												</span>
 												<Field.Field class="w-full">
-													<label
-														for="nationalIdFile"
-														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-													>
-														<Upload class="h-5 w-5 text-gray-600" />
-														<span class="text-sm font-medium">
-															Upload National ID <br />(Emirates ID/Aadhar)
-														</span>
-													</label>
+													{#if uploadedFiles.nationalIdFile}
+														<h3 class="text-sm font-medium">National ID</h3>
+
+														<div
+															class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+														>
+															<div class="flex items-center gap-3">
+																<FileText class="h-10 w-10 text-orange-500" />
+																<div class="flex flex-col">
+																	<span class="text-sm font-medium"
+																		>{uploadedFiles.nationalIdFile.name}</span
+																	>
+																	<span class="text-xs text-muted-foreground"
+																		>{formatFileSize(uploadedFiles.nationalIdFile.size)}</span
+																	>
+																</div>
+															</div>
+															<button
+																type="button"
+																onclick={() => removeFile('nationalIdFile')}
+																class="text-destructive hover:text-destructive/80"
+															>
+																<Trash2 class="h-5 w-5" />
+															</button>
+														</div>
+													{:else}
+														<label
+															for="nationalIdFile"
+															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+														>
+															<Upload class="h-5 w-5 text-gray-600" />
+															<span class="text-sm font-medium">
+																Upload National ID <br />(Emirates ID/Aadhar)
+															</span>
+														</label>
+													{/if}
 													<Input
 														id="nationalIdFile"
 														class="sr-only"
 														{...createSale.fields.nationalIdFile.as('file')}
 														files={undefined}
 														accept=".pdf,image/*"
+														onchange={(e) => handleFileUpload('nationalIdFile', e)}
 													/>
 													{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
 														<Field.Error class="text-sm text-destructive"
@@ -265,9 +361,10 @@
 								</Field.Group>
 							</Field.Set>
 						</Field.Set>
-
-						<!-- Project Details Section -->
 						<Field.Separator />
+
+						<Field.Separator />
+						<!-- Project Details Section -->
 						<Field.Set>
 							<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
 
@@ -371,21 +468,58 @@
 											<RadioGroup.Item value="eoi" id="deal-eoi" />
 											<Field.Label for="deal-eoi" class="font-normal">EOI</Field.Label>
 										</Field.Field>
-
+										<Field.Field>
+											<DealPercentage
+												bind:value={paymentValue}
+												onValueChange={(v) => (paymentValue = v)}
+												disabled={dealStage !== 'eoi'}
+											/>
+											{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
 										<Field.Field class="w-full">
-											<label
-												for="bookingFormFile"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload booking form</span>
-											</label>
+											{#if uploadedFiles.bookingFormFile}
+												<h3 class="text-sm font-medium">Booking Form</h3>
+
+												<div
+													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<div class="flex items-center gap-3">
+														<FileText class="h-10 w-10 text-orange-500" />
+														<div class="flex flex-col">
+															<span class="text-sm font-medium"
+																>{uploadedFiles.bookingFormFile.name}</span
+															>
+															<span class="text-xs text-muted-foreground"
+																>{formatFileSize(uploadedFiles.bookingFormFile.size)}</span
+															>
+														</div>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeFile('bookingFormFile')}
+														class="text-destructive hover:text-destructive/80"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{:else}
+												<label
+													for="bookingFormFile"
+													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 text-gray-600" />
+													<span class="text-sm font-medium">Upload booking form</span>
+												</label>
+											{/if}
 											<Input
 												id="bookingFormFile"
 												class="sr-only"
 												{...createSale.fields.bookingFormFile.as('file')}
 												files={undefined}
 												accept=".pdf,image/*"
+												onchange={(e) => handleFileUpload('bookingFormFile', e)}
 											/>
 											{#each createSale.fields.bookingFormFile.issues() as issue, i (i)}
 												<Field.Error class="text-sm text-destructive">
@@ -393,19 +527,47 @@
 												</Field.Error>
 											{/each}
 										</Field.Field><Field.Field class="w-full">
-											<label
-												for="paymentReceiptFile"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload payment receipt</span>
-											</label>
+											{#if uploadedFiles.paymentReceiptFile}
+												<h3 class="text-sm font-medium">Payment Receipt</h3>
+
+												<div
+													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<div class="flex items-center gap-3">
+														<FileText class="h-10 w-10 text-orange-500" />
+														<div class="flex flex-col">
+															<span class="text-sm font-medium"
+																>{uploadedFiles.paymentReceiptFile.name}</span
+															>
+															<span class="text-xs text-muted-foreground"
+																>{formatFileSize(uploadedFiles.paymentReceiptFile.size)}</span
+															>
+														</div>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeFile('paymentReceiptFile')}
+														class="text-destructive hover:text-destructive/80"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{:else}
+												<label
+													for="paymentReceiptFile"
+													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 text-gray-600" />
+													<span class="text-sm font-medium">Upload payment receipt</span>
+												</label>
+											{/if}
 											<Input
 												id="paymentReceiptFile"
 												class="sr-only"
 												{...createSale.fields.paymentReceiptFile.as('file')}
 												files={undefined}
 												accept=".pdf,image/*"
+												onchange={(e) => handleFileUpload('paymentReceiptFile', e)}
 											/>
 											{#each createSale.fields.paymentReceiptFile.issues() as issue, i (i)}
 												<Field.Error class="text-sm text-destructive">
@@ -421,12 +583,69 @@
 											<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label
 											>
 										</Field.Field>
+										<Field.Field>
+											<DealPercentage
+												bind:value={paymentValue}
+												onValueChange={(v) => (paymentValue = v)}
+												disabled={dealStage !== 'booking'}
+											/>
+											{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
 									</div>
 								</RadioGroup.Root>
 							</Field.Group>
 						</Field.Set>
 						<Field.Separator />
+						<Field.Set>
+							<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+								Refferal Agreement
+							</Field.Legend>
+							<Field.Group class="space-y-4">
+								<Button variant="outline" type="button" class="w-xs bg-orange-50/40">
+									<PlusRound class="h-4 w-4" />
+									Generate Referral Agreement
+								</Button>
+							</Field.Group>
+						</Field.Set>
 
+						<Field.Separator />
+						<!-- Invoicing Stage Section -->
+						<Field.Set>
+							<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
+							<Field.Group class="flex flex-row items-start gap-6">
+								<Field.Field orientation="horizontal">
+									<Checkbox id="eligible-first-half" bind:checked={eligibleFirstHalf} />
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-first-half" class="text-sm font-normal">
+											Eligible for first half
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">10 + 4% paid</span>
+									</div>
+								</Field.Field>
+
+								<Field.Field orientation="horizontal">
+									<Checkbox id="eligible-second-half" bind:checked={eligibleSecondHalf} />
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-second-half" class="text-sm font-normal">
+											Eligible for second half
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+									</div>
+								</Field.Field>
+								<HorizontalSeparator text="OR" />
+								<Field.Field orientation="horizontal">
+									<Checkbox id="eligible-full" bind:checked={eligibleFull} />
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-full" class="text-sm font-normal">
+											Eligible for full
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+									</div>
+								</Field.Field>
+							</Field.Group>
+						</Field.Set>
 						<!-- Joint Buyers -->
 						<Field.Set>
 							<Field.Legend class="text-lg font-medium">Joint Buyers</Field.Legend>
