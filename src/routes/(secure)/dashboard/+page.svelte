@@ -3,22 +3,40 @@
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
+	import PlusRound from '~icons/lucide/circle-fading-plus';
+	import Upload from '~icons/lucide/cloud-upload';
 	import Hammer from '~icons/lucide/hammer';
+	import Home from '~icons/lucide/home';
 	import Pencil from '~icons/lucide/pencil';
 	import Plus from '~icons/lucide/plus';
 	import Save from '~icons/lucide/save';
+	import PriceTag from '~icons/lucide/tag';
 	import Traffic from '~icons/lucide/traffic-cone';
+	import X from '~icons/lucide/x';
 	import { createSale } from './sales.remote';
 
 	let dealType = $state<string>();
 	let developer = $state<string>();
 	let sheetOpen = $state(false);
+	let jointBuyers = $state<{ key: number }[]>([]);
+	let nextJointKey = 0;
+	let dealStage = $state<'eoi' | 'booking'>('eoi');
+
+	const addJointBuyer = () => {
+		jointBuyers = [...jointBuyers, { key: nextJointKey++ }];
+	};
+
+	const removeJointBuyer = (key: number) => {
+		jointBuyers = jointBuyers.filter((buyer) => buyer.key !== key);
+	};
 
 	// Sync the select values with form fields
 	$effect(() => {
@@ -30,6 +48,12 @@
 	$effect(() => {
 		if (developer) {
 			createSale.fields.developer.set(developer);
+		}
+	});
+
+	$effect(() => {
+		if (dealStage) {
+			createSale.fields.dealStage.set(dealStage);
 		}
 	});
 
@@ -78,12 +102,20 @@
 			</Sheet.Trigger>
 			<Sheet.Content side="right" class="w-150 max-w-150 overflow-y-auto sm:w-150 sm:max-w-150">
 				<form
+					enctype="multipart/form-data"
 					{...createSale.enhance(async ({ form, submit }) => {
 						try {
 							await submit();
-							form.reset();
 
-							toast.success('Sale created successfully!');
+							// Only reset and close if submission was successful (no validation errors)
+							const issues = createSale.fields.allIssues();
+							if (!issues?.length) {
+								form.reset();
+								sheetOpen = false;
+								dealType = undefined;
+								developer = undefined;
+								toast.success('Sale created successfully!');
+							}
 						} catch {
 							toast.error('Failed to create sale');
 						}
@@ -107,42 +139,135 @@
 					<div class="flex flex-col gap-8 p-6">
 						<!-- Client Details Section -->
 						<Field.Set>
-							<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
-							<Field.Group>
-								<div class="grid grid-cols-3 gap-4">
-									<Field.Field>
-										<Input {...createSale.fields.firstName.as('text')} placeholder="First Name" />
-										{#each createSale.fields.firstName.issues() as issue, i (i)}
-											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-										{/each}
-									</Field.Field>
-									<Field.Field>
-										<Input {...createSale.fields.lastName.as('text')} placeholder="Last Name" />
-										{#each createSale.fields.lastName.issues() as issue, i (i)}
-											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-										{/each}
-									</Field.Field>
-									<Field.Field>
-										<Input {...createSale.fields.email.as('email')} placeholder="Email" />
-										{#each createSale.fields.email.issues() as issue, i (i)}
-											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-										{/each}
-									</Field.Field>
-								</div>
+							<Field.Set>
+								<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
+								<Field.Group>
+									<div class="grid grid-cols-3 gap-4">
+										<Field.Field>
+											<Input {...createSale.fields.firstName.as('text')} placeholder="First Name" />
+											{#each createSale.fields.firstName.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+										<Field.Field>
+											<Input {...createSale.fields.lastName.as('text')} placeholder="Last Name" />
+											{#each createSale.fields.lastName.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+										<Field.Field>
+											<Input {...createSale.fields.email.as('email')} placeholder="Email" />
+											{#each createSale.fields.email.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+									</div>
 
-								<div class="flex gap-2">
-									<Input id="countryCode" class="w-32" disabled value="+971" />
-									<Field.Field class="flex-1">
-										<Input {...createSale.fields.phone.as('tel')} placeholder="00000 00000" />
-										{#each createSale.fields.phone.issues() as issue, i (i)}
-											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-										{/each}
-									</Field.Field>
-								</div>
-							</Field.Group>
+									<div class="flex gap-2">
+										<Input id="countryCode" class="w-32" disabled value="+971" />
+										<Field.Field class="flex-1">
+											<Input {...createSale.fields.phone.as('tel')} placeholder="00000 00000" />
+											{#each createSale.fields.phone.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+									</div>
+								</Field.Group>
+							</Field.Set>
+							<Field.Set>
+								<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+									<div
+										class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+									>
+										<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
+									</div>
+									Client KYC Documents
+								</Field.Legend>
+								<Field.Group class="space-y-4">
+									<div class="grid gap-4 xl:grid-cols-2">
+										<div class="space-y-4">
+											<div class="flex items-center gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													1
+												</span>
+												<Field.Field class="w-full">
+													<label
+														for="passportFile"
+														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+													>
+														<Upload class="h-5 w-5 text-gray-600" />
+														<span class="text-sm font-medium">Upload Passport</span>
+													</label>
+													<Input
+														id="passportFile"
+														class="sr-only"
+														{...createSale.fields.passportFile.as('file')}
+														files={undefined}
+														accept=".pdf,image/*"
+													/>
+													{#each createSale.fields.passportFile.issues() as issue, i (i)}
+														<Field.Error class="text-sm text-destructive">
+															{issue.message}
+														</Field.Error>
+													{/each}
+												</Field.Field>
+											</div>
+
+											<div class="flex items-center gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													2
+												</span>
+												<Field.Field class="w-full">
+													<label
+														for="nationalIdFile"
+														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+													>
+														<Upload class="h-5 w-5 text-gray-600" />
+														<span class="text-sm font-medium">
+															Upload National ID <br />(Emirates ID/Aadhar)
+														</span>
+													</label>
+													<Input
+														id="nationalIdFile"
+														class="sr-only"
+														{...createSale.fields.nationalIdFile.as('file')}
+														files={undefined}
+														accept=".pdf,image/*"
+													/>
+													{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
+														<Field.Error class="text-sm text-destructive"
+															>{issue.message}</Field.Error
+														>
+													{/each}
+												</Field.Field>
+											</div>
+										</div>
+										<div class="flex w-full flex-col items-center gap-4">
+											<div class="flex w-full flex-row gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													3
+												</span>
+												<p class="text-sm font-medium">AML Form</p>
+											</div>
+
+											<Button variant="outline" type="button" class="w-full bg-orange-50/40">
+												<PlusRound class="h-4 w-4" />
+												Generate Now
+											</Button>
+										</div>
+									</div>
+								</Field.Group>
+							</Field.Set>
 						</Field.Set>
 
 						<!-- Project Details Section -->
+						<Field.Separator />
 						<Field.Set>
 							<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
 
@@ -204,23 +329,243 @@
 
 								<div class="grid grid-cols-2 gap-4">
 									<Field.Field>
-										<Input {...createSale.fields.unitNo.as('text')} placeholder="🏠 Unit No" />
+										<InputGroup.Root id="unitNo">
+											<InputGroup.Input
+												{...createSale.fields.unitNo.as('text')}
+												placeholder="Unit No"
+											/>
+											<InputGroup.Addon>
+												<Home />
+											</InputGroup.Addon>
+										</InputGroup.Root>
 										{#each createSale.fields.unitNo.issues() as issue, i (i)}
 											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
 									</Field.Field>
 									<Field.Field>
-										<Input
-											{...createSale.fields.unitValue.as('text')}
-											placeholder="💰 Unit Value"
-										/>
-
+										<InputGroup.Root id="unitValue">
+											<InputGroup.Input
+												{...createSale.fields.unitValue.as('text')}
+												placeholder="Unit Value"
+											/>
+											<InputGroup.Addon>
+												<PriceTag />
+											</InputGroup.Addon>
+										</InputGroup.Root>
 										{#each createSale.fields.unitValue.issues() as issue, i (i)}
 											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
 									</Field.Field>
 								</div>
 							</Field.Group>
+						</Field.Set>
+						<Field.Separator />
+						<Field.Set>
+							<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+								Deal Status
+							</Field.Legend>
+							<Field.Group class="space-y-4">
+								<RadioGroup.Root bind:value={dealStage} class="flex w-full flex-row gap-4">
+									<div class="flex w-full flex-col gap-2">
+										<Field.Field orientation="horizontal">
+											<RadioGroup.Item value="eoi" id="deal-eoi" />
+											<Field.Label for="deal-eoi" class="font-normal">EOI</Field.Label>
+										</Field.Field>
+
+										<Field.Field class="w-full">
+											<label
+												for="bookingFormFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload booking form</span>
+											</label>
+											<Input
+												id="bookingFormFile"
+												class="sr-only"
+												{...createSale.fields.bookingFormFile.as('file')}
+												files={undefined}
+												accept=".pdf,image/*"
+											/>
+											{#each createSale.fields.bookingFormFile.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">
+													{issue.message}
+												</Field.Error>
+											{/each}
+										</Field.Field><Field.Field class="w-full">
+											<label
+												for="paymentReceiptFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload payment receipt</span>
+											</label>
+											<Input
+												id="paymentReceiptFile"
+												class="sr-only"
+												{...createSale.fields.paymentReceiptFile.as('file')}
+												files={undefined}
+												accept=".pdf,image/*"
+											/>
+											{#each createSale.fields.paymentReceiptFile.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">
+													{issue.message}
+												</Field.Error>
+											{/each}
+										</Field.Field>
+									</div>
+									<HorizontalSeparator text="OR" class="mx-4" />
+									<div class="flex w-full flex-col gap-2">
+										<Field.Field orientation="horizontal">
+											<RadioGroup.Item value="booking" id="deal-booking" />
+											<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label
+											>
+										</Field.Field>
+									</div>
+								</RadioGroup.Root>
+							</Field.Group>
+						</Field.Set>
+						<Field.Separator />
+
+						<!-- Joint Buyers -->
+						<Field.Set>
+							<Field.Legend class="text-lg font-medium">Joint Buyers</Field.Legend>
+
+							{#each jointBuyers as buyer, index (buyer.key)}
+								<div
+									class="flex flex-col gap-4 rounded-xl border border-border/60 bg-background/80 p-4"
+								>
+									<div class="flex items-center justify-between">
+										<p class="text-base font-semibold">Buyer {index + 2} details</p>
+										<Button
+											variant="ghost"
+											size="icon"
+											onclick={() => removeJointBuyer(buyer.key)}
+											aria-label="Remove joint buyer"
+										>
+											<X class="h-4 w-4" />
+										</Button>
+									</div>
+									<Field.Group>
+										<div class="grid grid-cols-3 gap-4">
+											<Field.Field>
+												<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" />
+											</Field.Field>
+											<Field.Field>
+												<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" />
+											</Field.Field>
+											<Field.Field>
+												<Input
+													name={`jointBuyers[${index}].email`}
+													placeholder="Email"
+													type="email"
+												/>
+											</Field.Field>
+										</div>
+
+										<div class="flex gap-2">
+											<Input class="w-32" disabled value="+971" />
+											<Field.Field class="flex-1">
+												<Input
+													name={`jointBuyers[${index}].phone`}
+													placeholder="00000 00000"
+													type="tel"
+												/>
+											</Field.Field>
+										</div>
+									</Field.Group>
+
+									<Field.Set>
+										<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+											<div
+												class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+											>
+												<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
+											</div>
+											Client KYC Document
+										</Field.Legend>
+										<Field.Group class="space-y-4">
+											<div class="grid gap-4 xl:grid-cols-2">
+												<div class="space-y-4">
+													<div class="flex items-center gap-4">
+														<span
+															class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+														>
+															1
+														</span>
+														<Field.Field class="w-full">
+															<label
+																for={`joint-passport-${buyer.key}`}
+																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+															>
+																<Upload class="h-5 w-5 text-gray-600" />
+																<span class="text-sm font-medium">Upload Passport</span>
+															</label>
+															<Input
+																id={`joint-passport-${buyer.key}`}
+																name={`jointBuyers[${index}].passportFile`}
+																class="sr-only"
+																type="file"
+																accept=".pdf,image/*"
+															/>
+														</Field.Field>
+													</div>
+
+													<div class="flex items-center gap-4">
+														<span
+															class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+														>
+															2
+														</span>
+														<Field.Field class="w-full">
+															<label
+																for={`joint-national-${buyer.key}`}
+																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+															>
+																<Upload class="h-5 w-5 text-gray-600" />
+																<span class="text-sm font-medium">
+																	Upload National ID <br />(Emirates ID/Aadhar)
+																</span>
+															</label>
+															<Input
+																id={`joint-national-${buyer.key}`}
+																name={`jointBuyers[${index}].nationalIdFile`}
+																class="sr-only"
+																type="file"
+																accept=".pdf,image/*"
+															/>
+														</Field.Field>
+													</div>
+												</div>
+
+												<div class="flex w-full flex-col items-center gap-4">
+													<div class="flex w-full flex-row gap-4">
+														<span
+															class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+														>
+															3
+														</span>
+														<p class="text-sm font-medium">AML Form</p>
+													</div>
+
+													<Button variant="outline" type="button" class="w-full bg-orange-50/40">
+														<PlusRound class="h-4 w-4" />
+														Generate Now
+													</Button>
+												</div>
+											</div>
+										</Field.Group>
+									</Field.Set>
+								</div>
+							{/each}
+
+							<button
+								type="button"
+								class="flex w-full items-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 px-4 py-3 text-sm font-semibold text-foreground hover:border-foreground/60"
+								onclick={addJointBuyer}
+							>
+								<Plus class="h-4 w-4" /> Add joint buyer
+							</button>
 						</Field.Set>
 					</div>
 				</form>
