@@ -6,7 +6,9 @@ import {
 } from '$env/static/private';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type SessionCookieOptions } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { randomUUID } from 'node:crypto';
 
 export const firebaseApp =
 	getApps().find((it) => it.name === 'firebase-admin-app') ??
@@ -22,7 +24,50 @@ export const firebaseApp =
 		'firebase-admin-app'
 	);
 export const auth = getAuth(firebaseApp);
+export const firestore = getFirestore(firebaseApp);
 export const storage = getStorage(firebaseApp);
+
+type UploadedFile = {
+	path: string;
+	downloadURL: string;
+	token: string;
+	contentType: string;
+	size: number;
+	name: string;
+	lastModified: number;
+};
+
+export async function uploadFileWithLink(
+	imageFile: File | null,
+	path: string
+): Promise<UploadedFile | null> {
+	if (!imageFile || imageFile.size <= 0) return null;
+
+	const bucket = storage.bucket();
+	const fileName = `${path}/${randomUUID()}-${imageFile.name}`;
+	const file = bucket.file(fileName);
+	const token = randomUUID();
+	const imageData = await imageFile.arrayBuffer();
+
+	await file.save(Buffer.from(imageData), {
+		contentType: imageFile.type || 'application/octet-stream',
+		metadata: {
+			firebaseStorageDownloadTokens: token
+		}
+	});
+
+	const downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+
+	return {
+		path: fileName,
+		downloadURL,
+		token,
+		contentType: imageFile.type || 'application/octet-stream',
+		size: imageFile.size,
+		name: imageFile.name,
+		lastModified: imageFile.lastModified
+	};
+}
 
 export async function createSessionCookie(
 	idToken: string,

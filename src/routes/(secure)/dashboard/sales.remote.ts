@@ -1,5 +1,8 @@
 import { form } from '$app/server';
-import { redirect } from '@sveltejs/kit';
+import { firestore, uploadFileWithLink } from '$lib/server/firebase';
+import { error, redirect } from '@sveltejs/kit';
+import { FieldValue } from 'firebase-admin/firestore';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 // Define the schema for the sale form using Zod
@@ -69,23 +72,91 @@ const saleSchema = z.object({
 	unitValue: z.string().min(1, 'Unit value is required')
 });
 
+const toUploadedFile = async (file: File | null | undefined, path: string) => {
+	if (!file || file.size <= 0) return null;
+	const uploaded = await uploadFileWithLink(file, path);
+	if (!uploaded) return null;
+
+	return {
+		...uploaded,
+		// Keep original file metadata for reference
+		original: {
+			name: file.name,
+			size: file.size,
+			type: file.type,
+			lastModified: file.lastModified
+		}
+	};
+};
+
 export const createSale = form(saleSchema, async (data) => {
-	// TODO: Add your database logic here
-	// For example:
-	// await db.sql`
-	// 	INSERT INTO sales (
-	// 		first_name, last_name, email, phone,
-	// 		deal_type, developer, property, unit_no, unit_value,
-	// 		deal_status, payment_percentage
-	// 	) VALUES (
-	// 		${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone},
-	// 		${data.dealType}, ${data.developer}, ${data.property}, ${data.unitNo}, ${data.unitValue},
-	// 		${data.dealStatus}, ${data.paymentPercentage || data.customPaymentValue}
-	// 	)
-	// `;
+	const timestamp = FieldValue.serverTimestamp();
+	const createdByUid = data.dealOwners[0]?.userId ?? 'unknown';
+	const basePath = `sales/${createdByUid}/${randomUUID()}`;
 
-	console.error('Sale created:', data);
+	// Upload primary buyer documents
+	const [primaryPassportFile, primaryNationalIdFile] = await Promise.all([
+		toUploadedFile(data.passportFile, `${basePath}/primary/passport`),
+		toUploadedFile(data.nationalIdFile, `${basePath}/primary/national-id`)
+	]);
 
-	// Redirect back to dashboard after successful submission
+	// Upload joint buyer documents
+	const jointBuyers = await Promise.all(
+		data.jointBuyers.map(async (buyer, index) => {
+			const [passportFile, nationalIdFile] = await Promise.all([
+				toUploadedFile(buyer.passportFile, `${basePath}/joint/${index}/passport`),
+				toUploadedFile(buyer.nationalIdFile, `${basePath}/joint/${index}/national-id`)
+			]);
+
+			return {
+				firstName: buyer.firstName,
+				lastName: buyer.lastName,
+				email: buyer.email,
+				phone: buyer.phone,
+				passportFile,
+				nationalIdFile
+			};
+		})
+	);
+
+	// Upload booking and payment documents
+	const [bookingFormFile, paymentReceiptFile] = await Promise.all([
+		toUploadedFile(data.bookingFormFile, `${basePath}/booking-form`),
+		toUploadedFile(data.paymentReceiptFile, `${basePath}/payment-receipt`)
+	]);
+
+	const saleRecord = {
+		primaryBuyer: {
+			firstName: data.firstName,
+			lastName: data.lastName,
+			email: data.email,
+			phone: data.phone,
+			passportFile: primaryPassportFile,
+			nationalIdFile: primaryNationalIdFile
+		},
+		jointBuyers,
+		dealOwners: data.dealOwners,
+		dealStage: data.dealStage,
+		paymentValue: data.paymentValue,
+		bookingFormFile,
+		paymentReceiptFile,
+		dealType: data.dealType,
+		developer: data.developer,
+		property: data.property,
+		unitNo: data.unitNo,
+		unitValue: data.unitValue,
+		createdByUid,
+		createdByEmail: data.dealOwners[0]?.email ?? null,
+		createdAt: timestamp,
+		updatedAt: timestamp
+	};
+
+	try {
+		await firestore.collection('sales').add(saleRecord);
+	} catch (err) {
+		console.error('Failed to save sale to Firestore', err);
+		throw error(500, 'Unable to save sale right now. Please try again.');
+	}
+
 	redirect(303, '/dashboard');
 });
