@@ -92,6 +92,11 @@
 		paymentReceiptFile: null
 	});
 
+	// Track uploaded files for joint buyers
+	let jointBuyerFiles = $state<
+		Record<number, { passportFile: File | null; nationalIdFile: File | null }>
+	>({});
+
 	const handleFileUpload = (fieldName: string, event: Event) => {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
@@ -112,11 +117,36 @@
 	};
 
 	const addJointBuyer = () => {
-		jointBuyers = [...jointBuyers, { key: nextJointKey++ }];
+		const newKey = nextJointKey++;
+		jointBuyers = [...jointBuyers, { key: newKey }];
+		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null };
 	};
 
 	const removeJointBuyer = (key: number) => {
 		jointBuyers = jointBuyers.filter((buyer) => buyer.key !== key);
+		delete jointBuyerFiles[key];
+	};
+
+	const handleJointBuyerFileUpload = (
+		buyerKey: number,
+		fieldName: 'passportFile' | 'nationalIdFile',
+		event: Event
+	) => {
+		const input = event.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			if (!jointBuyerFiles[buyerKey]) {
+				jointBuyerFiles[buyerKey] = { passportFile: null, nationalIdFile: null };
+			}
+			jointBuyerFiles[buyerKey][fieldName] = input.files[0];
+		}
+	};
+
+	const removeJointBuyerFile = (buyerKey: number, fieldName: 'passportFile' | 'nationalIdFile') => {
+		if (jointBuyerFiles[buyerKey]) {
+			jointBuyerFiles[buyerKey][fieldName] = null;
+		}
+		const input = document.getElementById(`joint-${fieldName}-${buyerKey}`) as HTMLInputElement;
+		if (input) input.value = '';
 	};
 
 	const handleOwnerSelect = (ownerKey: number, userId: string) => {
@@ -982,19 +1012,52 @@
 															1
 														</span>
 														<Field.Field class="w-full">
-															<label
-																for={`joint-passport-${buyer.key}`}
-																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-															>
-																<Upload class="h-5 w-5 text-gray-600" />
-																<span class="text-sm font-medium">Upload Passport</span>
-															</label>
+															{#if jointBuyerFiles[buyer.key]?.passportFile}
+																<h3 class="text-sm font-medium">Passport</h3>
+																<div
+																	class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+																>
+																	<div class="flex items-center gap-3">
+																		<FileText class="h-10 w-10 text-orange-500" />
+																		<div class="flex flex-col">
+																			<span class="text-sm font-medium"
+																				>{jointBuyerFiles[buyer.key]?.passportFile?.name ??
+																					''}</span
+																			>
+																			<span class="text-xs text-muted-foreground"
+																				>{jointBuyerFiles[buyer.key]?.passportFile
+																					? formatFileSize(
+																							jointBuyerFiles[buyer.key]?.passportFile?.size ?? 0
+																						)
+																					: ''}</span
+																			>
+																		</div>
+																	</div>
+																	<button
+																		type="button"
+																		onclick={() => removeJointBuyerFile(buyer.key, 'passportFile')}
+																		class="text-destructive hover:text-destructive/80"
+																	>
+																		<Trash2 class="h-5 w-5" />
+																	</button>
+																</div>
+															{:else}
+																<label
+																	for={`joint-passportFile-${buyer.key}`}
+																	class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+																>
+																	<Upload class="h-5 w-5 text-gray-600" />
+																	<span class="text-sm font-medium">Upload Passport</span>
+																</label>
+															{/if}
 															<Input
-																id={`joint-passport-${buyer.key}`}
+																id={`joint-passportFile-${buyer.key}`}
 																name={`jointBuyers[${index}].passportFile`}
 																class="sr-only"
 																type="file"
 																accept=".pdf,image/*"
+																onchange={(e) =>
+																	handleJointBuyerFileUpload(buyer.key, 'passportFile', e)}
 															/>
 														</Field.Field>
 													</div>
@@ -1006,21 +1069,55 @@
 															2
 														</span>
 														<Field.Field class="w-full">
-															<label
-																for={`joint-national-${buyer.key}`}
-																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-															>
-																<Upload class="h-5 w-5 text-gray-600" />
-																<span class="text-sm font-medium">
-																	Upload National ID <br />(Emirates ID/Aadhar)
-																</span>
-															</label>
+															{#if jointBuyerFiles[buyer.key]?.nationalIdFile}
+																<h3 class="text-sm font-medium">National ID</h3>
+																<div
+																	class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+																>
+																	<div class="flex items-center gap-3">
+																		<FileText class="h-10 w-10 text-orange-500" />
+																		<div class="flex flex-col">
+																			<span class="text-sm font-medium"
+																				>{jointBuyerFiles[buyer.key]?.nationalIdFile?.name ??
+																					''}</span
+																			>
+																			<span class="text-xs text-muted-foreground"
+																				>{jointBuyerFiles[buyer.key]?.nationalIdFile
+																					? formatFileSize(
+																							jointBuyerFiles[buyer.key]?.nationalIdFile?.size ?? 0
+																						)
+																					: ''}</span
+																			>
+																		</div>
+																	</div>
+																	<button
+																		type="button"
+																		onclick={() =>
+																			removeJointBuyerFile(buyer.key, 'nationalIdFile')}
+																		class="text-destructive hover:text-destructive/80"
+																	>
+																		<Trash2 class="h-5 w-5" />
+																	</button>
+																</div>
+															{:else}
+																<label
+																	for={`joint-nationalIdFile-${buyer.key}`}
+																	class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+																>
+																	<Upload class="h-5 w-5 text-gray-600" />
+																	<span class="text-sm font-medium">
+																		Upload National ID <br />(Emirates ID/Aadhar)
+																	</span>
+																</label>
+															{/if}
 															<Input
-																id={`joint-national-${buyer.key}`}
+																id={`joint-nationalIdFile-${buyer.key}`}
 																name={`jointBuyers[${index}].nationalIdFile`}
 																class="sr-only"
 																type="file"
 																accept=".pdf,image/*"
+																onchange={(e) =>
+																	handleJointBuyerFileUpload(buyer.key, 'nationalIdFile', e)}
 															/>
 														</Field.Field>
 													</div>
