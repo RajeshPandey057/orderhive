@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DealPercentage from '$lib/components/deal-percentage.svelte';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -11,6 +12,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
+	import { firekitCollection, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
@@ -27,16 +29,60 @@
 	import X from '~icons/lucide/x';
 	import { createSale } from './sales.remote';
 
-	let dealType = $state<string>();
-	let developer = $state<string>();
 	let sheetOpen = $state(false);
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
-	let dealStage = $state<'eoi' | 'booking'>('eoi');
-	let paymentValue = $state<number | string>('');
+	let nextOwnerKey = 0;
 	let eligibleFirstHalf = $state(false);
 	let eligibleSecondHalf = $state(false);
 	let eligibleFull = $state(false);
+
+	type FirestoreUser = {
+		id: string;
+		email: string;
+		displayName?: string;
+		photoURL?: string;
+	};
+
+	type DealOwnerRow = {
+		key: number;
+		userId: string;
+		email: string;
+		name: string;
+		split: number;
+		photoURL?: string;
+	};
+
+	const users = firekitCollection<FirestoreUser>('users');
+
+	let dealOwners = $state<DealOwnerRow[]>([
+		{
+			key: nextOwnerKey++,
+			userId: firekitUser.uid ?? '',
+			email: firekitUser.email ?? '',
+			name: firekitUser.displayName ?? 'You',
+			split: 100,
+			photoURL: firekitUser.photoURL ?? undefined
+		}
+	]);
+
+	const syncDealOwners = () => {
+		createSale.fields.dealOwners.set(
+			dealOwners.map((owner) => ({
+				userId: owner.userId,
+				email: owner.email,
+				split: Number(owner.split) || 0
+			}))
+		);
+	};
+
+	syncDealOwners();
+
+	const ownerOptions = $derived(users.data ?? []);
+	const splitTotal = $derived(
+		dealOwners.reduce((total, owner) => total + (Number(owner.split) || 0), 0)
+	);
+	const splitRemaining = $derived(100 - splitTotal);
 
 	// Track uploaded files
 	let uploadedFiles = $state<Record<string, File | null>>({
@@ -73,29 +119,61 @@
 		jointBuyers = jointBuyers.filter((buyer) => buyer.key !== key);
 	};
 
-	// Sync the select values with form fields
-	$effect(() => {
-		if (dealType) {
-			createSale.fields.dealType.set(dealType as 'off-plan' | 'on-plan' | 'resell');
-		}
-	});
+	const handleOwnerSelect = (ownerKey: number, userId: string) => {
+		const selectedUser = ownerOptions.find((user) => user.id === userId);
 
-	$effect(() => {
-		if (developer) {
-			createSale.fields.developer.set(developer);
-		}
-	});
+		dealOwners = dealOwners.map((owner) =>
+			owner.key === ownerKey
+				? {
+						...owner,
+						userId,
+						email: selectedUser?.email ?? '',
+						name: selectedUser?.displayName ?? selectedUser?.email ?? 'Owner',
+						photoURL: selectedUser?.photoURL
+					}
+				: owner
+		);
 
-	$effect(() => {
-		if (dealStage) {
-			createSale.fields.dealStage.set(dealStage);
-		}
-	});
-	$effect(() => {
-		if (paymentValue) {
-			createSale.fields.paymentValue.set(Number(paymentValue));
-		}
-	});
+		syncDealOwners();
+	};
+
+	const handleSplitChange = (ownerKey: number, value: string) => {
+		const numericSplit = Number(value);
+		dealOwners = dealOwners.map((owner) =>
+			owner.key === ownerKey
+				? {
+						...owner,
+						split: Number.isNaN(numericSplit) ? 0 : numericSplit
+					}
+				: owner
+		);
+
+		syncDealOwners();
+	};
+
+	const addDealOwner = () => {
+		const defaultSplit = Math.max(0, splitRemaining);
+		dealOwners = [
+			...dealOwners,
+			{
+				key: nextOwnerKey++,
+				userId: '',
+				email: '',
+				name: '',
+				split: defaultSplit
+			}
+		];
+
+		syncDealOwners();
+	};
+
+	const removeDealOwner = (ownerKey: number) => {
+		if (dealOwners.length === 1) return;
+		dealOwners = dealOwners.filter((owner) => owner.key !== ownerKey);
+
+		syncDealOwners();
+	};
+
 	const dealTypes = [
 		{ value: 'off-plan', label: 'Off Plan' },
 		{ value: 'on-plan', label: 'On Plan' },
@@ -118,10 +196,11 @@
 	];
 
 	const dealTypeLabel = $derived(
-		dealTypes.find((d) => d.value === dealType)?.label ?? 'Choose deal'
+		dealTypes.find((d) => d.value === createSale.fields.dealType.value())?.label ?? 'Choose deal'
 	);
 	const developerLabel = $derived(
-		developers.find((d) => d.value === developer)?.label ?? 'Select Developer'
+		developers.find((d) => d.value === createSale.fields.developer.value())?.label ??
+			'Select Developer'
 	);
 </script>
 
@@ -151,8 +230,6 @@
 							if (!issues?.length) {
 								form.reset();
 								sheetOpen = false;
-								dealType = undefined;
-								developer = undefined;
 								toast.success('Sale created successfully!');
 							}
 						} catch {
@@ -168,13 +245,22 @@
 							<Sheet.Close class={buttonVariants({ variant: 'outline', size: 'sm' })}>
 								<Pencil class="mr-2 h-4 w-4" /> Save as Draft
 							</Sheet.Close>
-							<Button type="submit" size="sm" disabled={!!createSale.pending}>
+							<Button
+								type="submit"
+								size="sm"
+								disabled={!!createSale.pending || splitRemaining !== 0}
+								title={splitRemaining !== 0 ? 'Owner split must total 100%' : undefined}
+							>
 								<Save class="mr-2 h-4 w-4" />
 								{createSale.pending ? 'Saving...' : 'Save'}
 							</Button>
 						</div>
 					</div>
-
+					{#each createSale.fields.allIssues() as issue, i (i)}
+						<Field.Error class="text-sm text-destructive">
+							{issue.message}
+						</Field.Error>
+					{/each}
 					<div class="flex flex-col gap-8 p-6">
 						<!-- Client Details Section -->
 						<Field.Set>
@@ -371,7 +457,12 @@
 							<Field.Group>
 								<div class="grid grid-cols-3 gap-4">
 									<Field.Field id="dealType">
-										<Select.Root type="single" bind:value={dealType}>
+										<Select.Root
+											type="single"
+											value={createSale.fields.dealType.value() ?? ''}
+											onValueChange={(v) =>
+												createSale.fields.dealType.set(v as 'off-plan' | 'on-plan' | 'resell')}
+										>
 											<Select.Trigger id="dealype">
 												<div class="flex items-center gap-2">
 													<Traffic />
@@ -390,7 +481,11 @@
 										{/each}
 									</Field.Field>
 									<Field.Field id="developer">
-										<Select.Root type="single" bind:value={developer}>
+										<Select.Root
+											type="single"
+											value={createSale.fields.developer.value() ?? ''}
+											onValueChange={(v) => createSale.fields.developer.set(v as string)}
+										>
 											<Select.Trigger id="developer">
 												<div class="flex items-center gap-2">
 													<Hammer />
@@ -461,8 +556,19 @@
 							<Field.Legend class="flex items-center gap-4 text-lg font-medium">
 								Deal Status
 							</Field.Legend>
+							{#each createSale.fields.dealStage.issues() as issue, i (i)}
+								<Field.Error class="text-sm text-destructive">
+									{issue.message}
+								</Field.Error>
+							{/each}
 							<Field.Group class="space-y-4">
-								<RadioGroup.Root bind:value={dealStage} class="flex w-full flex-row gap-4">
+								<RadioGroup.Root
+									bind:value={
+										() => createSale.fields.dealStage.value() ?? '',
+										(v) => createSale.fields.dealStage.set(v ?? '')
+									}
+									class="flex w-full flex-row gap-4"
+								>
 									<div class="flex w-full flex-col gap-2">
 										<Field.Field orientation="horizontal">
 											<RadioGroup.Item value="eoi" id="deal-eoi" />
@@ -470,10 +576,13 @@
 										</Field.Field>
 										<Field.Field>
 											<DealPercentage
-												bind:value={paymentValue}
-												onValueChange={(v) => (paymentValue = v)}
-												disabled={dealStage !== 'eoi'}
+												bind:value={
+													() => createSale.fields.paymentValue.value() ?? 0,
+													(v) => createSale.fields.paymentValue.set(Number(v) || 0)
+												}
+												disabled={createSale.fields.dealStage.value() !== 'eoi'}
 											/>
+											<input class="sr-only" {...createSale.fields.paymentValue.as('number')} />
 											{#each createSale.fields.paymentValue.issues() as issue, i (i)}
 												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 											{/each}
@@ -585,9 +694,11 @@
 										</Field.Field>
 										<Field.Field>
 											<DealPercentage
-												bind:value={paymentValue}
-												onValueChange={(v) => (paymentValue = v)}
-												disabled={dealStage !== 'booking'}
+												bind:value={
+													() => createSale.fields.paymentValue.value() ?? 0,
+													(v) => createSale.fields.paymentValue.set(Number(v) || 0)
+												}
+												disabled={createSale.fields.dealStage.value() !== 'booking'}
 											/>
 											{#each createSale.fields.paymentValue.issues() as issue, i (i)}
 												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -595,6 +706,7 @@
 										</Field.Field>
 									</div>
 								</RadioGroup.Root>
+								<input class="sr-only" {...createSale.fields.dealStage.as('text')} />
 							</Field.Group>
 						</Field.Set>
 						<Field.Separator />
@@ -645,6 +757,163 @@
 									</div>
 								</Field.Field>
 							</Field.Group>
+						</Field.Set><Field.Set>
+							<Field.Legend class="flex items-center justify-between text-lg font-medium">
+								<span>Deal Owners</span>
+								<span
+									class={[
+										'ml-4 text-sm',
+										{
+											'text-muted-foreground': splitRemaining === 0,
+											'text-destructive': splitRemaining !== 0
+										}
+									]}
+								>
+									{splitRemaining === 0
+										? 'Split totals 100%'
+										: splitRemaining > 0
+											? `Remaining ${splitRemaining.toFixed(0)}%`
+											: `Over by ${Math.abs(splitRemaining).toFixed(0)}%`}
+								</span>
+							</Field.Legend>
+
+							<div class="space-y-3 rounded-xl border border-border/60 bg-background/60">
+								<div
+									class="grid grid-cols-[minmax(0,1.6fr)_140px_40px] items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
+								>
+									<span>Owners</span>
+									<span class="text-right">Split %</span>
+									<span></span>
+								</div>
+
+								{#each dealOwners as owner, index (owner.key)}
+									<div
+										class="grid grid-cols-[minmax(0,1.6fr)_140px_40px] items-center gap-4 border-t border-border/40 px-4 py-3"
+									>
+										<div class="flex min-w-0 items-center gap-3 md:gap-4">
+											<Avatar.Root
+												class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase"
+											>
+												{#if owner.photoURL}
+													<Avatar.Image src={owner.photoURL} alt={owner.name || owner.email} />
+												{/if}
+												<Avatar.Fallback
+													>{owner.name?.[0] || owner.email?.[0] || 'A'}</Avatar.Fallback
+												>
+											</Avatar.Root>
+											<div class="min-w-0 flex-1 space-y-1">
+												<Select.Root
+													type="single"
+													value={owner.userId}
+													onValueChange={(value) => handleOwnerSelect(owner.key, value)}
+												>
+													<Select.Trigger class="w-full justify-between">
+														<div class="flex flex-row items-center gap-2 text-left">
+															<span class="truncate text-sm leading-tight font-medium">
+																{owner.userId === firekitUser.uid
+																	? 'You'
+																	: owner.name || 'Add owner'}
+															</span>
+															<span class="truncate text-xs leading-tight text-muted-foreground">
+																{owner.email || 'Select an agent to auto-fill email'}
+															</span>
+														</div>
+													</Select.Trigger>
+													<Select.Content class="max-h-64 overflow-y-auto">
+														{#if users.loading}
+															<Select.Item value="loading" disabled>Loading owners...</Select.Item>
+														{:else if ownerOptions.length === 0}
+															<Select.Item value="empty" disabled>No owners found</Select.Item>
+														{:else}
+															{#each ownerOptions as user (user.id)}
+																<Select.Item value={user.id}>
+																	<div class="flex flex-col text-left">
+																		<span class="text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'Owner'}
+																		</span>
+																		{#if user.email}
+																			<span class="text-xs text-muted-foreground">{user.email}</span
+																			>
+																		{/if}
+																	</div>
+																</Select.Item>
+															{/each}
+														{/if}
+													</Select.Content>
+												</Select.Root>
+												<input
+													class="sr-only"
+													{...createSale.fields.dealOwners[index]?.userId.as('text')}
+													value={owner.userId}
+												/>
+												<input
+													class="sr-only"
+													{...createSale.fields.dealOwners[index]?.email.as('email')}
+													value={owner.email}
+												/>
+												{#each createSale.fields.dealOwners[index]?.userId.issues() ?? [] as issue, i (i)}
+													<Field.Error class="text-xs text-destructive">{issue.message}</Field.Error
+													>
+												{/each}
+												{#each createSale.fields.dealOwners[index]?.email.issues() ?? [] as issue, i (i)}
+													<Field.Error class="text-xs text-destructive">{issue.message}</Field.Error
+													>
+												{/each}
+											</div>
+										</div>
+
+										<div class="flex items-center justify-end gap-2">
+											<Input
+												{...createSale.fields.dealOwners[index]?.split.as('number')}
+												class="h-10   w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+												type="number"
+												min="0"
+												max="100"
+												step="1"
+												value={owner.split}
+												oninput={(event) =>
+													handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
+											/>
+											{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
+												<Field.Error class="col-span-2 text-xs text-destructive"
+													>{issue.message}</Field.Error
+												>
+											{/each}
+										</div>
+
+										<div class="flex items-center justify-end">
+											{#if dealOwners.length > 1}
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon"
+													class="text-muted-foreground"
+													onclick={() => removeDealOwner(owner.key)}
+													aria-label="Remove owner"
+												>
+													<Trash2 class="h-4 w-4" />
+												</Button>
+											{/if}
+										</div>
+									</div>
+								{/each}
+
+								<div class="flex items-center justify-between border-t border-border/40 px-4 py-3">
+									<Button type="button" variant="outline" class="gap-2" onclick={addDealOwner}>
+										<Plus class="h-4 w-4" />
+										Add another agent
+									</Button>
+									<div class="text-sm text-muted-foreground">
+										<span class={splitRemaining === 0 ? 'text-emerald-600' : 'text-destructive'}>
+											{splitRemaining === 0
+												? 'Ready to submit'
+												: splitRemaining > 0
+													? `Allocate ${splitRemaining.toFixed(0)}% more`
+													: `Reduce ${Math.abs(splitRemaining).toFixed(0)}%`}
+										</span>
+									</div>
+								</div>
+							</div>
 						</Field.Set>
 						<!-- Joint Buyers -->
 						<Field.Set>

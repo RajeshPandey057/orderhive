@@ -16,6 +16,12 @@ const buyerSchema = z.object({
 	})
 });
 
+const dealOwnerSchema = z.object({
+	userId: z.string().min(1, 'Owner is required'),
+	email: z.email('Owner email is required'),
+	split: z.number().min(0, 'Split must be at least 0').max(100, 'Split cannot exceed 100')
+});
+
 const saleSchema = z.object({
 	// Primary Buyer (marked as primary)
 	firstName: buyerSchema.shape.firstName,
@@ -25,11 +31,29 @@ const saleSchema = z.object({
 	passportFile: buyerSchema.shape.passportFile,
 	nationalIdFile: buyerSchema.shape.nationalIdFile,
 
+	// Deal Owners
+	dealOwners: z
+		.array(dealOwnerSchema)
+		.min(1, 'At least one deal owner is required')
+		.superRefine((owners, ctx) => {
+			const total = owners.reduce((sum, owner) => sum + owner.split, 0);
+
+			if (Math.round(total * 100) / 100 !== 100) {
+				ctx.addIssue({
+					code: 'custom',
+					message: 'Deal owner split must total 100%'
+				});
+			}
+		}),
+
 	// Joint Buyers (unlimited)
 	jointBuyers: z.array(buyerSchema).default([]),
 	// Deal Status
 	dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
-	paymentValue: z.number(),
+	paymentValue: z
+		.number()
+		.min(0, 'Payment value must be at least 0')
+		.max(100, 'Payment value cannot exceed 100'),
 	bookingFormFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
 		message: 'Booking form upload is required'
 	}),

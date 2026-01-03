@@ -11,7 +11,7 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
-	let { user }: { user: { name: string; email: string; avatar: string } } = $props();
+	let { user }: { user: { name: string; email: string; avatar: string | undefined } } = $props();
 	const sidebar = useSidebar();
 </script>
 

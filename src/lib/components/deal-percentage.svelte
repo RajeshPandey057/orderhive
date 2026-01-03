@@ -7,7 +7,7 @@
 		disabled?: boolean;
 	}
 
-	let { value = $bindable(''), onValueChange, disabled = false }: Props = $props();
+	let { value = $bindable(5), onValueChange, disabled = false }: Props = $props();
 
 	const percentages = [5, 10, 20];
 
@@ -18,7 +18,7 @@
 
 	const handleCustomChange = (e: Event) => {
 		const input = e.target as HTMLInputElement;
-		value = input.value ? Number(input.value) : '';
+		value = input.value ? Number(input.value) : 0;
 		onValueChange?.(value);
 	};
 

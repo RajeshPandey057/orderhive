@@ -57,7 +57,7 @@
 			user={{
 				email: firekitUser?.email || '',
 				name: firekitUser?.displayName || 'shadcn',
-				avatar: firekitUser?.photoURL || '/avatars/shadcn.jpg'
+				avatar: firekitUser?.photoURL || undefined
 			}}
 		/>
 	</Sidebar.Footer>
