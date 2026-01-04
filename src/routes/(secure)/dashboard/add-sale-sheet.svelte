@@ -275,7 +275,7 @@
 				</Field.Error>
 			{/each}
 			<div class="flex flex-col gap-8 p-6">
-				<!-- Client Details Section -->
+				<!-- Primary Buyer Section -->
 				<Field.Set>
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
@@ -460,7 +460,6 @@
 				</Field.Set>
 				<Field.Separator />
 
-				<Field.Separator />
 				<!-- Project Details Section -->
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
@@ -563,6 +562,8 @@
 					</Field.Group>
 				</Field.Set>
 				<Field.Separator />
+
+				<!-- Deal Status Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
 						Deal Status
@@ -720,6 +721,8 @@
 					</Field.Group>
 				</Field.Set>
 				<Field.Separator />
+
+				<!-- Refferal Agreement Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
 						Refferal Agreement
@@ -731,10 +734,9 @@
 						</Button>
 					</Field.Group>
 				</Field.Set>
-
 				<Field.Separator />
-				<!-- Invoicing Stage Section -->
 
+				<!-- Invoicing Stage Section -->
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
 
@@ -775,7 +777,9 @@
 					</RadioGroup.Root>
 					<input class="sr-only" {...createSale.fields.invoiceStage.as('text')} />
 				</Field.Set>
+				<Field.Separator />
 
+				<!-- Deal Owners Section -->
 				<Field.Set>
 					<Field.Legend
 						class={[
@@ -934,7 +938,9 @@
 						</div>
 					</div>
 				</Field.Set>
-				<!-- Joint Buyers -->
+				<Field.Separator />
+
+				<!-- Joint Buyers Sections-->
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Joint Buyers</Field.Legend>
 

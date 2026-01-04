@@ -5,6 +5,22 @@ import 'unplugin-icons/types/svelte';
 // for information about these interfaces
 declare global {
 	type Sale = {
+		commnets: {
+			authourName: string;
+			authourUid: string;
+			authorEmail: string;
+			authourPhotoURL: string;
+			section:
+				| 'primary-buyer'
+				| 'project-details'
+				| 'deal-status'
+				| 'refferal-agreement'
+				| 'invoicing-stage'
+				| 'deal-owners'
+				| 'joint-buyers';
+			message: string;
+			createdAt: FieldValue;
+		}[];
 		status: 'pending' | 'approved' | 'rejected';
 		commissionStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
 		invoiceFile: {
