@@ -8,6 +8,7 @@
 		renderSnippet
 	} from '$lib/components/ui/data-table/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
@@ -79,7 +80,7 @@
 					};
 				});
 				return renderSnippet(cellSnippet, {
-					client: `${row.original.primaryBuyer.firstName} ${row.original.primaryBuyer.lastName}`
+					client: `${row.original.clientDetails.firstName} ${row.original.clientDetails.lastName}`
 				});
 			}
 		},
@@ -540,8 +541,36 @@
 					{/each}
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={columns.length} class="h-24 text-center">
-							No results found.
+						<Table.Cell colspan={columns.length} class="py-12">
+							<Empty.Root>
+								<Empty.Header>
+									<Empty.Media variant="icon">
+										<Search class="h-8 w-8" />
+									</Empty.Media>
+									<Empty.Title>No Sales Found</Empty.Title>
+									<Empty.Description>
+										{#if columnFilters.length > 0 || globalFilter}
+											No sales match your current filters. Try adjusting your search criteria.
+										{:else}
+											No sales data available yet. Start by adding your first sale.
+										{/if}
+									</Empty.Description>
+								</Empty.Header>
+								{#if columnFilters.length > 0 || globalFilter}
+									<Empty.Content>
+										<Button
+											variant="outline"
+											size="sm"
+											onclick={() => {
+												table.resetColumnFilters();
+												globalFilter = '';
+											}}
+										>
+											Clear Filters
+										</Button>
+									</Empty.Content>
+								{/if}
+							</Empty.Root>
 						</Table.Cell>
 					</Table.Row>
 				{/if}

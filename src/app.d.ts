@@ -11,7 +11,7 @@ declare global {
 			authorEmail: string;
 			authourPhotoURL: string;
 			section:
-				| 'primary-buyer'
+				| 'client-details'
 				| 'project-details'
 				| 'deal-status'
 				| 'refferal-agreement'
@@ -41,7 +41,7 @@ declare global {
 			name: string | undefined;
 			lastModified: number | undefined;
 		} | null;
-		primaryBuyer: {
+		clientDetails: {
 			firstName: string;
 			lastName: string;
 			email: string;

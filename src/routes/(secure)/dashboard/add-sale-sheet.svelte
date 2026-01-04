@@ -275,7 +275,7 @@
 				</Field.Error>
 			{/each}
 			<div class="flex flex-col gap-8 p-6">
-				<!-- Primary Buyer Section -->
+				<!-- Client Details Section -->
 				<Field.Set>
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>

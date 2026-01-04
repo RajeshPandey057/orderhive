@@ -1,7 +1,11 @@
 <script lang="ts">
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { firekitCollection } from 'svelte-firekit';
+	import AlertCircle from '~icons/lucide/alert-circle';
+	import PlusRound from '~icons/lucide/circle-fading-plus';
+	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
 	import AddSaleSheet from './add-sale-sheet.svelte';
 	import SalesTable from './sales-table.svelte';
 
@@ -24,29 +28,45 @@
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
 	{#if salesCollection.loading}
 		<div class="flex min-h-100 items-center justify-center rounded-xl bg-muted/50">
-			<div class="text-center">
-				<div
-					class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]"
-					role="status"
-				>
-					<span class="sr-only">Loading...</span>
-				</div>
-				<p class="mt-2 text-sm text-muted-foreground">Loading sales data...</p>
-			</div>
+			<Empty.Root>
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Loader class="h-8 w-8 animate-spin" />
+					</Empty.Media>
+					<Empty.Title>Loading Sales Data</Empty.Title>
+					<Empty.Description>Please wait while we fetch your sales information...</Empty.Description
+					>
+				</Empty.Header>
+			</Empty.Root>
 		</div>
 	{:else if salesCollection.error}
 		<div class="flex min-h-100 items-center justify-center rounded-xl bg-muted/50">
-			<div class="text-center text-destructive">
-				<p class="font-medium">Error loading sales</p>
-				<p class="text-sm">{salesCollection.error.message}</p>
-			</div>
+			<Empty.Root>
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<AlertCircle class="h-8 w-8 text-destructive" />
+					</Empty.Media>
+					<Empty.Title>Error Loading Sales</Empty.Title>
+					<Empty.Description>{salesCollection.error.message}</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
 		</div>
 	{:else if salesCollection.empty}
 		<div class="flex min-h-100 items-center justify-center rounded-xl bg-muted/50">
-			<div class="text-center">
-				<p class="font-medium text-muted-foreground">No sales found</p>
-				<p class="text-sm text-muted-foreground">Add your first sale to get started</p>
-			</div>
+			<Empty.Root>
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<PlusRound class="h-8 w-8" />
+					</Empty.Media>
+					<Empty.Title>No Sales Found</Empty.Title>
+					<Empty.Description
+						>Add your first sale to get started with tracking your deals</Empty.Description
+					>
+				</Empty.Header>
+				<Empty.Content>
+					<AddSaleSheet />
+				</Empty.Content>
+			</Empty.Root>
 		</div>
 	{:else}
 		<SalesTable data={salesCollection.data} />
