@@ -5,40 +5,8 @@
 	import AddSaleSheet from './add-sale-sheet.svelte';
 	import SalesTable from './sales-table.svelte';
 
-	// Define the Sale interface matching Firestore structure
-	interface Sale {
-		id: string;
-		primaryBuyer: {
-			firstName: string;
-			lastName: string;
-		};
-		property: string;
-		developer: string;
-		unitValue: string;
-		dealStage: string;
-		paymentValue: number;
-	}
-
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
-
-	// Transform Firestore data to match table format
-	const tableData = $derived(
-		salesCollection.data.map((sale) => ({
-			id: sale.id,
-			client: `${sale.primaryBuyer.firstName} ${sale.primaryBuyer.lastName}`,
-			property: sale.property,
-			location: sale.developer,
-			unitValue: parseInt(sale.unitValue.replace(/,/g, '')) || 0,
-			dealStatus: sale.dealStage === 'eoi' ? 'EOI' : 'Booking',
-			paymentValue: sale.paymentValue,
-			invoicingStage: sale.paymentValue >= 10 ? 'First half' : 'Second half',
-			invoicingPayment: `${10 + 4}% paid`,
-			invoicingStatus:
-				sale.paymentValue === 100 ? 'Approved' : sale.paymentValue > 50 ? 'Review' : 'Next Month',
-			commission: Math.round((parseInt(sale.unitValue.replace(/,/g, '')) || 0) * 0.02)
-		}))
-	);
 </script>
 
 <header
@@ -81,6 +49,6 @@
 			</div>
 		</div>
 	{:else}
-		<SalesTable data={tableData} />
+		<SalesTable data={salesCollection.data} />
 	{/if}
 </div>

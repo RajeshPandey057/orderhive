@@ -65,6 +65,10 @@ const saleSchema = z.object({
 	}),
 
 	// Project Details
+	invoiceStage: z.enum(
+		['eligible-first-half', 'eligible-second-half', 'eligible-full'],
+		'Invoice stage is required'
+	),
 	dealType: z.enum(['off-plan', 'on-plan', 'resell'], 'Deal type is required'),
 	developer: z.string().min(1, 'Developer is required'),
 	property: z.string().min(1, 'Property is required'),
@@ -79,6 +83,7 @@ const toUploadedFile = async (file: File | null | undefined, path: string) => {
 
 	return {
 		...uploaded,
+		status: 'pending',
 		// Keep original file metadata for reference
 		original: {
 			name: file.name,
@@ -126,6 +131,10 @@ export const createSale = form(saleSchema, async (data) => {
 	]);
 
 	const saleRecord = {
+		status: 'pending',
+		commissionStatus: 'pending',
+		invoiceFile: { status: 'pending' },
+		invoiceStage: data.invoiceStage,
 		primaryBuyer: {
 			firstName: data.firstName,
 			lastName: data.lastName,

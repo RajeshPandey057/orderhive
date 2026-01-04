@@ -26,26 +26,17 @@
 		getSortedRowModel
 	} from '@tanstack/table-core';
 	import { createRawSnippet } from 'svelte';
-
-	interface Sale {
-		id: string;
-		client: string;
-		property: string;
-		location: string;
-		unitValue: number;
-		dealStatus: string;
-		paymentValue: number;
-		invoicingStage: string;
-		invoicingPayment: string;
-		invoicingStatus: string;
-		commission: number;
-	}
+	import DealDetailSheet from './deal-detail-sheet.svelte';
 
 	interface Props {
 		data: Sale[];
 	}
 
 	let { data = [] }: Props = $props();
+
+	// State for detail sheet
+	let detailSheetOpen = $state(false);
+	let selectedSale = $state<Sale | null>(null);
 
 	// Define columns
 	const columns: ColumnDef<Sale>[] = [
@@ -87,7 +78,9 @@
 						render: () => `<div class="font-medium">${client}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, { client: row.original.client });
+				return renderSnippet(cellSnippet, {
+					client: `${row.original.primaryBuyer.firstName} ${row.original.primaryBuyer.lastName}`
+				});
 			}
 		},
 		{
@@ -119,7 +112,7 @@
 				);
 				return renderSnippet(cellSnippet, {
 					property: row.original.property,
-					location: row.original.location
+					location: row.original.developer
 				});
 			}
 		},
@@ -149,14 +142,14 @@
 						render: () => `<div class="font-medium">${formatted}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, { value: row.original.unitValue });
+				return renderSnippet(cellSnippet, { value: Number(row.original.unitValue) });
 			}
 		},
 		{
 			accessorKey: 'dealStatus',
 			header: 'Deal Status',
 			cell: ({ row }) => {
-				const status = row.original.dealStatus;
+				const status = row.original.dealStage;
 				const payment = row.original.paymentValue;
 
 				const getStatusBadgeColor = (s: string) => {
@@ -189,9 +182,14 @@
 			accessorKey: 'invoicingStage',
 			header: 'Invoicing Stage',
 			cell: ({ row }) => {
-				const stage = row.original.invoicingStage;
-				const payment = row.original.invoicingPayment;
-				const status = row.original.invoicingStatus;
+				const stage = row.original.paymentValue >= 10 ? 'First half' : 'Second half';
+				const payment = `10% + 4% paid`;
+				const status =
+					row.original.paymentValue === 100
+						? 'Approved'
+						: row.original.paymentValue > 50
+							? 'Review'
+							: 'Next Month';
 
 				const getStatusBadgeColor = (s: string) => {
 					const lower = s.toLowerCase();
@@ -247,7 +245,9 @@
 						render: () => `<div class="text-right font-medium">${formatted}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, { value: row.original.commission });
+				return renderSnippet(cellSnippet, {
+					value: Math.round((parseInt(row.original.unitValue.replace(/,/g, '')) || 0) * 0.02)
+				});
 			}
 		}
 	];
@@ -524,7 +524,13 @@
 			<Table.Body>
 				{#if table.getRowModel().rows?.length}
 					{#each table.getRowModel().rows as row (row.id)}
-						<Table.Row class="border-b last:border-b-0 hover:bg-muted/50">
+						<Table.Row
+							class="cursor-pointer border-b last:border-b-0 hover:bg-muted/50"
+							onclick={() => {
+								selectedSale = row.original;
+								detailSheetOpen = true;
+							}}
+						>
 							{#each row.getVisibleCells() as cell (cell.id)}
 								<Table.Cell class="border-r last:border-r-0">
 									<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
@@ -576,3 +582,6 @@
 		{/snippet}
 	</Pagination.Root>
 </div>
+
+<!-- Detail Sheet -->
+<DealDetailSheet bind:open={detailSheetOpen} bind:sale={selectedSale} />

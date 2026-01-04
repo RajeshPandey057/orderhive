@@ -2,7 +2,6 @@
 	import DealPercentage from '$lib/components/deal-percentage.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -31,9 +30,6 @@
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
 	let nextOwnerKey = 0;
-	let eligibleFirstHalf = $state(false);
-	let eligibleSecondHalf = $state(false);
-	let eligibleFull = $state(false);
 
 	type FirestoreUser = {
 		id: string;
@@ -738,11 +734,19 @@
 
 				<Field.Separator />
 				<!-- Invoicing Stage Section -->
+
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
-					<Field.Group class="flex flex-row items-start gap-6">
+
+					<RadioGroup.Root
+						class="flex w-full flex-row justify-around"
+						bind:value={
+							() => createSale.fields.invoiceStage.value() ?? 'eligible-first-half',
+							(v) => createSale.fields.invoiceStage.set(v ?? 'eligible-first-half')
+						}
+					>
 						<Field.Field orientation="horizontal">
-							<Checkbox id="eligible-first-half" bind:checked={eligibleFirstHalf} />
+							<RadioGroup.Item value="eligible-first-half" id="eligible-first-half" />
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-first-half" class="text-sm font-normal">
 									Eligible for first half
@@ -750,9 +754,8 @@
 								<span class="text-sm text-muted-foreground">10 + 4% paid</span>
 							</div>
 						</Field.Field>
-
 						<Field.Field orientation="horizontal">
-							<Checkbox id="eligible-second-half" bind:checked={eligibleSecondHalf} />
+							<RadioGroup.Item value="eligible-second-half" id="eligible-second-half" />
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-second-half" class="text-sm font-normal">
 									Eligible for second half
@@ -760,9 +763,8 @@
 								<span class="text-sm text-muted-foreground">20 + 4% paid</span>
 							</div>
 						</Field.Field>
-						<HorizontalSeparator text="OR" />
 						<Field.Field orientation="horizontal">
-							<Checkbox id="eligible-full" bind:checked={eligibleFull} />
+							<RadioGroup.Item value="eligible-full" id="eligible-full" />
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-full" class="text-sm font-normal">
 									Eligible for full
@@ -770,8 +772,11 @@
 								<span class="text-sm text-muted-foreground">20 + 4% paid</span>
 							</div>
 						</Field.Field>
-					</Field.Group>
-				</Field.Set><Field.Set>
+					</RadioGroup.Root>
+					<input class="sr-only" {...createSale.fields.invoiceStage.as('text')} />
+				</Field.Set>
+
+				<Field.Set>
 					<Field.Legend
 						class={[
 							'flex items-center justify-between text-lg font-medium',
