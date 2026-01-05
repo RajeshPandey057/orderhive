@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DealPercentage from '$lib/components/deal-percentage.svelte';
+	import PhoneInput from '$lib/components/phone-input.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -91,6 +92,12 @@
 		Record<number, { passportFile: File | null; nationalIdFile: File | null }>
 	>({});
 
+	// Track phone countries and values for joint buyers
+	let jointBuyerPhoneCountries = $state<Record<number, string>>({});
+	let jointBuyerPhoneValues = $state<Record<number, string>>({});
+	let clientPhoneCountry = $state<string>('AE');
+	let clientPhoneValue = $state<string>('');
+
 	const handleFileUpload = (fieldName: string, event: Event) => {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
@@ -114,11 +121,15 @@
 		const newKey = nextJointKey++;
 		jointBuyers = [...jointBuyers, { key: newKey }];
 		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null };
+		jointBuyerPhoneCountries[newKey] = 'AE';
+		jointBuyerPhoneValues[newKey] = '';
 	};
 
 	const removeJointBuyer = (key: number) => {
 		jointBuyers = jointBuyers.filter((buyer) => buyer.key !== key);
 		delete jointBuyerFiles[key];
+		delete jointBuyerPhoneCountries[key];
+		delete jointBuyerPhoneValues[key];
 	};
 
 	const handleJointBuyerFileUpload = (
@@ -300,16 +311,14 @@
 									{/each}
 								</Field.Field>
 							</div>
-
-							<div class="flex gap-2">
-								<Input id="countryCode" class="w-32" disabled value="+971" />
-								<Field.Field class="flex-1">
-									<Input {...createSale.fields.phone.as('tel')} placeholder="00000 00000" />
-									{#each createSale.fields.phone.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-							</div>
+							<Field.Field>
+								<PhoneInput
+									bind:value={clientPhoneValue}
+									bind:country={clientPhoneCountry}
+									showCountrySelect={true}
+								/>
+							</Field.Field>
+							<input type="hidden" name="phone" value={clientPhoneValue || ''} />
 						</Field.Group>
 					</Field.Set>
 					<Field.Set>
@@ -972,16 +981,18 @@
 									</Field.Field>
 								</div>
 
-								<div class="flex gap-2">
-									<Input class="w-32" disabled value="+971" />
-									<Field.Field class="flex-1">
-										<Input
-											name={`jointBuyers[${index}].phone`}
-											placeholder="00000 00000"
-											type="tel"
-										/>
-									</Field.Field>
-								</div>
+								<Field.Field>
+									<PhoneInput
+										bind:value={jointBuyerPhoneValues[buyer.key]}
+										bind:country={jointBuyerPhoneCountries[buyer.key]}
+										showCountrySelect={true}
+									></PhoneInput>
+								</Field.Field>
+								<input
+									type="hidden"
+									name={`jointBuyers[${index}].phone`}
+									value={jointBuyerPhoneValues[buyer.key] || ''}
+								/>
 							</Field.Group>
 
 							<Field.Set>
