@@ -10,6 +10,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
+	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
 	import { firekitCollection, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
@@ -131,6 +132,16 @@
 		delete jointBuyerPhoneCountries[key];
 		delete jointBuyerPhoneValues[key];
 	};
+
+	function getE164number(phoneValue: string, phoneCountry: string): string {
+		if (!phoneValue.trim()) return '';
+		try {
+			const parsed = parsePhoneNumberWithError(phoneValue, phoneCountry as CountryCode);
+			return parsed?.format('E.164') || '';
+		} catch {
+			return '';
+		}
+	}
 
 	const handleJointBuyerFileUpload = (
 		buyerKey: number,
@@ -318,7 +329,11 @@
 									showCountrySelect={true}
 								/>
 							</Field.Field>
-							<input type="hidden" name="phone" value={clientPhoneValue || ''} />
+							<input
+								type="hidden"
+								name="phone"
+								value={getE164number(clientPhoneValue, clientPhoneCountry) || ''}
+							/>
 						</Field.Group>
 					</Field.Set>
 					<Field.Set>
@@ -991,7 +1006,10 @@
 								<input
 									type="hidden"
 									name={`jointBuyers[${index}].phone`}
-									value={jointBuyerPhoneValues[buyer.key] || ''}
+									value={getE164number(
+										jointBuyerPhoneValues[buyer.key] || '',
+										jointBuyerPhoneCountries[buyer.key] || ''
+									)}
 								/>
 							</Field.Group>
 
