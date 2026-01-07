@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
@@ -34,7 +35,102 @@
 		if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'kb';
 		return (bytes / (1024 * 1024)).toFixed(1) + 'mb';
 	};
+
+	const getInitials = (name: string): string => {
+		return name
+			.split(' ')
+			.map((n) => n[0])
+			.join('')
+			.toUpperCase()
+			.slice(0, 2);
+	};
+
+	const formatCommentDate = (timestamp: unknown): string => {
+		if (!timestamp) return '';
+		const date =
+			typeof timestamp === 'object' &&
+			timestamp !== null &&
+			'toDate' in timestamp &&
+			typeof timestamp.toDate === 'function'
+				? timestamp.toDate()
+				: new Date(timestamp as string | number);
+		const options: Intl.DateTimeFormatOptions = {
+			day: 'numeric',
+			month: 'short',
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true
+		};
+		return date.toLocaleDateString('en-US', options).replace(',', ' -');
+	};
+
+	const filterCommentsBySection = (
+		section:
+			| 'client-details'
+			| 'project-details'
+			| 'deal-status'
+			| 'refferal-agreement'
+			| 'invoicing-stage'
+			| 'deal-owners'
+			| 'joint-buyers'
+	) => {
+		return sale?.commnets?.filter((comment) => comment.section === section) ?? [];
+	};
 </script>
+
+{#snippet sectionComments(section: string)}
+	{@const comments = filterCommentsBySection(
+		section as
+			| 'client-details'
+			| 'project-details'
+			| 'deal-status'
+			| 'refferal-agreement'
+			| 'invoicing-stage'
+			| 'deal-owners'
+			| 'joint-buyers'
+	)}
+
+	{#if comments.length > 0}
+		<div class="mt-4 space-y-4">
+			<h4 class="text-sm font-semibold underline decoration-muted-foreground/30 underline-offset-8">
+				Comment
+			</h4>
+			<div class="mt-6 space-y-6">
+				{#each comments as comment (comment.createdAt)}
+					<div class="flex items-start gap-4">
+						<Avatar.Root class="size-9 bg-blue-600">
+							{#if comment.authourPhotoURL}
+								<Avatar.Image src={comment.authourPhotoURL} alt={comment.authourName} />
+							{/if}
+							<Avatar.Fallback class="bg-blue-600 text-xs text-white">
+								{getInitials(comment.authourName)}
+							</Avatar.Fallback>
+						</Avatar.Root>
+						<div class="flex-1 space-y-1.5">
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-semibold text-foreground">{comment.authourName}</span>
+									<Badge
+										variant="secondary"
+										class="bg-muted px-1.5 py-0 text-[10px] font-normal text-muted-foreground hover:bg-muted"
+									>
+										{comment.team.charAt(0).toUpperCase() + comment.team.slice(1)}
+									</Badge>
+								</div>
+								<span class="text-xs text-muted-foreground">
+									{formatCommentDate(comment.createdAt)}
+								</span>
+							</div>
+							<p class="text-sm leading-relaxed text-muted-foreground">
+								{comment.message}
+							</p>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+{/snippet}
 
 <Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-200 max-w-200 overflow-y-auto sm:w-200 sm:max-w-200">
@@ -97,7 +193,6 @@
 					</Table.Root>
 				</div>
 			</div>
-			<!-- Client KYC docs  -->
 			<div class="space-y-4">
 				<div class="flex items-center gap-4">
 					<div
@@ -247,7 +342,6 @@
 					</div>
 
 					<!-- AML Form -->
-					<!-- AML Form -->
 					<div class="space-y-3">
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-4">
@@ -316,6 +410,12 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- Client Details Comments -->
+			{@render sectionComments('client-details')}
+
+			<Separator class="my-4" />
+
 			<!-- Project Details -->
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
@@ -369,6 +469,11 @@
 				</div>
 			</div>
 
+			<!-- Project Details Comments -->
+			{@render sectionComments('project-details')}
+
+			<Separator class="my-4" />
+
 			<!-- Deal Status -->
 			<div class="space-y-4">
 				<h2 class="text-lg font-medium">Deal Status</h2>
@@ -391,8 +496,6 @@
 					</Table.Root>
 				</div>
 			</div>
-
-			<!-- Deal Documents -->
 			<div class="space-y-6">
 				<!-- Booking Form -->
 				<div class="space-y-3">
@@ -521,7 +624,11 @@
 				</div>
 			</div>
 
+			<!-- Deal Status Comments -->
+			{@render sectionComments('deal-status')}
+
 			<Separator class="my-4" />
+
 			<!-- Referral Agreement -->
 			<div class="space-y-4">
 				<h2 class="text-lg font-medium">Referral Agreement</h2>
@@ -591,7 +698,11 @@
 				</div>
 			</div>
 
+			<!-- Referral Agreement Comments -->
+			{@render sectionComments('refferal-agreement')}
+
 			<Separator class="my-4" />
+
 			<!-- Invoicing Stage -->
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
@@ -646,7 +757,11 @@
 				</div>
 			</div>
 
+			<!-- Invoicing Stage Comments -->
+			{@render sectionComments('invoicing-stage')}
+
 			<Separator class="my-4" />
+
 			<!-- Deal Owners -->
 			<div class="space-y-4">
 				<h2 class="text-lg font-medium">Deal Owners</h2>
@@ -674,6 +789,12 @@
 				</div>
 			</div>
 
+			<!-- Deal Owners Comments -->
+			{@render sectionComments('deal-owners')}
+
+			<Separator class="my-4" />
+
+			<!-- Joint Buyers -->
 			{#if sale?.jointBuyers && sale.jointBuyers.length > 0}
 				<Separator class="my-4" />
 				<!-- Joint Buyers -->
@@ -949,6 +1070,9 @@
 							</div>
 						</div>
 					{/each}
+
+					<!-- Joint Buyers Comments -->
+					{@render sectionComments('joint-buyers')}
 				</div>
 			{/if}
 		</div>

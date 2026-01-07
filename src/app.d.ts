@@ -8,6 +8,7 @@ declare global {
 		commnets: {
 			authourName: string;
 			authourUid: string;
+			team: 'finance' | 'compliance' | 'admin' | 'agent';
 			authorEmail: string;
 			authourPhotoURL: string;
 			section:
