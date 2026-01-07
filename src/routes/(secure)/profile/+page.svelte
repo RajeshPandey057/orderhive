@@ -97,7 +97,9 @@
 			</div>
 			<div class="flex-1">
 				<h2 class="text-2xl font-semibold">{firekitUser.displayName || 'User'}</h2>
-				<p class="text-sm text-muted-foreground">{firekitUser.email}</p>
+				<a href="mailto:{firekitUser.email}" class="text-sm text-muted-foreground hover:underline">
+					{firekitUser.email}
+				</a>
 				{#if !firekitUser.isEmailVerified}
 					<p class="mt-2 text-xs text-yellow-600 dark:text-yellow-500">
 						⚠️ Email not verified. Please check your inbox.
@@ -138,7 +140,13 @@
 				<div
 					class="flex h-10 w-full items-center rounded-lg border border-border/70 bg-background px-3 text-sm"
 				>
-					{firekitUser.email || 'Not set'}
+					{#if firekitUser.email}
+						<a href="mailto:{firekitUser.email}" class="hover:underline">
+							{firekitUser.email}
+						</a>
+					{:else}
+						Not set
+					{/if}
 				</div>
 			</div>
 

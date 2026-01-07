@@ -22,7 +22,8 @@ declare global {
 			createdAt: FieldValue;
 		}[];
 		status: 'pending' | 'approved' | 'rejected';
-		commissionStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
+		financeStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
+		complianceStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
 		invoiceFile: {
 			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
@@ -99,6 +100,23 @@ declare global {
 				lastModified: number;
 			} | null;
 		};
+		refferalAgreementFile: {
+			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			original: {
+				name: string;
+				size: number;
+				type: string;
+				lastModified: number;
+			};
+			path: string;
+			downloadURL: string;
+			token: string;
+			contentType: string;
+			size: number;
+			name: string;
+			lastModified: number;
+		} | null;
 		jointBuyers: {
 			firstName: string;
 			lastName: string;
@@ -159,6 +177,8 @@ declare global {
 		dealOwners: {
 			userId: string;
 			email: string;
+			name: string;
+			photoURL: string;
 			split: number;
 		}[];
 		dealStage: 'eoi' | 'booking';

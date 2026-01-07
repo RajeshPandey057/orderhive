@@ -3,6 +3,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Badge } from '@/components/ui/badge';
+	import { Separator } from '@/components/ui/separator';
 	import ChevronDown from '~icons/lucide/chevron-down';
 	import Upload from '~icons/lucide/cloud-upload';
 	import FileText from '~icons/lucide/file-text';
@@ -21,8 +22,9 @@
 	const getBadgeVariant = (status: string) => {
 		const lower = status.toLowerCase();
 		if (lower === 'in review' || lower === 'info' || lower === 'pending') return 'secondary';
-		if (lower === 'verified' || lower === 'success') return 'success';
+		if (lower === 'verified' || lower === 'success' || lower === 'approved') return 'success';
 		if (lower === 'rejected' || lower === 'error') return 'destructive';
+		if (lower === 'not-eligible') return 'outline';
 		return 'secondary';
 	};
 
@@ -49,7 +51,7 @@
 		<div class="space-y-6 p-6">
 			<!-- Client Details -->
 			<div class="space-y-4">
-				<h2 class="text-2xl font-semibold">Client Details</h2>
+				<h2 class="text-lg font-medium">Client Details</h2>
 				<div class="rounded-lg border">
 					<Table.Root>
 						<Table.Body>
@@ -65,9 +67,31 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">Phone</Table.Cell>
-								<Table.Cell class="font-medium">{sale?.clientDetails.phone ?? '-'}</Table.Cell>
+								<Table.Cell class="font-medium">
+									{#if sale?.clientDetails.phone}
+										<a
+											href="tel:{sale.clientDetails.phone}"
+											class="text-orange-500 hover:underline"
+										>
+											{sale.clientDetails.phone}
+										</a>
+									{:else}
+										-
+									{/if}
+								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">Email</Table.Cell>
-								<Table.Cell class="font-medium">{sale?.clientDetails.email ?? '-'}</Table.Cell>
+								<Table.Cell class="font-medium">
+									{#if sale?.clientDetails.email}
+										<a
+											href="mailto:{sale.clientDetails.email}"
+											class="text-orange-500 hover:underline"
+										>
+											{sale.clientDetails.email}
+										</a>
+									{:else}
+										-
+									{/if}
+								</Table.Cell>
 							</Table.Row>
 						</Table.Body>
 					</Table.Root>
@@ -81,7 +105,7 @@
 					>
 						<Upload class="h-4 w-4 text-orange-500" stroke-width="4" />
 					</div>
-					<h2 class="text-2xl font-semibold">Client KYC Document</h2>
+					<h2 class="text-sm font-medium">Client KYC Document</h2>
 				</div>
 
 				<div class="space-y-6">
@@ -94,7 +118,7 @@
 								>
 									1
 								</span>
-								<h3 class="text-lg font-medium">Passport</h3>
+								<h3 class="text-sm font-medium">Passport</h3>
 							</div>
 							<div class="flex items-center gap-4">
 								<div class="flex items-center gap-2">
@@ -162,7 +186,7 @@
 								>
 									2
 								</span>
-								<h3 class="text-lg font-medium">Government ID</h3>
+								<h3 class="text-sm font-medium">Government ID</h3>
 							</div>
 							<div class="flex items-center gap-4">
 								<div class="flex items-center gap-2">
@@ -232,7 +256,7 @@
 								>
 									3
 								</span>
-								<h3 class="text-lg font-medium">AML Form</h3>
+								<h3 class="text-sm font-medium">AML Form</h3>
 							</div>
 							<div class="flex items-center gap-4">
 								<div class="flex items-center gap-2">
@@ -295,17 +319,7 @@
 			<!-- Project Details -->
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
-					<h2 class="text-2xl font-semibold">Project Details</h2>
-					<div class="flex items-center gap-4">
-						<div class="flex items-center gap-2">
-							<span class="text-sm text-muted-foreground">Compliance:</span>
-							<Badge variant="secondary">In Review</Badge>
-						</div>
-						<div class="flex items-center gap-2">
-							<span class="text-sm text-muted-foreground">Finance:</span>
-							<Badge variant="default">Verified</Badge>
-						</div>
-					</div>
+					<h2 class="text-lg font-medium">Project Details</h2>
 				</div>
 				<div class="rounded-lg border">
 					<Table.Root>
@@ -357,7 +371,7 @@
 
 			<!-- Deal Status -->
 			<div class="space-y-4">
-				<h2 class="text-2xl font-semibold">Deal Status</h2>
+				<h2 class="text-lg font-medium">Deal Status</h2>
 				<div class="rounded-lg border">
 					<Table.Root>
 						<Table.Body>
@@ -377,6 +391,566 @@
 					</Table.Root>
 				</div>
 			</div>
+
+			<!-- Deal Documents -->
+			<div class="space-y-6">
+				<!-- Booking Form -->
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-4">
+							<span
+								class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+							>
+								1
+							</span>
+							<h3 class="text-sm font-medium">Booking Form</h3>
+						</div>
+						<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Compliance:</span>
+								<Badge
+									variant={getBadgeVariant(sale?.bookingFormFile?.complianceStatus ?? 'pending')}
+								>
+									{sale?.bookingFormFile?.complianceStatus === 'pending'
+										? 'In Review'
+										: (sale?.bookingFormFile?.complianceStatus ?? 'In Review')}
+								</Badge>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Finance:</span>
+								<Badge variant={getBadgeVariant(sale?.bookingFormFile?.financeStatus ?? 'pending')}>
+									{sale?.bookingFormFile?.financeStatus === 'pending'
+										? 'In Review'
+										: (sale?.bookingFormFile?.financeStatus ?? 'In Review')}
+								</Badge>
+							</div>
+						</div>
+					</div>
+					{#if sale?.bookingFormFile}
+						<div
+							class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+						>
+							<div class="flex items-center gap-3">
+								<FileText class="h-10 w-10 text-orange-500" />
+								<div class="flex flex-col">
+									<span class="text-sm font-medium">{sale.bookingFormFile.name}</span>
+									<span class="text-xs text-muted-foreground"
+										>{formatFileSize(sale.bookingFormFile.size)}</span
+									>
+								</div>
+							</div>
+							<a
+								href={sale.bookingFormFile.downloadURL}
+								target="_blank"
+								class={buttonVariants({ variant: 'outline', size: 'sm' })}
+							>
+								View
+							</a>
+						</div>
+					{:else}
+						<div
+							class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+						>
+							No booking form uploaded
+						</div>
+					{/if}
+				</div>
+
+				<!-- Payment Receipt -->
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-4">
+							<span
+								class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+							>
+								2
+							</span>
+							<h3 class="text-sm font-medium">Payment Receipt</h3>
+						</div>
+						<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Compliance:</span>
+								<Badge
+									variant={getBadgeVariant(sale?.paymentReceiptFile?.complianceStatus ?? 'pending')}
+								>
+									{sale?.paymentReceiptFile?.complianceStatus === 'pending'
+										? 'In Review'
+										: (sale?.paymentReceiptFile?.complianceStatus ?? 'In Review')}
+								</Badge>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Finance:</span>
+								<Badge
+									variant={getBadgeVariant(sale?.paymentReceiptFile?.financeStatus ?? 'pending')}
+								>
+									{sale?.paymentReceiptFile?.financeStatus === 'pending'
+										? 'In Review'
+										: (sale?.paymentReceiptFile?.financeStatus ?? 'In Review')}
+								</Badge>
+							</div>
+						</div>
+					</div>
+					{#if sale?.paymentReceiptFile}
+						<div
+							class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+						>
+							<div class="flex items-center gap-3">
+								<FileText class="h-10 w-10 text-orange-500" />
+								<div class="flex flex-col">
+									<span class="text-sm font-medium">{sale.paymentReceiptFile.name}</span>
+									<span class="text-xs text-muted-foreground"
+										>{formatFileSize(sale.paymentReceiptFile.size)}</span
+									>
+								</div>
+							</div>
+							<a
+								href={sale.paymentReceiptFile.downloadURL}
+								target="_blank"
+								class={buttonVariants({ variant: 'outline', size: 'sm' })}
+							>
+								View
+							</a>
+						</div>
+					{:else}
+						<div
+							class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+						>
+							No payment receipt uploaded
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<Separator class="my-4" />
+			<!-- Referral Agreement -->
+			<div class="space-y-4">
+				<h2 class="text-lg font-medium">Referral Agreement</h2>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-4">
+							<span
+								class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+							>
+								3
+							</span>
+							<h3 class="text-sm font-medium">Referral Agreement</h3>
+						</div>
+						<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Compliance:</span>
+								<Badge
+									variant={getBadgeVariant(
+										sale?.refferalAgreementFile?.complianceStatus ?? 'pending'
+									)}
+								>
+									{sale?.refferalAgreementFile?.complianceStatus === 'pending'
+										? 'In Review'
+										: (sale?.refferalAgreementFile?.complianceStatus ?? 'In Review')}
+								</Badge>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="text-sm text-muted-foreground">Finance:</span>
+								<Badge
+									variant={getBadgeVariant(sale?.refferalAgreementFile?.financeStatus ?? 'pending')}
+								>
+									{sale?.refferalAgreementFile?.financeStatus === 'pending'
+										? 'In Review'
+										: (sale?.refferalAgreementFile?.financeStatus ?? 'In Review')}
+								</Badge>
+							</div>
+						</div>
+					</div>
+					{#if sale?.refferalAgreementFile}
+						<div
+							class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+						>
+							<div class="flex items-center gap-3">
+								<FileText class="h-10 w-10 text-orange-500" />
+								<div class="flex flex-col">
+									<span class="text-sm font-medium">{sale.refferalAgreementFile.name}</span>
+									<span class="text-xs text-muted-foreground"
+										>{formatFileSize(sale.refferalAgreementFile.size)}</span
+									>
+								</div>
+							</div>
+							<a
+								href={sale.refferalAgreementFile.downloadURL}
+								target="_blank"
+								class={buttonVariants({ variant: 'outline', size: 'sm' })}
+							>
+								View
+							</a>
+						</div>
+					{:else}
+						<div
+							class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+						>
+							No referral agreement uploaded
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<Separator class="my-4" />
+			<!-- Invoicing Stage -->
+			<div class="space-y-4">
+				<div class="flex items-center justify-between">
+					<h2 class="text-lg font-medium">Invoicing Stage</h2>
+					<div class="flex items-center gap-4">
+						<div class="flex items-center gap-2">
+							<span class="text-sm text-muted-foreground">Compliance:</span>
+							<Badge variant={getBadgeVariant(sale?.complianceStatus ?? 'pending')}>
+								{#if sale?.complianceStatus === 'pending'}
+									In Review
+								{:else}
+									<span class="capitalize">
+										{sale?.complianceStatus === 'approved'
+											? 'Verified'
+											: (sale?.complianceStatus?.replace('-', ' ') ?? 'In Review')}
+									</span>
+								{/if}
+							</Badge>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-sm text-muted-foreground">Finance:</span>
+							<Badge variant={getBadgeVariant(sale?.financeStatus ?? 'pending')}>
+								{#if sale?.financeStatus === 'pending'}
+									In Review
+								{:else}
+									<span class="capitalize">
+										{sale?.financeStatus === 'approved'
+											? 'Verified'
+											: (sale?.financeStatus?.replace('-', ' ') ?? 'In Review')}
+									</span>
+								{/if}
+							</Badge>
+						</div>
+					</div>
+				</div>
+				<div class="rounded-lg border">
+					<Table.Root>
+						<Table.Body>
+							<Table.Row>
+								<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+									Stage
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									<div class="flex flex-col">
+										<span>First half</span>
+										<span class="text-xs font-normal text-muted-foreground">10 + 4% paid</span>
+									</div>
+								</Table.Cell>
+							</Table.Row>
+						</Table.Body>
+					</Table.Root>
+				</div>
+			</div>
+
+			<Separator class="my-4" />
+			<!-- Deal Owners -->
+			<div class="space-y-4">
+				<h2 class="text-lg font-medium">Deal Owners</h2>
+				<div class="rounded-lg border">
+					<Table.Root>
+						<Table.Body>
+							{#each sale?.dealOwners ?? [] as owner, i (owner.userId)}
+								<Table.Row>
+									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+										Agent {i + 1}
+									</Table.Cell>
+									<Table.Cell class="font-medium">
+										<a href="mailto:{owner.email}" class="text-orange-500 hover:underline">
+											{owner.email}
+										</a>
+									</Table.Cell>
+									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+										% Split
+									</Table.Cell>
+									<Table.Cell class="font-medium">{owner.split}%</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</div>
+			</div>
+
+			{#if sale?.jointBuyers && sale.jointBuyers.length > 0}
+				<Separator class="my-4" />
+				<!-- Joint Buyers -->
+				<div class="space-y-6">
+					<h2 class="text-lg font-medium">Joint Buyers</h2>
+					{#each sale.jointBuyers as buyer, i (i)}
+						<div class="space-y-8 rounded-xl border bg-muted/5 p-6">
+							<div class="flex items-center justify-between border-b pb-4">
+								<h3 class="text-md font-medium text-orange-500">Joint Buyer #{i + 1}</h3>
+							</div>
+
+							<!-- Buyer Details (Copy of Client Details UI) -->
+							<div class="space-y-4">
+								<h2 class="text-lg font-medium">Details</h2>
+								<div class="rounded-lg border bg-background">
+									<Table.Root>
+										<Table.Body>
+											<Table.Row>
+												<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+													First Name
+												</Table.Cell>
+												<Table.Cell class="font-medium">{buyer.firstName ?? '-'}</Table.Cell>
+												<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+													Last Name
+												</Table.Cell>
+												<Table.Cell class="font-medium">{buyer.lastName ?? '-'}</Table.Cell>
+											</Table.Row>
+											<Table.Row>
+												<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+													Phone
+												</Table.Cell>
+												<Table.Cell class="font-medium">
+													{#if buyer.phone}
+														<a href="tel:{buyer.phone}" class="text-orange-500 hover:underline">
+															{buyer.phone}
+														</a>
+													{:else}
+														-
+													{/if}
+												</Table.Cell>
+												<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+													Email
+												</Table.Cell>
+												<Table.Cell class="font-medium">
+													{#if buyer.email}
+														<a href="mailto:{buyer.email}" class="text-orange-500 hover:underline">
+															{buyer.email}
+														</a>
+													{:else}
+														-
+													{/if}
+												</Table.Cell>
+											</Table.Row>
+										</Table.Body>
+									</Table.Root>
+								</div>
+							</div>
+
+							<!-- Buyer KYC (Copy of Client KYC UI) -->
+							<div class="space-y-4">
+								<div class="flex items-center gap-4">
+									<div
+										class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+									>
+										<Upload class="h-4 w-4 text-orange-500" stroke-width="4" />
+									</div>
+									<h2 class="text-sm font-medium">KYC Documents</h2>
+								</div>
+
+								<div class="space-y-6">
+									<!-- Passport -->
+									<div class="space-y-3">
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													1
+												</span>
+												<h3 class="text-sm font-medium">Passport</h3>
+											</div>
+											<div class="flex items-center gap-4">
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Compliance:</span>
+													<Badge
+														variant={getBadgeVariant(
+															buyer.passportFile?.complianceStatus ?? 'pending'
+														)}
+													>
+														{buyer.passportFile?.complianceStatus === 'pending'
+															? 'In Review'
+															: (buyer.passportFile?.complianceStatus ?? 'In Review')}
+													</Badge>
+												</div>
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Finance:</span>
+													<Badge
+														variant={getBadgeVariant(
+															buyer.passportFile?.financeStatus ?? 'pending'
+														)}
+													>
+														{buyer.passportFile?.financeStatus === 'pending'
+															? 'In Review'
+															: (buyer.passportFile?.financeStatus ?? 'In Review')}
+													</Badge>
+												</div>
+											</div>
+										</div>
+										{#if buyer.passportFile}
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium">{buyer.passportFile.name}</span>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(buyer.passportFile.size)}</span
+														>
+													</div>
+												</div>
+												<a
+													href={buyer.passportFile.downloadURL}
+													target="_blank"
+													class={buttonVariants({ variant: 'outline', size: 'sm' })}
+												>
+													View
+												</a>
+											</div>
+										{:else}
+											<div
+												class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+											>
+												No passport uploaded
+											</div>
+										{/if}
+									</div>
+
+									<!-- Government ID -->
+									<div class="space-y-3">
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													2
+												</span>
+												<h3 class="text-sm font-medium">Government ID</h3>
+											</div>
+											<div class="flex items-center gap-4">
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Compliance:</span>
+													<Badge
+														variant={getBadgeVariant(
+															buyer.nationalIdFile?.complianceStatus ?? 'pending'
+														)}
+													>
+														{buyer.nationalIdFile?.complianceStatus === 'pending'
+															? 'In Review'
+															: (buyer.nationalIdFile?.complianceStatus ?? 'In Review')}
+													</Badge>
+												</div>
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Finance:</span>
+													<Badge
+														variant={getBadgeVariant(
+															buyer.nationalIdFile?.financeStatus ?? 'pending'
+														)}
+													>
+														{buyer.nationalIdFile?.financeStatus === 'pending'
+															? 'In Review'
+															: (buyer.nationalIdFile?.financeStatus ?? 'In Review')}
+													</Badge>
+												</div>
+											</div>
+										</div>
+										{#if buyer.nationalIdFile}
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium">{buyer.nationalIdFile.name}</span>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(buyer.nationalIdFile.size)}</span
+														>
+													</div>
+												</div>
+												<a
+													href={buyer.nationalIdFile.downloadURL}
+													target="_blank"
+													class={buttonVariants({ variant: 'outline', size: 'sm' })}
+												>
+													View
+												</a>
+											</div>
+										{:else}
+											<div
+												class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+											>
+												No national ID uploaded
+											</div>
+										{/if}
+									</div>
+
+									<!-- AML Form -->
+									<div class="space-y-3">
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-4">
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>
+													3
+												</span>
+												<h3 class="text-sm font-medium">AML Form</h3>
+											</div>
+											<div class="flex items-center gap-4">
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Compliance:</span>
+													<Badge
+														variant={getBadgeVariant(
+															buyer.amlFormFile?.complianceStatus ?? 'pending'
+														)}
+													>
+														{buyer.amlFormFile?.complianceStatus === 'pending'
+															? 'In Review'
+															: (buyer.amlFormFile?.complianceStatus ?? 'In Review')}
+													</Badge>
+												</div>
+												<div class="flex items-center gap-2">
+													<span class="text-sm text-muted-foreground">Finance:</span>
+													<Badge
+														variant={getBadgeVariant(buyer.amlFormFile?.financeStatus ?? 'pending')}
+													>
+														{buyer.amlFormFile?.financeStatus === 'pending'
+															? 'In Review'
+															: (buyer.amlFormFile?.financeStatus ?? 'In Review')}
+													</Badge>
+												</div>
+											</div>
+										</div>
+										{#if buyer.amlFormFile}
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium">{buyer.amlFormFile.name}</span>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(buyer.amlFormFile.size)}</span
+														>
+													</div>
+												</div>
+												<a
+													href={buyer.amlFormFile.downloadURL}
+													target="_blank"
+													class={buttonVariants({ variant: 'outline', size: 'sm' })}
+												>
+													View
+												</a>
+											</div>
+										{:else}
+											<div
+												class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+											>
+												No AML form uploaded
+											</div>
+										{/if}
+									</div>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</Sheet.Content>
 </Sheet.Root>

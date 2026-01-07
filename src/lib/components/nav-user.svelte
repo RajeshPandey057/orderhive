@@ -21,7 +21,9 @@
 			</Avatar.Root>
 			<div class="grid flex-1 text-start text-sm leading-tight">
 				<span class="truncate font-medium">{user.name}</span>
-				<span class="truncate text-xs">{user.email}</span>
+				<a href="mailto:{user.email}" class="truncate text-xs hover:underline">
+					{user.email}
+				</a>
 			</div>
 			<ChevronsUpDownIcon class="ms-auto size-4" />
 		</Sidebar.MenuButton>

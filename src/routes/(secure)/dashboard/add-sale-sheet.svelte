@@ -67,6 +67,8 @@
 			dealOwners.map((owner) => ({
 				userId: owner.userId,
 				email: owner.email,
+				name: owner.name,
+				photoURL: owner.photoURL || '',
 				split: Number(owner.split) || 0
 			}))
 		);
