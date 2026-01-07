@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { useRole } from '$lib/auth/roles.svelte';
+	import { getRoleContext } from '@/auth/role.svelte';
 
-	const roleContext = useRole();
+	const roleManager = getRoleContext();
 </script>
+
+getRoleContext
 
 <div class="flex flex-col gap-4 p-6">
 	<h1 class="text-3xl font-bold">Invoices</h1>
 	<p class="text-muted-foreground">
-		Current Role: <span class="font-semibold text-foreground">{roleContext().role?.accessType}</span
+		Current Role: <span class="font-semibold text-foreground">{roleManager.role}</span>
 		>
 	</p>
 	<p class="text-muted-foreground">
