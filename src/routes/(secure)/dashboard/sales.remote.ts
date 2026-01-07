@@ -83,7 +83,8 @@ const toUploadedFile = async (file: File | null | undefined, path: string) => {
 
 	return {
 		...uploaded,
-		status: 'pending',
+		financeStatus: 'pending',
+		complianceStatus: 'pending',
 		// Keep original file metadata for reference
 		original: {
 			name: file.name,

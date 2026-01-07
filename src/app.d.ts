@@ -24,7 +24,8 @@ declare global {
 		status: 'pending' | 'approved' | 'rejected';
 		commissionStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
 		invoiceFile: {
-			status: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 			original:
 				| {
 						name: string;
@@ -47,7 +48,25 @@ declare global {
 			email: string;
 			phone: string;
 			passportFile: {
-				status: 'pending' | 'verified' | 'rejected';
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				original: {
+					name: string;
+					size: number;
+					type: string;
+					lastModified: number;
+				};
+				path: string;
+				downloadURL: string;
+				token: string;
+				contentType: string;
+				size: number;
+				name: string;
+				lastModified: number;
+			} | null;
+			amlFormFile: {
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 				original: {
 					name: string;
 					size: number;
@@ -63,7 +82,8 @@ declare global {
 				lastModified: number;
 			} | null;
 			nationalIdFile: {
-				status: 'pending' | 'verified' | 'rejected';
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 				original: {
 					name: string;
 					size: number;
@@ -84,8 +104,26 @@ declare global {
 			lastName: string;
 			email: string;
 			phone: string;
+			amlFormFile: {
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				original: {
+					name: string;
+					size: number;
+					type: string;
+					lastModified: number;
+				};
+				path: string;
+				downloadURL: string;
+				token: string;
+				contentType: string;
+				size: number;
+				name: string;
+				lastModified: number;
+			} | null;
 			passportFile: {
-				status: 'pending' | 'verified' | 'rejected';
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 				original: {
 					name: string;
 					size: number;
@@ -101,7 +139,8 @@ declare global {
 				lastModified: number;
 			} | null;
 			nationalIdFile: {
-				status: 'pending' | 'verified' | 'rejected';
+				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 				original: {
 					name: string;
 					size: number;
@@ -125,7 +164,8 @@ declare global {
 		dealStage: 'eoi' | 'booking';
 		paymentValue: number;
 		bookingFormFile: {
-			status: 'pending' | 'verified' | 'rejected';
+			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 			original: {
 				name: string;
 				size: number;
@@ -141,7 +181,8 @@ declare global {
 			lastModified: number;
 		} | null;
 		paymentReceiptFile: {
-			status: 'pending' | 'verified' | 'rejected';
+			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 			original: {
 				name: string;
 				size: number;
@@ -156,6 +197,7 @@ declare global {
 			name: string;
 			lastModified: number;
 		} | null;
+
 		dealType: 'off-plan' | 'on-plan' | 'resell';
 		developer: string;
 		property: string;
