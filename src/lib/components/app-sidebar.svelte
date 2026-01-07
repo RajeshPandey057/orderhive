@@ -13,12 +13,12 @@
 			},
 			{
 				title: 'Sales Tracker',
-				url: '/sales-tracker',
+				url: '/agent/sales-tracker',
 				icon: LucideBookMarked
 			},
 			{
 				title: 'Notifications',
-				url: '/notifications',
+				url: '/agent/notifications',
 				icon: LucideBell
 			}
 		]
