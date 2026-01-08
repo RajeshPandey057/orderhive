@@ -441,45 +441,6 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="h-9 gap-1">
-							Invoicing Status
-							{#if table.getColumn('invoicingStatus')?.getFilterValue()}
-								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-									1
-								</span>
-							{/if}
-							<ChevronDown class="h-4 w-4 opacity-50" />
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start">
-					<DropdownMenu.Item
-						onclick={() => table.getColumn('invoicingStatus')?.setFilterValue(undefined)}
-					>
-						All
-					</DropdownMenu.Item>
-					<DropdownMenu.Separator />
-					<DropdownMenu.Item
-						onclick={() => table.getColumn('invoicingStatus')?.setFilterValue('Approved')}
-					>
-						Approved
-					</DropdownMenu.Item>
-					<DropdownMenu.Item
-						onclick={() => table.getColumn('invoicingStatus')?.setFilterValue('Review')}
-					>
-						Review
-					</DropdownMenu.Item>
-					<DropdownMenu.Item
-						onclick={() => table.getColumn('invoicingStatus')?.setFilterValue('Next Month')}
-					>
-						Next Month
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-
 			{#if columnFilters.length > 0 || globalFilter}
 				<Button
 					variant="ghost"

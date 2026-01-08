@@ -133,6 +133,8 @@ export const createSale = form(saleSchema, async (data) => {
 
 	const saleRecord = {
 		status: 'pending',
+		financeStatus: 'pending',
+		complianceStatus: 'pending',
 		commissionStatus: 'pending',
 		invoiceFile: { status: 'pending' },
 		invoiceStage: data.invoiceStage,

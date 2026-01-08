@@ -4,16 +4,13 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
 	import SalesTable from '@/components/sales-table.svelte';
-	import { where } from 'firebase/firestore';
 	import { firekitCollection } from 'svelte-firekit';
 	import AlertCircle from '~icons/lucide/alert-circle';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
 
 	// Fetch sales data from Firestore
-	const salesCollection = firekitCollection<Sale>('sales', [
-		where('complianceStatus', '==', 'approved')
-	]);
+	const salesCollection = firekitCollection<Sale>('sales');
 </script>
 
 <header
@@ -72,6 +69,8 @@
 			</Empty.Root>
 		</div>
 	{:else}
-		<SalesTable data={salesCollection.data} />
+		<SalesTable
+			data={salesCollection.data.filter((sale) => sale.complianceStatus === 'approved')}
+		/>
 	{/if}
 </div>
