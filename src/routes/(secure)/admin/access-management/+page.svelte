@@ -1,18 +1,21 @@
 <script lang="ts">
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Briefcase from '~icons/lucide/briefcase';
 	import Hammer from '~icons/lucide/hammer';
 	import Search from '~icons/lucide/search';
+	import Trash2 from '~icons/lucide/trash-2';
 	import Trophy from '~icons/lucide/trophy';
 	import UserPlus from '~icons/lucide/user-plus';
-	import { inviteUser } from './access.remote';
+	import { deleteUser, inviteUser, updateUser } from './access.remote';
 	// Fetch roles collection from Firebase
 	const rolesCollection = firekitCollection<Role>('roles');
 
@@ -22,6 +25,11 @@
 
 	// Dialog state
 	let dialogOpen = $state(false);
+
+	// Edit Sheet state
+	let editSheetOpen = $state(false);
+	let selectedRole = $state<Role | null>(null);
+	let editAccessType = $state<string | undefined>(undefined);
 
 	// Form state for access type (needed for conditional rendering)
 	let selectedAccessType = $state<string | undefined>('admin');
@@ -75,7 +83,7 @@
 		{ value: 'platinum', label: 'Platinum' }
 	];
 
-	// Derived labels
+	// Derived labels for invite form
 	const accessTypeLabel = $derived(
 		accessTypes.find((t) => t.value === inviteUser.fields.accessType.value())?.label ??
 			'Select access type'
@@ -91,10 +99,71 @@
 			'Select agent level'
 	);
 
-	// Handle edit access
+	// Derived labels for edit form
+	const editAccessTypeLabel = $derived(
+		accessTypes.find((t) => t.value === updateUser.fields.accessType.value())?.label ??
+			'Select access type'
+	);
+
+	const editAgentRoleLabel = $derived(
+		agentRoles.find((r) => r.value === updateUser.fields.agentRole.value())?.label ??
+			'Select agent role'
+	);
+
+	const editAgentLevelLabel = $derived(
+		agentLevels.find((l) => l.value === updateUser.fields.agentLevel.value())?.label ??
+			'Select agent level'
+	);
+
+	// Handle edit access - opens sheet with role data
 	function handleEditAccess(role: Role) {
-		// TODO: Implement edit access dialog
-		console.log('Edit access for:', role.email);
+		selectedRole = role;
+		editAccessType = role.accessType;
+		// Pre-populate the update form fields
+		updateUser.fields.email.set(role.email);
+		updateUser.fields.accessType.set(
+			role.accessType as 'admin' | 'agent' | 'finance' | 'compliance'
+		);
+		if (role.agentRole) updateUser.fields.agentRole.set(role.agentRole);
+		if (role.agentLevel) updateUser.fields.agentLevel.set(role.agentLevel);
+		editSheetOpen = true;
+	}
+
+	// Handle delete user
+	async function handleDeleteUser() {
+		if (!selectedRole) return;
+
+		try {
+			await deleteUser({ email: selectedRole.email });
+			editSheetOpen = false;
+			selectedRole = null;
+			toast.success('User deleted successfully!');
+		} catch {
+			toast.error('Failed to delete user');
+		}
+	}
+
+	// Handle edit access type change
+	function handleEditAccessTypeChange(value: string | undefined) {
+		editAccessType = value;
+		updateUser.fields.accessType.set(value as 'admin' | 'agent' | 'finance' | 'compliance');
+		// Clear agent fields if not agent
+		if (value !== 'agent') {
+			updateUser.fields.agentRole.set('');
+			updateUser.fields.agentLevel.set('');
+		}
+	}
+
+	// Get user initials for avatar
+	function getInitials(role: Role): string {
+		if (role.firstName && role.lastName) {
+			return `${role.firstName.charAt(0)}${role.lastName.charAt(0)}`.toUpperCase();
+		}
+		if (role.firstName) return role.firstName.charAt(0).toUpperCase();
+		if (role.lastName) return role.lastName.charAt(0).toUpperCase();
+		// Use first two chars before @ from email
+		const emailPrefix = role.email.split('@')[0];
+		return emailPrefix.substring(0, 2).toUpperCase();
 	}
 
 	// Get display name
@@ -435,3 +504,147 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- Edit Access Sheet -->
+<Sheet.Root bind:open={editSheetOpen}>
+	<Sheet.Content side="right" class="px-6 sm:max-w-md">
+		<Sheet.Header>
+			<Sheet.Title class="text-start text-2xl font-semibold">Edit Access</Sheet.Title>
+		</Sheet.Header>
+
+		{#if selectedRole}
+			<div class="flex flex-col gap-6 py-6">
+				<!-- User Info with Avatar -->
+				<div class="flex items-center gap-4">
+					<Avatar.Root class="h-12 w-12 border-2 border-blue-200">
+						<Avatar.Fallback class="bg-blue-100 font-semibold text-blue-700">
+							{getInitials(selectedRole)}
+						</Avatar.Fallback>
+					</Avatar.Root>
+					<div class="flex flex-col">
+						<span class="text-lg font-semibold">{getDisplayName(selectedRole)}</span>
+						<span class="text-sm text-muted-foreground">{selectedRole.email}</span>
+					</div>
+				</div>
+
+				<!-- Update Form -->
+				<form
+					{...updateUser.enhance(async ({ form, submit }) => {
+						try {
+							await submit();
+
+							const issues = updateUser.fields.allIssues();
+							if (!issues?.length) {
+								form.reset();
+								editSheetOpen = false;
+								selectedRole = null;
+								editAccessType = undefined;
+								toast.success('Access updated successfully!');
+							}
+						} catch {
+							toast.error('Failed to update access');
+						}
+					})}
+				>
+					<div class="flex flex-col gap-6">
+						<!-- Hidden email field -->
+						<input type="hidden" {...updateUser.fields.email.as('text')} />
+
+						<!-- Role Type Field -->
+						<Field.Field>
+							<Field.Label for="editAccessType">Role Type</Field.Label>
+							<div class="flex items-center gap-2">
+								<Select.Root
+									type="single"
+									value={updateUser.fields.accessType.value()}
+									onValueChange={handleEditAccessTypeChange}
+								>
+									<Select.Trigger id="editAccessType" class="flex-1">
+										<Hammer />
+										{editAccessTypeLabel}
+									</Select.Trigger>
+									<Select.Content>
+										{#each accessTypes as type (type.value)}
+											<Select.Item class="self-start" value={type.value}>{type.label}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+
+								<!-- Delete Button -->
+								<Button
+									type="button"
+									variant="destructive"
+									class="gap-2"
+									onclick={handleDeleteUser}
+								>
+									<Trash2 class="h-4 w-4" />
+									Delete User
+								</Button>
+							</div>
+							<input type="hidden" {...updateUser.fields.accessType.as('text')} />
+							{#each updateUser.fields.accessType.issues() as issue, i (i)}
+								<Field.Error>{issue.message}</Field.Error>
+							{/each}
+						</Field.Field>
+
+						<!-- Agent-specific fields (shown only when accessType is 'agent') -->
+						{#if editAccessType === 'agent'}
+							<!-- Agent Role Field -->
+							<Field.Field>
+								<Field.Label for="editAgentRole">Agent Role</Field.Label>
+								<Select.Root
+									type="single"
+									value={updateUser.fields.agentRole.value()}
+									onValueChange={(v) => updateUser.fields.agentRole.set(v)}
+								>
+									<Select.Trigger id="editAgentRole">
+										<Briefcase />
+										{editAgentRoleLabel}
+									</Select.Trigger>
+									<Select.Content>
+										{#each agentRoles as role (role.value)}
+											<Select.Item value={role.value}>{role.label}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...updateUser.fields.agentRole.as('text')} />
+								{#each updateUser.fields.agentRole.issues() as issue, i (i)}
+									<Field.Error>{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+
+							<!-- Agent Level Field -->
+							<Field.Field>
+								<Field.Label for="editAgentLevel">Agent Level</Field.Label>
+								<Select.Root
+									type="single"
+									value={updateUser.fields.agentLevel.value()}
+									onValueChange={(v) => updateUser.fields.agentLevel.set(v)}
+								>
+									<Select.Trigger id="editAgentLevel">
+										<Trophy />
+										{editAgentLevelLabel}
+									</Select.Trigger>
+									<Select.Content>
+										{#each agentLevels as level (level.value)}
+											<Select.Item value={level.value}>{level.label}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...updateUser.fields.agentLevel.as('text')} />
+								{#each updateUser.fields.agentLevel.issues() as issue, i (i)}
+									<Field.Error>{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+						{/if}
+
+						<!-- Update Button -->
+						<Button type="submit" class="w-full" disabled={!!updateUser.pending}>
+							{updateUser.pending ? 'Updating...' : 'Update Access'}
+						</Button>
+					</div>
+				</form>
+			</div>
+		{/if}
+	</Sheet.Content>
+</Sheet.Root>

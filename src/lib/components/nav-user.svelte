@@ -2,10 +2,12 @@
 	import { goto } from '$app/navigation';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { getRoleContext } from '@/auth/role.svelte';
 	import { getInitials } from '@/utils';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 
 	let { user }: { user: { name: string; email: string; avatar: string | undefined } } = $props();
+	const roleManager = getRoleContext();
 </script>
 
 <Sidebar.Menu>
@@ -22,7 +24,9 @@
 			<div class="grid flex-1 text-start text-sm leading-tight">
 				<span class="truncate font-medium">{user.name}</span>
 				<a href="mailto:{user.email}" class="truncate text-xs hover:underline">
-					{user.email}
+					{roleManager?.role
+						? roleManager.role.charAt(0).toUpperCase() + roleManager.role.slice(1)
+						: user.email}
 				</a>
 			</div>
 			<ChevronsUpDownIcon class="ms-auto size-4" />
