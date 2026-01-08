@@ -4,6 +4,21 @@ import 'unplugin-icons/types/svelte';
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
+	type Role = {
+		uid?: string;
+		email: string;
+		team?: string[];
+		lastName?: string;
+		photoURL?: string;
+		firstName?: string;
+		agentRole?: string;
+		agentLevel?: string;
+		createdAt?: FieldValue;
+		updatedAt?: FieldValue;
+		seniorManagerEmail?: string;
+		reportingManagerEmail?: string;
+		accessType: 'admin' | 'agent' | 'finance' | 'compliance' | 'super-admin';
+	};
 	type Sale = {
 		commnets: {
 			authourName: string;
