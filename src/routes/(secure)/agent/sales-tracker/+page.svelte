@@ -9,6 +9,7 @@
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
 
+	let { data } = $props();
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
 </script>
@@ -69,6 +70,6 @@
 			</Empty.Root>
 		</div>
 	{:else}
-		<SalesTable data={salesCollection.data} />
+		<SalesTable data={salesCollection.data} role={data?.user?.role} />
 	{/if}
 </div>

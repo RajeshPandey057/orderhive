@@ -19,6 +19,7 @@ declare global {
 		accessType: 'admin' | 'agent' | 'finance' | 'compliance' | 'super-admin';
 	};
 	type Sale = {
+		id: string;
 		commnets: {
 			authourName: string;
 			authourUid: string;

@@ -27,13 +27,14 @@
 		getSortedRowModel
 	} from '@tanstack/table-core';
 	import { createRawSnippet } from 'svelte';
-	import DealDetailSheet from '../../routes/(secure)/agent/sales-tracker/deal-detail-sheet.svelte';
+	import SaleDetailSheet from './sale-detail-sheet.svelte';
 
 	interface Props {
 		data: Sale[];
+		role?: 'agent' | 'finance' | 'admin' | 'compliance' | 'super-admin';
 	}
 
-	let { data = [] }: Props = $props();
+	let { data = [], role }: Props = $props();
 
 	// State for detail sheet
 	let detailSheetOpen = $state(false);
@@ -574,4 +575,4 @@
 </div>
 
 <!-- Detail Sheet -->
-<DealDetailSheet bind:open={detailSheetOpen} bind:sale={selectedSale} />
+<SaleDetailSheet bind:open={detailSheetOpen} bind:sale={selectedSale} {role} />

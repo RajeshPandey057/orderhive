@@ -9,6 +9,7 @@
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
 
+	let { data } = $props();
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
 </script>
@@ -71,6 +72,7 @@
 	{:else}
 		<SalesTable
 			data={salesCollection.data.filter((sale) => sale.complianceStatus === 'approved')}
+			role={data?.user?.role}
 		/>
 	{/if}
 </div>

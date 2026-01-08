@@ -1,10 +1,12 @@
 <script lang="ts">
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import { buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Badge } from '@/components/ui/badge';
 	import { Separator } from '@/components/ui/separator';
+	import { firekitDocMutations } from 'svelte-firekit';
+	import { toast } from 'svelte-sonner';
 	import ChevronDown from '~icons/lucide/chevron-down';
 	import Upload from '~icons/lucide/cloud-upload';
 	import FileText from '~icons/lucide/file-text';
@@ -13,11 +15,11 @@
 	interface Props {
 		open?: boolean;
 		sale?: Sale | null;
+		role?: 'agent' | 'finance' | 'admin' | 'compliance' | 'super-admin';
 		onOpenChange?: (open: boolean) => void;
 	}
 
-	let { open = $bindable(), sale = $bindable(), onOpenChange }: Props = $props();
-
+	let { open = $bindable(), sale = $bindable(), role, onOpenChange }: Props = $props();
 	// Parse client name
 
 	const getBadgeVariant = (status: string) => {
@@ -75,6 +77,50 @@
 			| 'joint-buyers'
 	) => {
 		return sale?.commnets?.filter((comment) => comment.section === section) ?? [];
+	};
+
+	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
+
+	const updateFileStatus = async (filePath: string, status: 'approved' | 'rejected') => {
+		if (!sale?.id) return;
+
+		const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+
+		try {
+			const result = await firekitDocMutations.update(
+				`sales/${sale.id}`,
+				{
+					[filePath]: {
+						[statusField]: status
+					}
+				},
+				{ merge: true }
+			);
+
+			if (result.success) {
+				toast.success(`Document ${status} successfully`);
+				// Update local state
+				const pathParts = filePath.split('.');
+				if (sale) {
+					let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+					for (let i = 0; i < pathParts.length - 1; i++) {
+						target = target[pathParts[i]] as Record<string, unknown>;
+					}
+					const file = target[pathParts[pathParts.length - 1]] as
+						| Record<string, unknown>
+						| undefined;
+					if (file) {
+						file[statusField] = status;
+						sale = { ...sale };
+					}
+				}
+			} else {
+				toast.error(result.error?.message ?? 'Failed to update status');
+			}
+		} catch (error) {
+			toast.error('Failed to update document status');
+			console.error(error);
+		}
 	};
 </script>
 
@@ -216,6 +262,24 @@
 								<h3 class="text-sm font-medium">Passport</h3>
 							</div>
 							<div class="flex items-center gap-4">
+								{#if canApproveReject && sale?.clientDetails.passportFile}
+									<Button
+										variant="default"
+										size="sm"
+										class="bg-green-700 hover:bg-green-800"
+										onclick={() => updateFileStatus('clientDetails.passportFile', 'approved')}
+									>
+										Approve Doc
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+										onclick={() => updateFileStatus('clientDetails.passportFile', 'rejected')}
+									>
+										Reject
+									</Button>
+								{/if}
 								<div class="flex items-center gap-2">
 									<span class="text-sm text-muted-foreground">Compliance:</span>
 									<Badge
@@ -284,6 +348,24 @@
 								<h3 class="text-sm font-medium">Government ID</h3>
 							</div>
 							<div class="flex items-center gap-4">
+								{#if canApproveReject && sale?.clientDetails.nationalIdFile}
+									<Button
+										variant="default"
+										size="sm"
+										class="bg-green-700 hover:bg-green-800"
+										onclick={() => updateFileStatus('clientDetails.nationalIdFile', 'approved')}
+									>
+										Approve Doc
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+										onclick={() => updateFileStatus('clientDetails.nationalIdFile', 'rejected')}
+									>
+										Reject
+									</Button>
+								{/if}
 								<div class="flex items-center gap-2">
 									<span class="text-sm text-muted-foreground">Compliance:</span>
 									<Badge
@@ -353,6 +435,24 @@
 								<h3 class="text-sm font-medium">AML Form</h3>
 							</div>
 							<div class="flex items-center gap-4">
+								{#if canApproveReject && sale?.clientDetails.amlFormFile}
+									<Button
+										variant="default"
+										size="sm"
+										class="bg-green-700 hover:bg-green-800"
+										onclick={() => updateFileStatus('clientDetails.amlFormFile', 'approved')}
+									>
+										Approve Doc
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+										onclick={() => updateFileStatus('clientDetails.amlFormFile', 'rejected')}
+									>
+										Reject
+									</Button>
+								{/if}
 								<div class="flex items-center gap-2">
 									<span class="text-sm text-muted-foreground">Compliance:</span>
 									<Badge
@@ -509,6 +609,24 @@
 							<h3 class="text-sm font-medium">Booking Form</h3>
 						</div>
 						<div class="flex items-center gap-4">
+							{#if canApproveReject && sale?.bookingFormFile}
+								<Button
+									variant="default"
+									size="sm"
+									class="bg-green-700 hover:bg-green-800"
+									onclick={() => updateFileStatus('bookingFormFile', 'approved')}
+								>
+									Approve Doc
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+									onclick={() => updateFileStatus('bookingFormFile', 'rejected')}
+								>
+									Reject
+								</Button>
+							{/if}
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground">Compliance:</span>
 								<Badge
@@ -571,6 +689,24 @@
 							<h3 class="text-sm font-medium">Payment Receipt</h3>
 						</div>
 						<div class="flex items-center gap-4">
+							{#if canApproveReject && sale?.paymentReceiptFile}
+								<Button
+									variant="default"
+									size="sm"
+									class="bg-green-700 hover:bg-green-800"
+									onclick={() => updateFileStatus('paymentReceiptFile', 'approved')}
+								>
+									Approve Doc
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+									onclick={() => updateFileStatus('paymentReceiptFile', 'rejected')}
+								>
+									Reject
+								</Button>
+							{/if}
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground">Compliance:</span>
 								<Badge
@@ -643,6 +779,24 @@
 							<h3 class="text-sm font-medium">Referral Agreement</h3>
 						</div>
 						<div class="flex items-center gap-4">
+							{#if canApproveReject && sale?.refferalAgreementFile}
+								<Button
+									variant="default"
+									size="sm"
+									class="bg-green-700 hover:bg-green-800"
+									onclick={() => updateFileStatus('refferalAgreementFile', 'approved')}
+								>
+									Approve Doc
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+									onclick={() => updateFileStatus('refferalAgreementFile', 'rejected')}
+								>
+									Reject
+								</Button>
+							{/if}
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground">Compliance:</span>
 								<Badge
@@ -877,6 +1031,26 @@
 												<h3 class="text-sm font-medium">Passport</h3>
 											</div>
 											<div class="flex items-center gap-4">
+												{#if canApproveReject && buyer.passportFile}
+													<Button
+														variant="default"
+														size="sm"
+														class="bg-green-700 hover:bg-green-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.passportFile`, 'approved')}
+													>
+														Approve Doc
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.passportFile`, 'rejected')}
+													>
+														Reject
+													</Button>
+												{/if}
 												<div class="flex items-center gap-2">
 													<span class="text-sm text-muted-foreground">Compliance:</span>
 													<Badge
@@ -945,6 +1119,26 @@
 												<h3 class="text-sm font-medium">Government ID</h3>
 											</div>
 											<div class="flex items-center gap-4">
+												{#if canApproveReject && buyer.nationalIdFile}
+													<Button
+														variant="default"
+														size="sm"
+														class="bg-green-700 hover:bg-green-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.nationalIdFile`, 'approved')}
+													>
+														Approve Doc
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.nationalIdFile`, 'rejected')}
+													>
+														Reject
+													</Button>
+												{/if}
 												<div class="flex items-center gap-2">
 													<span class="text-sm text-muted-foreground">Compliance:</span>
 													<Badge
@@ -1013,6 +1207,26 @@
 												<h3 class="text-sm font-medium">AML Form</h3>
 											</div>
 											<div class="flex items-center gap-4">
+												{#if canApproveReject && buyer.amlFormFile}
+													<Button
+														variant="default"
+														size="sm"
+														class="bg-green-700 hover:bg-green-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.amlFormFile`, 'approved')}
+													>
+														Approve Doc
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+														onclick={() =>
+															updateFileStatus(`jointBuyers.${i}.amlFormFile`, 'rejected')}
+													>
+														Reject
+													</Button>
+												{/if}
 												<div class="flex items-center gap-2">
 													<span class="text-sm text-muted-foreground">Compliance:</span>
 													<Badge
