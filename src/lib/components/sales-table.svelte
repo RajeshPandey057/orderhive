@@ -27,7 +27,7 @@
 		getSortedRowModel
 	} from '@tanstack/table-core';
 	import { createRawSnippet } from 'svelte';
-	import DealDetailSheet from './deal-detail-sheet.svelte';
+	import DealDetailSheet from '../../routes/(secure)/agent/sales-tracker/deal-detail-sheet.svelte';
 
 	interface Props {
 		data: Sale[];

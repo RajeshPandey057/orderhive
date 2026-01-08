@@ -26,7 +26,7 @@
 	import Traffic from '~icons/lucide/traffic-cone';
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
-	import { createSale } from './sales.remote';
+	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	let sheetOpen = $state(false);
 	let jointBuyers = $state<{ key: number }[]>([]);

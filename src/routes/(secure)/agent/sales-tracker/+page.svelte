@@ -2,12 +2,12 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
+	import SalesTable from '@/components/sales-table.svelte';
 	import { firekitCollection } from 'svelte-firekit';
 	import AlertCircle from '~icons/lucide/alert-circle';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
-	import AddSaleSheet from './add-sale-sheet.svelte';
-	import SalesTable from './sales-table.svelte';
 
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
