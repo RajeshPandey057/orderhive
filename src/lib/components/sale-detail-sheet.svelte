@@ -7,7 +7,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { Badge } from '@/components/ui/badge';
 	import { Separator } from '@/components/ui/separator';
-	import { firekitDocMutations, firekitUser } from 'svelte-firekit';
+	import { firekitDocMutations, firekitUploadTask, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import ArrowLeft from '~icons/lucide/arrow-left';
 	import ChevronDown from '~icons/lucide/chevron-down';
@@ -83,6 +83,27 @@
 	};
 
 	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
+
+	// Invoice status state
+	let selectedInvoiceStatus = $state<'pending' | 'generated' | 'raised'>('pending');
+	let invoiceFile = $state<File | null>(null);
+	let isUploadingInvoice = $state(false);
+	let uploadProgress = $state(0);
+
+	// Sync selected status with sale data
+	$effect(() => {
+		if (sale?.invoiceFile) {
+			const status =
+				role === 'finance' ? sale.invoiceFile.financeStatus : sale.invoiceFile.complianceStatus;
+			if (status === 'generated' || status === 'raised') {
+				selectedInvoiceStatus = status;
+			} else {
+				selectedInvoiceStatus = 'pending';
+			}
+		} else {
+			selectedInvoiceStatus = 'pending';
+		}
+	});
 
 	// Reject dialog state
 	let rejectDialogOpen = $state(false);
@@ -294,6 +315,124 @@
 		} catch (error) {
 			toast.error('Failed to update sale status');
 			console.error(error);
+		}
+	};
+
+	const handleInvoiceStatusChange = async (status: 'pending' | 'generated' | 'raised') => {
+		selectedInvoiceStatus = status;
+
+		// If changing to pending, update the status in Firebase
+		if (status === 'pending' && sale?.id) {
+			const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+			try {
+				const currentInvoiceFile = sale.invoiceFile || {};
+				await firekitDocMutations.update(`sales/${sale.id}`, {
+					invoiceFile: {
+						...currentInvoiceFile,
+						[statusField]: 'pending'
+					}
+				});
+				if (sale.invoiceFile) {
+					if (statusField === 'financeStatus') {
+						sale.invoiceFile.financeStatus = 'pending';
+					} else {
+						sale.invoiceFile.complianceStatus = 'pending';
+					}
+					sale = { ...sale };
+				}
+			} catch (error) {
+				console.error('Failed to update invoice status:', error);
+			}
+		}
+
+		// If changing to raised and file exists, update status
+		if (status === 'raised' && sale?.id && sale?.invoiceFile?.downloadURL) {
+			const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+			try {
+				await firekitDocMutations.update(`sales/${sale.id}`, {
+					invoiceFile: {
+						...sale.invoiceFile,
+						[statusField]: 'raised'
+					}
+				});
+				if (sale.invoiceFile) {
+					if (statusField === 'financeStatus') {
+						sale.invoiceFile.financeStatus = 'raised';
+					} else {
+						sale.invoiceFile.complianceStatus = 'raised';
+					}
+					sale = { ...sale };
+				}
+				toast.success('Invoice marked as raised');
+			} catch (error) {
+				console.error('Failed to update invoice status:', error);
+				toast.error('Failed to update invoice status');
+			}
+		}
+	};
+
+	const handleInvoiceFileSelect = (event: Event) => {
+		const target = event.target as HTMLInputElement;
+		if (target.files && target.files[0]) {
+			invoiceFile = target.files[0];
+		}
+	};
+
+	const uploadInvoice = async () => {
+		if (!invoiceFile || !sale?.id) return;
+
+		isUploadingInvoice = true;
+		uploadProgress = 0;
+
+		try {
+			const path = `sales/${sale.createdByUid}/${sale.id}/invoice`;
+			const upload = firekitUploadTask(path, invoiceFile);
+
+			// Wait for upload to complete, polling progress
+			while (!upload.completed && !upload.error) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				uploadProgress = upload.progress;
+			}
+
+			if (upload.error) {
+				throw upload.error;
+			}
+
+			const downloadURL = upload.downloadURL;
+			const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+
+			const invoiceFileData = {
+				...(sale.invoiceFile || {}),
+				path,
+				downloadURL,
+				name: invoiceFile.name,
+				size: invoiceFile.size,
+				contentType: invoiceFile.type,
+				lastModified: invoiceFile.lastModified,
+				[statusField]: 'generated',
+				original: {
+					name: invoiceFile.name,
+					size: invoiceFile.size,
+					type: invoiceFile.type,
+					lastModified: invoiceFile.lastModified
+				}
+			};
+
+			await firekitDocMutations.update(`sales/${sale.id}`, {
+				invoiceFile: invoiceFileData
+			});
+
+			// Update local state
+			sale.invoiceFile = invoiceFileData as Sale['invoiceFile'];
+			sale = { ...sale };
+			invoiceFile = null;
+			toast.success('Invoice uploaded successfully');
+		} catch (error) {
+			console.error('Failed to upload invoice:', error);
+			toast.error('Failed to upload invoice');
+		} finally {
+			isUploadingInvoice = false;
+			uploadProgress = 0;
 		}
 	};
 </script>
@@ -1106,6 +1245,115 @@
 						</Table.Body>
 					</Table.Root>
 				</div>
+
+				<!-- Invoice Status Tabs -->
+				{#if canApproveReject}
+					<div class="space-y-4">
+						<div class="flex w-fit rounded-lg border bg-muted/30 p-1">
+							<button
+								class="rounded-md px-4 py-2 text-sm font-medium transition-colors {selectedInvoiceStatus ===
+								'pending'
+									? 'bg-background shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => handleInvoiceStatusChange('pending')}
+							>
+								Invoice Pending
+							</button>
+							<button
+								class="rounded-md px-4 py-2 text-sm font-medium transition-colors {selectedInvoiceStatus ===
+								'generated'
+									? 'bg-foreground text-background shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => handleInvoiceStatusChange('generated')}
+							>
+								Invoice Generated
+							</button>
+							<button
+								class="rounded-md px-4 py-2 text-sm font-medium transition-colors {selectedInvoiceStatus ===
+								'raised'
+									? 'bg-background shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => handleInvoiceStatusChange('raised')}
+								disabled={!sale?.invoiceFile?.downloadURL}
+							>
+								Invoice Raised
+							</button>
+						</div>
+
+						<!-- Upload Area for Generated Status -->
+						{#if selectedInvoiceStatus === 'generated'}
+							{#if sale?.invoiceFile?.downloadURL}
+								<div
+									class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+								>
+									<div class="flex items-center gap-3">
+										<FileText class="h-10 w-10 text-orange-500" />
+										<div class="flex flex-col">
+											<span class="text-sm font-medium">{sale.invoiceFile.name ?? 'Invoice'}</span>
+											<span class="text-xs text-muted-foreground"
+												>{formatFileSize(sale.invoiceFile.size)}</span
+											>
+										</div>
+									</div>
+									<a
+										href={sale.invoiceFile.downloadURL}
+										target="_blank"
+										class={buttonVariants({ variant: 'outline', size: 'sm' })}
+									>
+										View
+									</a>
+								</div>
+							{:else}
+								<label
+									class="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed bg-muted/20 p-6 transition-colors hover:bg-muted/30"
+								>
+									<input
+										type="file"
+										class="hidden"
+										accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+										onchange={handleInvoiceFileSelect}
+										disabled={isUploadingInvoice}
+									/>
+									{#if invoiceFile}
+										<div class="flex flex-col items-center gap-2">
+											<FileText class="h-8 w-8 text-orange-500" />
+											<span class="text-sm font-medium">{invoiceFile.name}</span>
+											<span class="text-xs text-muted-foreground"
+												>{formatFileSize(invoiceFile.size)}</span
+											>
+											{#if isUploadingInvoice}
+												<div class="mt-2 h-2 w-48 overflow-hidden rounded-full bg-muted">
+													<div
+														class="h-full bg-orange-500 transition-all"
+														style="width: {uploadProgress}%"
+													></div>
+												</div>
+												<span class="text-xs text-muted-foreground">{uploadProgress}% uploaded</span
+												>
+											{:else}
+												<Button
+													size="sm"
+													class="mt-2"
+													onclick={(e) => {
+														e.preventDefault();
+														uploadInvoice();
+													}}
+												>
+													Upload Invoice
+												</Button>
+											{/if}
+										</div>
+									{:else}
+										<div class="flex items-center gap-2 text-muted-foreground">
+											<Upload class="h-5 w-5" />
+											<span class="text-sm">upload invoice</span>
+										</div>
+									{/if}
+								</label>
+							{/if}
+						{/if}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Invoicing Stage Comments -->
