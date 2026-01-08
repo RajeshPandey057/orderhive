@@ -10,6 +10,7 @@
 	import SvgLoader from '~icons/svg-spinners/gooey-balls-2';
 
 	let loading = $state(false);
+	let hasRedirected = $state(false);
 
 	async function onclick() {
 		try {
@@ -17,15 +18,20 @@
 			loading = true;
 			if (firekitUser.initialized && !firekitUser.uid) {
 				await firekitAuth.signInWithGoogle();
+				hasRedirected = true;
 				goto('/dashboard');
 			}
 		} catch (error) {
 			console.error('Authentication failed:', error);
+			loading = false;
 		}
 	}
 
+	// Redirect if already logged in (only once)
 	$effect(() => {
-		if (firekitUser.uid) {
+		if (hasRedirected) return;
+		if (firekitUser.initialized && firekitUser.uid) {
+			hasRedirected = true;
 			goto('/dashboard');
 		}
 	});
