@@ -36,8 +36,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { getRoleContext } from '$lib/auth/role.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { getDefaultRoute, getMenuItems, isMenuItemActive, type AccessType } from '$lib/constants';
 	import FullLogo from '@/svg/full-logo.svelte';
 	import type { ComponentProps } from 'svelte';
 	import { firekitUser } from 'svelte-firekit';
@@ -47,27 +47,32 @@
 	let {
 		ref = $bindable(null),
 		collapsible = 'icon',
+		data,
 		...restProps
-	}: ComponentProps<typeof Sidebar.Root> = $props();
-
-	// Get role context
-	const roleManager = getRoleContext();
+	}: ComponentProps<typeof Sidebar.Root> & {
+		data: { user: { uid: string; email: string; role: AccessType } | null };
+	} = $props();
 
 	// Build navigation items dynamically based on role
 	const navItems = $derived(
-		roleManager.menuItems.map((item) => ({
-			title: item.title,
-			url: item.url,
-			icon: getIconForMenuItem(item.title),
-			isActive: roleManager.isMenuItemActive(item.url, page.url.pathname)
-		}))
+		data?.user?.role
+			? getMenuItems(data.user.role).map((item) => ({
+					title: item.title,
+					url: item.url,
+					icon: getIconForMenuItem(item.title),
+					isActive: isMenuItemActive(item.url, page.url.pathname)
+				}))
+			: []
 	);
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
 	<Sidebar.Header>
 		<Sidebar.Menu>
-			<Sidebar.MenuItem class="px-2 py-6" onclick={() => goto(roleManager.getDefaultRoute())}>
+			<Sidebar.MenuItem
+				class="px-2 py-6"
+				onclick={() => data?.user?.role && goto(getDefaultRoute(data.user.role))}
+			>
 				<FullLogo />
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
@@ -80,7 +85,8 @@
 			user={{
 				email: firekitUser?.email || '',
 				name: firekitUser?.displayName || 'shadcn',
-				avatar: firekitUser?.photoURL || undefined
+				avatar: firekitUser?.photoURL || undefined,
+				role: data?.user?.role || ''
 			}}
 		/>
 	</Sidebar.Footer>

@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
-	import { getRoleContext } from '@/auth/role.svelte';
+	import { getDefaultRoute } from '@/constants';
 	import { onMount } from 'svelte';
 
-	const roleManager = getRoleContext();
+	let { data } = $props();
 
 	// Redirect to role-specific dashboard on mount
 	onMount(() => {
-		const targetRoute = roleManager.getDefaultRoute();
-		if (targetRoute !== '/dashboard') {
-			goto(targetRoute, { replaceState: true });
+		if (data?.user?.role) {
+			const targetRoute = getDefaultRoute(data.user.role);
+			if (targetRoute !== '/dashboard') {
+				goto(targetRoute, { replaceState: true });
+			}
 		}
 	});
 </script>

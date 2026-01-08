@@ -4,12 +4,12 @@
 	import Sonner from '@/components/ui/sonner/sonner.svelte';
 	import { AuthGuard } from 'svelte-firekit';
 
-	let { children } = $props();
+	let { children, data } = $props();
 </script>
 
 <AuthGuard requireAuth={true} redirectTo="/">
 	<Sidebar.Provider>
-		<AppSidebar />
+		<AppSidebar {data} />
 		<Sidebar.Inset>
 			{@render children?.()}
 		</Sidebar.Inset>
