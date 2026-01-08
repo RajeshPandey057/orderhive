@@ -1,12 +1,15 @@
 <script lang="ts">
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { Badge } from '@/components/ui/badge';
 	import { Separator } from '@/components/ui/separator';
-	import { firekitDocMutations } from 'svelte-firekit';
+	import { firekitDocMutations, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
+	import ArrowLeft from '~icons/lucide/arrow-left';
 	import ChevronDown from '~icons/lucide/chevron-down';
 	import Upload from '~icons/lucide/cloud-upload';
 	import FileText from '~icons/lucide/file-text';
@@ -81,21 +84,152 @@
 
 	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
 
+	// Reject dialog state
+	let rejectDialogOpen = $state(false);
+	let rejectFilePath = $state('');
+	let rejectSection = $state<Sale['commnets'][0]['section']>('client-details');
+	let rejectComment = $state('');
+	let isSubmittingReject = $state(false);
+
+	const getSectionFromFilePath = (filePath: string): Sale['commnets'][0]['section'] => {
+		if (filePath.startsWith('clientDetails.') || filePath.startsWith('jointBuyers.')) {
+			return filePath.includes('jointBuyers') ? 'joint-buyers' : 'client-details';
+		}
+		if (filePath.includes('bookingFormFile') || filePath.includes('paymentReceiptFile')) {
+			return 'deal-status';
+		}
+		if (filePath.includes('refferalAgreementFile')) {
+			return 'refferal-agreement';
+		}
+		return 'client-details';
+	};
+
+	const openRejectDialog = (filePath: string) => {
+		rejectFilePath = filePath;
+		rejectSection = getSectionFromFilePath(filePath);
+		rejectComment = '';
+		rejectDialogOpen = true;
+	};
+
+	const submitRejection = async () => {
+		if (!sale?.id || !rejectComment.trim()) {
+			toast.error('Please provide a reason for rejection');
+			return;
+		}
+
+		isSubmittingReject = true;
+		const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+
+		try {
+			const newComment = {
+				authourName: firekitUser.displayName || 'Unknown',
+				authourUid: firekitUser.uid || '',
+				team: role as 'finance' | 'compliance' | 'admin' | 'agent',
+				authorEmail: firekitUser.email || '',
+				authourPhotoURL: firekitUser.photoURL || '',
+				section: rejectSection,
+				message: rejectComment.trim(),
+				createdAt: new Date()
+			};
+
+			// Build updated comments array manually since arrayUnion doesn't work with firekitDocMutations
+			const updatedComments = [...(sale.commnets || []), newComment];
+
+			let updateData: Record<string, unknown>;
+
+			if (rejectFilePath) {
+				// Rejecting a file - get the current file object and update it with the new status
+				// This preserves all existing fields in the file object
+				const pathParts = rejectFilePath.split('.');
+				let currentFile: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+				for (const part of pathParts) {
+					currentFile = currentFile[part] as Record<string, unknown>;
+				}
+
+				const updatedFile = {
+					...currentFile,
+					[statusField]: 'rejected'
+				};
+
+				updateData = {
+					[rejectFilePath]: updatedFile,
+					commnets: updatedComments
+				};
+			} else {
+				// Rejecting the sale status (invoicing stage)
+				updateData = {
+					[statusField]: 'rejected',
+					commnets: updatedComments
+				};
+			}
+
+			const result = await firekitDocMutations.update(`sales/${sale.id}`, updateData);
+
+			if (result.success) {
+				toast.success(
+					rejectFilePath ? 'Document rejected successfully' : 'Sale rejected successfully'
+				);
+				// Update local state
+				if (sale) {
+					if (rejectFilePath) {
+						// Update file status
+						const pathParts = rejectFilePath.split('.');
+						let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+						for (let i = 0; i < pathParts.length - 1; i++) {
+							target = target[pathParts[i]] as Record<string, unknown>;
+						}
+						const file = target[pathParts[pathParts.length - 1]] as
+							| Record<string, unknown>
+							| undefined;
+						if (file) {
+							file[statusField] = 'rejected';
+						}
+					} else {
+						// Update sale status (invoicing stage)
+						if (statusField === 'financeStatus') {
+							sale.financeStatus = 'rejected';
+						} else {
+							sale.complianceStatus = 'rejected';
+						}
+					}
+					// Update comments in local state
+					sale.commnets = updatedComments as Sale['commnets'];
+					sale = { ...sale };
+				}
+				rejectDialogOpen = false;
+			} else {
+				toast.error(result.error?.message ?? 'Failed to reject document');
+			}
+		} catch (error) {
+			toast.error('Failed to reject document');
+			console.error(error);
+		} finally {
+			isSubmittingReject = false;
+		}
+	};
+
 	const updateFileStatus = async (filePath: string, status: 'approved' | 'rejected') => {
 		if (!sale?.id) return;
 
 		const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
 
 		try {
-			const result = await firekitDocMutations.update(
-				`sales/${sale.id}`,
-				{
-					[filePath]: {
-						[statusField]: status
-					}
-				},
-				{ merge: true }
-			);
+			// Get the current file object and update it with the new status
+			// This preserves all existing fields in the file object
+			const pathParts = filePath.split('.');
+			let currentFile: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+			for (const part of pathParts) {
+				currentFile = currentFile[part] as Record<string, unknown>;
+			}
+
+			const updatedFile = {
+				...currentFile,
+				[statusField]: status
+			};
+
+			const result = await firekitDocMutations.update(`sales/${sale.id}`, {
+				[filePath]: updatedFile
+			});
 
 			if (result.success) {
 				toast.success(`Document ${status} successfully`);
@@ -119,6 +253,46 @@
 			}
 		} catch (error) {
 			toast.error('Failed to update document status');
+			console.error(error);
+		}
+	};
+
+	const updateSaleStatus = async (status: 'approved' | 'not-eligible' | 'rejected') => {
+		if (!sale?.id) return;
+
+		if (status === 'rejected') {
+			// Open reject dialog for invoicing stage
+			rejectFilePath = '';
+			rejectSection = 'invoicing-stage';
+			rejectComment = '';
+			rejectDialogOpen = true;
+			return;
+		}
+
+		const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
+
+		try {
+			const result = await firekitDocMutations.update(`sales/${sale.id}`, {
+				[statusField]: status
+			});
+
+			if (result.success) {
+				const statusText = status === 'approved' ? 'approved' : 'marked as not eligible';
+				toast.success(`Sale ${statusText} successfully`);
+				// Update local state
+				if (sale) {
+					if (statusField === 'financeStatus') {
+						sale.financeStatus = status;
+					} else {
+						sale.complianceStatus = status;
+					}
+					sale = { ...sale };
+				}
+			} else {
+				toast.error(result.error?.message ?? 'Failed to update status');
+			}
+		} catch (error) {
+			toast.error('Failed to update sale status');
 			console.error(error);
 		}
 	};
@@ -275,7 +449,7 @@
 										variant="outline"
 										size="sm"
 										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-										onclick={() => updateFileStatus('clientDetails.passportFile', 'rejected')}
+										onclick={() => openRejectDialog('clientDetails.passportFile')}
 									>
 										Reject
 									</Button>
@@ -361,7 +535,7 @@
 										variant="outline"
 										size="sm"
 										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-										onclick={() => updateFileStatus('clientDetails.nationalIdFile', 'rejected')}
+										onclick={() => openRejectDialog('clientDetails.nationalIdFile')}
 									>
 										Reject
 									</Button>
@@ -448,7 +622,7 @@
 										variant="outline"
 										size="sm"
 										class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-										onclick={() => updateFileStatus('clientDetails.amlFormFile', 'rejected')}
+										onclick={() => openRejectDialog('clientDetails.amlFormFile')}
 									>
 										Reject
 									</Button>
@@ -622,7 +796,7 @@
 									variant="outline"
 									size="sm"
 									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-									onclick={() => updateFileStatus('bookingFormFile', 'rejected')}
+									onclick={() => openRejectDialog('bookingFormFile')}
 								>
 									Reject
 								</Button>
@@ -702,7 +876,7 @@
 									variant="outline"
 									size="sm"
 									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-									onclick={() => updateFileStatus('paymentReceiptFile', 'rejected')}
+									onclick={() => openRejectDialog('paymentReceiptFile')}
 								>
 									Reject
 								</Button>
@@ -792,7 +966,7 @@
 									variant="outline"
 									size="sm"
 									class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-									onclick={() => updateFileStatus('refferalAgreementFile', 'rejected')}
+									onclick={() => openRejectDialog('refferalAgreementFile')}
 								>
 									Reject
 								</Button>
@@ -861,6 +1035,29 @@
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
 					<h2 class="text-lg font-medium">Invoicing Stage</h2>
+					<div class="flex items-center gap-2">
+						{#if canApproveReject}
+							<Button
+								variant="default"
+								size="sm"
+								class="bg-green-700 hover:bg-green-800"
+								onclick={() => updateSaleStatus('approved')}
+							>
+								Approve
+							</Button>
+							<Button variant="outline" size="sm" onclick={() => updateSaleStatus('not-eligible')}>
+								Not eligible
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
+								onclick={() => updateSaleStatus('rejected')}
+							>
+								Reject
+							</Button>
+						{/if}
+					</div>
 					<div class="flex items-center gap-4">
 						<div class="flex items-center gap-2">
 							<span class="text-sm text-muted-foreground">Compliance:</span>
@@ -1045,8 +1242,7 @@
 														variant="outline"
 														size="sm"
 														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-														onclick={() =>
-															updateFileStatus(`jointBuyers.${i}.passportFile`, 'rejected')}
+														onclick={() => openRejectDialog(`jointBuyers.${i}.passportFile`)}
 													>
 														Reject
 													</Button>
@@ -1133,8 +1329,7 @@
 														variant="outline"
 														size="sm"
 														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-														onclick={() =>
-															updateFileStatus(`jointBuyers.${i}.nationalIdFile`, 'rejected')}
+														onclick={() => openRejectDialog(`jointBuyers.${i}.nationalIdFile`)}
 													>
 														Reject
 													</Button>
@@ -1221,8 +1416,7 @@
 														variant="outline"
 														size="sm"
 														class="border-red-700 text-red-700 hover:bg-red-50 hover:text-red-800"
-														onclick={() =>
-															updateFileStatus(`jointBuyers.${i}.amlFormFile`, 'rejected')}
+														onclick={() => openRejectDialog(`jointBuyers.${i}.amlFormFile`)}
 													>
 														Reject
 													</Button>
@@ -1292,3 +1486,46 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Reject Document Dialog -->
+<Dialog.Root bind:open={rejectDialogOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<div class="space-y-6">
+			<Button
+				variant="outline"
+				size="icon"
+				class="h-10 w-10"
+				onclick={() => (rejectDialogOpen = false)}
+			>
+				<ArrowLeft class="h-4 w-4" />
+			</Button>
+
+			<div class="space-y-2">
+				<Dialog.Title class="text-2xl font-semibold">Reject document?</Dialog.Title>
+				<Dialog.Description class="text-muted-foreground">
+					please state the reason for rejecting this document.
+				</Dialog.Description>
+			</div>
+
+			<div class="space-y-3">
+				<label for="reject-comment" class="text-sm font-medium">Add your comment</label>
+				<Textarea
+					id="reject-comment"
+					placeholder="Enter your reason for rejection..."
+					bind:value={rejectComment}
+					rows={4}
+					class="resize-none"
+				/>
+			</div>
+
+			<Button
+				class="w-full"
+				size="lg"
+				disabled={isSubmittingReject || !rejectComment.trim()}
+				onclick={submitRejection}
+			>
+				{isSubmittingReject ? 'Submitting...' : 'Submit'}
+			</Button>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
