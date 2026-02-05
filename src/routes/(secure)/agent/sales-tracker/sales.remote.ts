@@ -2,7 +2,6 @@ import { form } from '$app/server';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 // Define the schema for the sale form using Zod
@@ -69,9 +68,14 @@ const saleSchema = z.object({
 		['eligible-first-half', 'eligible-second-half', 'eligible-full'],
 		'Invoice stage is required'
 	),
-	dealType: z.enum(['off-plan', 'on-plan', 'resell'], 'Deal type is required'),
+	dealType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
 	developer: z.string().min(1, 'Developer is required'),
 	property: z.string().min(1, 'Property is required'),
+	propertyType: z.enum(['commercial', 'residential', 'plot'], 'Property type is required'),
+	unitType: z.enum(
+		['studio', '1br', '2br', '3br', '4br', '5br', 'villa', 'townhouse', 'office'],
+		'Unit type is required'
+	),
 	unitNo: z.string().min(1, 'Unit number is required'),
 	unitValue: z.string().min(1, 'Unit value is required')
 });
@@ -95,10 +99,47 @@ const toUploadedFile = async (file: File | null | undefined, path: string) => {
 	};
 };
 
+// Generate unique predictable sale ID
+async function generateSaleId(): Promise<string> {
+	const today = new Date();
+	const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD format
+	const counterDocRef = firestore.collection('counters').doc(`sale-${dateStr}`);
+
+	// Use transaction to ensure atomicity
+	const saleId = await firestore.runTransaction(async (transaction) => {
+		const counterDoc = await transaction.get(counterDocRef);
+		let nextNumber = 1;
+
+		if (counterDoc.exists) {
+			const currentCount = counterDoc.data()?.count ?? 0;
+			nextNumber = currentCount + 1;
+		}
+
+		// Update counter
+		transaction.set(
+			counterDocRef,
+			{
+				count: nextNumber,
+				lastUpdated: FieldValue.serverTimestamp()
+			},
+			{ merge: true }
+		);
+
+		// Generate sale ID: IND-YYYYMMDD-XXXX
+		const paddedNumber = String(nextNumber).padStart(4, '0');
+		return `IND-${dateStr}-${paddedNumber}`;
+	});
+
+	return saleId;
+}
+
 export const createSale = form(saleSchema, async (data) => {
 	const timestamp = FieldValue.serverTimestamp();
 	const createdByUid = data.dealOwners[0]?.userId ?? 'unknown';
-	const basePath = `sales/${createdByUid}/${randomUUID()}`;
+
+	// Generate predictable sale ID
+	const saleId = await generateSaleId();
+	const basePath = `sales/${createdByUid}/${saleId}`;
 
 	// Upload primary buyer documents
 	const [primaryPassportFile, primaryNationalIdFile] = await Promise.all([
@@ -148,6 +189,7 @@ export const createSale = form(saleSchema, async (data) => {
 		},
 		jointBuyers,
 		dealOwners: data.dealOwners,
+		dealOwnerIds: data.dealOwners.map((owner) => owner.userId),
 		dealStage: data.dealStage,
 		paymentValue: data.paymentValue,
 		bookingFormFile,
@@ -155,6 +197,8 @@ export const createSale = form(saleSchema, async (data) => {
 		dealType: data.dealType,
 		developer: data.developer,
 		property: data.property,
+		propertyType: data.propertyType,
+		unitType: data.unitType,
 		unitNo: data.unitNo,
 		unitValue: data.unitValue,
 		createdByUid,
@@ -164,11 +208,11 @@ export const createSale = form(saleSchema, async (data) => {
 	};
 
 	try {
-		await firestore.collection('sales').add(saleRecord);
+		await firestore.collection('sales').doc(saleId).set(saleRecord);
 	} catch (err) {
 		console.error('Failed to save sale to Firestore', err);
 		throw error(500, 'Unable to save sale right now. Please try again.');
 	}
 
-	redirect(303, '/dashboard');
+	redirect(303, '/agent/sales-tracker');
 });

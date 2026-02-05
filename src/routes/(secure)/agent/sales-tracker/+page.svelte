@@ -12,6 +12,24 @@
 	let { data } = $props();
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
+
+	// Filter sales based on user role
+	const filteredSales = $derived.by(() => {
+		if (!salesCollection.data) return [];
+
+		// If user is an agent, only show sales where they are a deal owner
+		if (data?.user?.role === 'agent' && data?.user?.uid) {
+			const userUid = data.user.uid;
+			console.log('Filtering sales for agent with UID:', userUid);
+			return salesCollection.data.filter((sale) => sale.dealOwnerIds.includes(userUid));
+		}
+
+		// For other roles (admin, finance, compliance), show all sales
+		return salesCollection.data;
+	});
+
+	// Check if filtered results are empty
+	const isEmpty = $derived(filteredSales.length === 0);
 </script>
 
 <header
@@ -52,7 +70,7 @@
 				</Empty.Header>
 			</Empty.Root>
 		</div>
-	{:else if salesCollection.empty}
+	{:else if isEmpty}
 		<div class="flex min-h-100 items-center justify-center rounded-xl bg-muted/50">
 			<Empty.Root>
 				<Empty.Header>
@@ -61,7 +79,9 @@
 					</Empty.Media>
 					<Empty.Title>No Sales Found</Empty.Title>
 					<Empty.Description
-						>Add your first sale to get started with tracking your deals</Empty.Description
+						>{data?.user?.role === 'agent'
+							? 'You are not part of any sales yet. Sales where you are a deal owner will appear here.'
+							: 'Add your first sale to get started with tracking your deals'}</Empty.Description
 					>
 				</Empty.Header>
 				<Empty.Content>
@@ -70,6 +90,6 @@
 			</Empty.Root>
 		</div>
 	{:else}
-		<SalesTable data={salesCollection.data} role={data?.user?.role} />
+		<SalesTable data={filteredSales} role={data?.user?.role} />
 	{/if}
 </div>

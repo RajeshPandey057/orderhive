@@ -224,8 +224,7 @@
 
 	const dealTypes = [
 		{ value: 'off-plan', label: 'Off Plan' },
-		{ value: 'on-plan', label: 'On Plan' },
-		{ value: 'resell', label: 'Resell' }
+		{ value: 'secondary', label: 'Secondary' }
 	];
 	const developers = [
 		{ value: 'emmar', label: 'Emmar' },
@@ -242,13 +241,35 @@
 		{ value: 'binghatti', label: 'Binghatti' },
 		{ value: 'meras', label: 'Meras' }
 	];
+	const propertyTypes = [
+		{ value: 'commercial', label: 'Commercial' },
+		{ value: 'residential', label: 'Residential' },
+		{ value: 'plot', label: 'Plot' }
+	];
+	const unitTypes = [
+		{ value: 'studio', label: 'Studio' },
+		{ value: '1br', label: '1BR' },
+		{ value: '2br', label: '2BR' },
+		{ value: '3br', label: '3BR' },
+		{ value: '4br', label: '4BR' },
+		{ value: '5br', label: '5BR' },
+		{ value: 'villa', label: 'Villa' },
+		{ value: 'townhouse', label: 'Townhouse' },
+		{ value: 'office', label: 'Office' }
+	];
 
 	const dealTypeLabel = $derived(
-		dealTypes.find((d) => d.value === createSale.fields.dealType.value())?.label ?? 'Choose deal'
+		dealTypes.find((d) => d.value === createSale.fields.dealType.value())?.label ?? 'Deal'
 	);
 	const developerLabel = $derived(
-		developers.find((d) => d.value === createSale.fields.developer.value())?.label ??
-			'Select Developer'
+		developers.find((d) => d.value === createSale.fields.developer.value())?.label ?? 'Developer'
+	);
+	const propertyTypeLabel = $derived(
+		propertyTypes.find((p) => p.value === createSale.fields.propertyType.value())?.label ??
+			'Property Type'
+	);
+	const unitTypeLabel = $derived(
+		unitTypes.find((u) => u.value === createSale.fields.unitType.value())?.label ?? 'Unit Type'
 	);
 </script>
 
@@ -397,7 +418,7 @@
 												class="sr-only"
 												{...createSale.fields.passportFile.as('file')}
 												files={undefined}
-												accept=".pdf,image/*"
+												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 												onchange={(e) => handleFileUpload('passportFile', e)}
 											/>
 											{#each createSale.fields.passportFile.issues() as issue, i (i)}
@@ -456,7 +477,7 @@
 												class="sr-only"
 												{...createSale.fields.nationalIdFile.as('file')}
 												files={undefined}
-												accept=".pdf,image/*"
+												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 												onchange={(e) => handleFileUpload('nationalIdFile', e)}
 											/>
 											{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
@@ -491,13 +512,13 @@
 					<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
 
 					<Field.Group>
-						<div class="grid grid-cols-3 gap-4">
+						<div class="grid grid-cols-4 gap-4">
 							<Field.Field id="dealType">
 								<Select.Root
 									type="single"
 									value={createSale.fields.dealType.value() ?? ''}
 									onValueChange={(v) =>
-										createSale.fields.dealType.set(v as 'off-plan' | 'on-plan' | 'resell')}
+										createSale.fields.dealType.set(v as 'off-plan' | 'secondary')}
 								>
 									<Select.Trigger id="dealype">
 										<div class="flex items-center gap-2">
@@ -539,6 +560,69 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
+
+							<Field.Field id="propertyType">
+								<Select.Root
+									type="single"
+									value={createSale.fields.propertyType.value() ?? ''}
+									onValueChange={(v) =>
+										createSale.fields.propertyType.set(v as 'commercial' | 'residential' | 'plot')}
+								>
+									<Select.Trigger id="propertyType">
+										<div class="flex items-center gap-2">
+											<Building />
+											{propertyTypeLabel}
+										</div>
+									</Select.Trigger>
+									<Select.Content>
+										{#each propertyTypes as propertyType (propertyType.value)}
+											<Select.Item {...propertyType} />
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...createSale.fields.propertyType.as('text')} />
+								{#each createSale.fields.propertyType.issues() as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+							<Field.Field id="unitType">
+								<Select.Root
+									type="single"
+									value={createSale.fields.unitType.value() ?? ''}
+									onValueChange={(v) =>
+										createSale.fields.unitType.set(
+											v as
+												| 'studio'
+												| '1br'
+												| '2br'
+												| '3br'
+												| '4br'
+												| '5br'
+												| 'villa'
+												| 'townhouse'
+												| 'office'
+										)}
+								>
+									<Select.Trigger id="unitType">
+										<div class="flex items-center gap-2">
+											<Home />
+											{unitTypeLabel}
+										</div>
+									</Select.Trigger>
+									<Select.Content>
+										{#each unitTypes as unitType (unitType.value)}
+											<Select.Item {...unitType} />
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...createSale.fields.unitType.as('text')} />
+								{#each createSale.fields.unitType.issues() as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+						</div>
+
+						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
 								<InputGroup.Root id="property">
 									<InputGroup.Input
@@ -553,9 +637,6 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
-						</div>
-
-						<div class="grid grid-cols-2 gap-4">
 							<Field.Field>
 								<InputGroup.Root id="unitNo">
 									<InputGroup.Input
@@ -665,7 +746,7 @@
 										class="sr-only"
 										{...createSale.fields.bookingFormFile.as('file')}
 										files={undefined}
-										accept=".pdf,image/*"
+										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 										onchange={(e) => handleFileUpload('bookingFormFile', e)}
 									/>
 									{#each createSale.fields.bookingFormFile.issues() as issue, i (i)}
@@ -713,7 +794,7 @@
 										class="sr-only"
 										{...createSale.fields.paymentReceiptFile.as('file')}
 										files={undefined}
-										accept=".pdf,image/*"
+										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 										onchange={(e) => handleFileUpload('paymentReceiptFile', e)}
 									/>
 									{#each createSale.fields.paymentReceiptFile.issues() as issue, i (i)}
@@ -1076,7 +1157,7 @@
 														name={`jointBuyers[${index}].passportFile`}
 														class="sr-only"
 														type="file"
-														accept=".pdf,image/*"
+														accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 														onchange={(e) =>
 															handleJointBuyerFileUpload(buyer.key, 'passportFile', e)}
 													/>
@@ -1134,7 +1215,7 @@
 														name={`jointBuyers[${index}].nationalIdFile`}
 														class="sr-only"
 														type="file"
-														accept=".pdf,image/*"
+														accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 														onchange={(e) =>
 															handleJointBuyerFileUpload(buyer.key, 'nationalIdFile', e)}
 													/>

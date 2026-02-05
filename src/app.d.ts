@@ -197,6 +197,7 @@ declare global {
 			photoURL: string;
 			split: number;
 		}[];
+		dealOwnerIds: string[];
 		dealStage: 'eoi' | 'booking';
 		paymentValue: number;
 		bookingFormFile: {
@@ -234,9 +235,11 @@ declare global {
 			lastModified: number;
 		} | null;
 
-		dealType: 'off-plan' | 'on-plan' | 'resell';
+		dealType: 'off-plan' | 'secondary';
 		developer: string;
 		property: string;
+		propertyType: 'commercial' | 'residential' | 'plot';
+		unitType: 'studio' | '1br' | '2br' | '3br' | '4br' | '5br' | 'villa' | 'townhouse' | 'office';
 		unitNo: string;
 		unitValue: string;
 		createdByUid: string;

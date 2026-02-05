@@ -6,11 +6,23 @@
 	import './layout.css';
 
 	let { children } = $props();
+
+	function preventCopy(e: Event) {
+		e.preventDefault();
+		return false;
+	}
+
+	function preventContextMenu(e: Event) {
+		e.preventDefault();
+		return false;
+	}
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<svelte:body oncopy={preventCopy} oncut={preventCopy} oncontextmenu={preventContextMenu} />
 
 <SEO
 	title="Latest Financial News & AI Insights"

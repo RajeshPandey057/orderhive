@@ -61,6 +61,33 @@
 			enableHiding: false
 		},
 		{
+			accessorKey: 'id',
+			header: () => {
+				const headerSnippet = createRawSnippet(() => ({
+					render: () => `
+						<button class="flex items-center gap-1 font-medium hover:text-foreground">
+							Sale ID
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+						</button>
+					`
+				}));
+				return renderSnippet(headerSnippet);
+			},
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ saleId: string }]>((getSaleId) => {
+					const { saleId } = getSaleId();
+					return {
+						render: () =>
+							`<div class="font-mono text-sm font-semibold text-primary">${saleId}</div>`
+					};
+				});
+				return renderSnippet(cellSnippet, {
+					saleId: row.original.id
+				});
+			},
+			enableSorting: true
+		},
+		{
 			accessorKey: 'client',
 			header: () => {
 				const headerSnippet = createRawSnippet(() => ({
