@@ -856,10 +856,24 @@
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">Unit</Table.Cell>
 								<Table.Cell class="font-medium">{sale?.unitNo ?? '-'}</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Unit Type
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									<span class="uppercase">{sale?.unitType ?? '-'}</span>
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Unit Value
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Property Type
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									<span class="capitalize">{sale?.propertyType ?? '-'}</span>
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>
@@ -1236,11 +1250,22 @@
 									Stage
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									<div class="flex flex-col">
-										<span>First half</span>
-										<span class="text-xs font-normal text-muted-foreground">10 + 4% paid</span>
-									</div>
+									<span class="capitalize">
+										{sale?.invoiceStage ? sale.invoiceStage.replace(/-/g, ' ') : '-'}
+									</span>
 								</Table.Cell>
+								{#if sale?.tentativeEligibilityDate}
+									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+										Tentative Eligibility Date
+									</Table.Cell>
+									<Table.Cell class="font-medium">
+										{new Date(sale.tentativeEligibilityDate).toLocaleDateString('en-US', {
+											day: 'numeric',
+											month: 'short',
+											year: 'numeric'
+										})}
+									</Table.Cell>
+								{/if}
 							</Table.Row>
 						</Table.Body>
 					</Table.Root>

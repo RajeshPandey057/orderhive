@@ -238,6 +238,12 @@ declare global {
 		dealType: 'off-plan' | 'secondary';
 		developer: string;
 		property: string;
+		invoiceStage:
+			| 'eligible-first-half'
+			| 'eligible-second-half'
+			| 'eligible-full'
+			| 'not-yet-eligible';
+		tentativeEligibilityDate: string | null;
 		propertyType: 'commercial' | 'residential' | 'plot';
 		unitType: 'studio' | '1br' | '2br' | '3br' | '4br' | '5br' | 'villa' | 'townhouse' | 'office';
 		unitNo: string;

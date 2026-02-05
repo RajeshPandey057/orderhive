@@ -65,9 +65,10 @@ const saleSchema = z.object({
 
 	// Project Details
 	invoiceStage: z.enum(
-		['eligible-first-half', 'eligible-second-half', 'eligible-full'],
+		['eligible-first-half', 'eligible-second-half', 'eligible-full', 'not-yet-eligible'],
 		'Invoice stage is required'
 	),
+	tentativeEligibilityDate: z.string().optional(),
 	dealType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
 	developer: z.string().min(1, 'Developer is required'),
 	property: z.string().min(1, 'Property is required'),
@@ -179,6 +180,7 @@ export const createSale = form(saleSchema, async (data) => {
 		commissionStatus: 'pending',
 		invoiceFile: { status: 'pending' },
 		invoiceStage: data.invoiceStage,
+		tentativeEligibilityDate: data.tentativeEligibilityDate || null,
 		clientDetails: {
 			firstName: data.firstName,
 			lastName: data.lastName,

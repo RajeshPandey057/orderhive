@@ -3,13 +3,16 @@
 	import PhoneInput from '$lib/components/phone-input.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
+	import { type DateValue } from '@internationalized/date';
 	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
 	import { firekitCollection, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
@@ -19,6 +22,7 @@
 	import FileText from '~icons/lucide/file-text';
 	import Hammer from '~icons/lucide/hammer';
 	import Home from '~icons/lucide/home';
+	import Loader2 from '~icons/lucide/loader-2';
 	import Pencil from '~icons/lucide/pencil';
 	import Plus from '~icons/lucide/plus';
 	import Save from '~icons/lucide/save';
@@ -32,6 +36,8 @@
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
 	let nextOwnerKey = 0;
+	let tentativeEligibilityDate = $state<DateValue | undefined>(undefined);
+	let popoverOpen = $state(false);
 
 	type FirestoreUser = {
 		id: string;
@@ -848,10 +854,10 @@
 					<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
 
 					<RadioGroup.Root
-						class="flex w-full flex-row justify-around"
+						class="grid w-full grid-cols-2 justify-around"
 						bind:value={
-							() => createSale.fields.invoiceStage.value() ?? 'eligible-first-half',
-							(v) => createSale.fields.invoiceStage.set(v ?? 'eligible-first-half')
+							() => createSale.fields.invoiceStage.value() ?? '',
+							(v) => createSale.fields.invoiceStage.set(v || undefined)
 						}
 					>
 						<Field.Field orientation="horizontal">
@@ -881,7 +887,82 @@
 								<span class="text-sm text-muted-foreground">20 + 4% paid</span>
 							</div>
 						</Field.Field>
+						<Field.Field orientation="horizontal">
+							<RadioGroup.Item value="not-yet-eligible" id="not-yet-eligible" />
+							<div class="flex flex-col gap-1">
+								<Field.Label for="not-yet-eligible" class="text-sm font-normal">
+									Not yet eligible for invoice
+								</Field.Label>
+								<span class="text-sm text-muted-foreground">Select tentative eligibility date</span>
+							</div>
+						</Field.Field>
 					</RadioGroup.Root>
+
+					{#if createSale.fields.invoiceStage.value() === 'not-yet-eligible'}
+						<div class="col-span-2 mt-4 rounded-lg border border-border/60 bg-background/60 p-4">
+							<Field.Field>
+								<Field.Label for="tentative-date" class="mb-2 text-sm font-medium">
+									Tentative Eligibility Date
+								</Field.Label>
+								<Popover.Root bind:open={popoverOpen}>
+									<Popover.Trigger class="w-full">
+										<Button
+											variant="outline"
+											class="w-full justify-start text-left font-normal"
+											id="tentative-date"
+											type="button"
+										>
+											{#if tentativeEligibilityDate}
+												{new Date(
+													tentativeEligibilityDate.year,
+													tentativeEligibilityDate.month - 1,
+													tentativeEligibilityDate.day
+												).toLocaleDateString('en-US', {
+													year: 'numeric',
+													month: 'long',
+													day: 'numeric'
+												})}
+											{:else}
+												<span class="text-muted-foreground">Pick a date</span>
+											{/if}
+										</Button>
+									</Popover.Trigger>
+									<Popover.Content class="w-auto p-0" align="start">
+										<CalendarComponent
+											type="single"
+											bind:value={tentativeEligibilityDate}
+											onValueChange={(value) => {
+												tentativeEligibilityDate = value;
+												// Update hidden input for form submission
+												const hiddenInput = document.querySelector(
+													'input[name="tentativeEligibilityDate"]'
+												) as HTMLInputElement;
+												if (hiddenInput && value) {
+													const date = new Date(value.year, value.month - 1, value.day);
+													hiddenInput.value = date.toISOString().split('T')[0];
+												}
+												popoverOpen = false;
+											}}
+										/>
+									</Popover.Content>
+								</Popover.Root>
+								<input
+									type="hidden"
+									name="tentativeEligibilityDate"
+									value={tentativeEligibilityDate
+										? new Date(
+												tentativeEligibilityDate.year,
+												tentativeEligibilityDate.month - 1,
+												tentativeEligibilityDate.day
+											)
+												.toISOString()
+												.split('T')[0]
+										: ''}
+								/>
+							</Field.Field>
+						</div>
+					{/if}
+
 					<input class="sr-only" {...createSale.fields.invoiceStage.as('text')} />
 				</Field.Set>
 				<Field.Separator />
@@ -1254,5 +1335,18 @@
 				</Field.Set>
 			</div>
 		</form>
+
+		<!-- Saving Overlay -->
+		{#if createSale.pending}
+			<div
+				class="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
+				style="pointer-events: all;"
+			>
+				<div class="flex flex-col items-center gap-3 rounded-lg border bg-card p-6 shadow-lg">
+					<Loader2 class="h-8 w-8 animate-spin text-primary" />
+					<p class="text-sm font-medium text-foreground">Saving sale...</p>
+				</div>
+			</div>
+		{/if}
 	</Sheet.Content>
 </Sheet.Root>

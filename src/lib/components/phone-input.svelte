@@ -25,7 +25,7 @@
 	let {
 		value = $bindable(''),
 		country = $bindable('AE'),
-		placeholder = '50 588 3469',
+		placeholder = '050 588 3469',
 		disabled = false,
 		required = false,
 		showCountrySelect = true,
