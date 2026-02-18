@@ -848,9 +848,9 @@
 									</div>
 								</Table.Cell>
 								<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
-									Property
+									Project
 								</Table.Cell>
-								<Table.Cell class="font-medium">{sale?.property ?? '-'}</Table.Cell>
+								<Table.Cell class="font-medium">{sale?.project ?? '-'}</Table.Cell>
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">Unit</Table.Cell>
@@ -878,11 +878,11 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Deal Type
+									Sale Type
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									<div class="flex items-center justify-between">
-										<span class="capitalize">{sale?.dealType ?? '-'}</span>
+										<span class="capitalize">{sale?.saleType ?? '-'}</span>
 										<ChevronDown class="h-4 w-4 text-muted-foreground" />
 									</div>
 								</Table.Cell>

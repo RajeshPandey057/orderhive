@@ -228,7 +228,7 @@
 		syncDealOwners();
 	};
 
-	const dealTypes = [
+	const saleTypes = [
 		{ value: 'off-plan', label: 'Off Plan' },
 		{ value: 'secondary', label: 'Secondary' }
 	];
@@ -253,19 +253,13 @@
 		{ value: 'plot', label: 'Plot' }
 	];
 	const unitTypes = [
-		{ value: 'studio', label: 'Studio' },
-		{ value: '1br', label: '1BR' },
-		{ value: '2br', label: '2BR' },
-		{ value: '3br', label: '3BR' },
-		{ value: '4br', label: '4BR' },
-		{ value: '5br', label: '5BR' },
-		{ value: 'villa', label: 'Villa' },
-		{ value: 'townhouse', label: 'Townhouse' },
-		{ value: 'office', label: 'Office' }
+		{ value: 'apartment', label: 'Apartment' },
+		{ value: 'townhouse', label: 'Townhouse/Villa' },
+		{ value: 'office', label: 'Office Space' }
 	];
 
-	const dealTypeLabel = $derived(
-		dealTypes.find((d) => d.value === createSale.fields.dealType.value())?.label ?? 'Deal'
+	const saleTypeLabel = $derived(
+		saleTypes.find((d) => d.value === createSale.fields.saleType.value())?.label ?? 'Deal'
 	);
 	const developerLabel = $derived(
 		developers.find((d) => d.value === createSale.fields.developer.value())?.label ?? 'Developer'
@@ -474,7 +468,7 @@
 												>
 													<Upload class="h-5 w-5 text-gray-600" />
 													<span class="text-sm font-medium">
-														Upload National ID <br />(Emirates ID/Aadhar)
+														Upload National ID <br />(Emirates ID)
 													</span>
 												</label>
 											{/if}
@@ -519,27 +513,27 @@
 
 					<Field.Group>
 						<div class="grid grid-cols-4 gap-4">
-							<Field.Field id="dealType">
+							<Field.Field id="saleType">
 								<Select.Root
 									type="single"
-									value={createSale.fields.dealType.value() ?? ''}
+									value={createSale.fields.saleType.value() ?? ''}
 									onValueChange={(v) =>
-										createSale.fields.dealType.set(v as 'off-plan' | 'secondary')}
+										createSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
 								>
 									<Select.Trigger id="dealype">
 										<div class="flex items-center gap-2">
 											<Traffic />
-											{dealTypeLabel}
+											{saleTypeLabel}
 										</div>
 									</Select.Trigger>
 									<Select.Content>
-										{#each dealTypes as dealType (dealType.value)}
-											<Select.Item {...dealType} />
+										{#each saleTypes as saleType (saleType.value)}
+											<Select.Item {...saleType} />
 										{/each}
 									</Select.Content>
 								</Select.Root>
-								<input type="hidden" {...createSale.fields.dealType.as('text')} />
-								{#each createSale.fields.dealType.issues() as issue, i (i)}
+								<input type="hidden" {...createSale.fields.saleType.as('text')} />
+								{#each createSale.fields.saleType.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
@@ -596,18 +590,7 @@
 									type="single"
 									value={createSale.fields.unitType.value() ?? ''}
 									onValueChange={(v) =>
-										createSale.fields.unitType.set(
-											v as
-												| 'studio'
-												| '1br'
-												| '2br'
-												| '3br'
-												| '4br'
-												| '5br'
-												| 'villa'
-												| 'townhouse'
-												| 'office'
-										)}
+										createSale.fields.unitType.set(v as 'apartment' | 'townhouse' | 'office')}
 								>
 									<Select.Trigger id="unitType">
 										<div class="flex items-center gap-2">
@@ -630,16 +613,16 @@
 
 						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
-								<InputGroup.Root id="property">
+								<InputGroup.Root id="project">
 									<InputGroup.Input
-										{...createSale.fields.property.as('text')}
-										placeholder="Select Property"
+										{...createSale.fields.project.as('text')}
+										placeholder="Select Project"
 									/>
 									<InputGroup.Addon>
 										<Building />
 									</InputGroup.Addon>
 								</InputGroup.Root>
-								{#each createSale.fields.property.issues() as issue, i (i)}
+								{#each createSale.fields.project.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
@@ -1287,7 +1270,7 @@
 														>
 															<Upload class="h-5 w-5 text-gray-600" />
 															<span class="text-sm font-medium">
-																Upload National ID <br />(Emirates ID/Aadhar)
+																Upload National ID <br />(Emirates ID)
 															</span>
 														</label>
 													{/if}

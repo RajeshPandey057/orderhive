@@ -69,14 +69,11 @@ const saleSchema = z.object({
 		'Invoice stage is required'
 	),
 	tentativeEligibilityDate: z.string().optional(),
-	dealType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
+	saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
 	developer: z.string().min(1, 'Developer is required'),
-	property: z.string().min(1, 'Property is required'),
+	project: z.string().min(1, 'Project is required'),
 	propertyType: z.enum(['commercial', 'residential', 'plot'], 'Property type is required'),
-	unitType: z.enum(
-		['studio', '1br', '2br', '3br', '4br', '5br', 'villa', 'townhouse', 'office'],
-		'Unit type is required'
-	),
+	unitType: z.enum(['apartment', 'townhouse', 'office'], 'Unit type is required'),
 	unitNo: z.string().min(1, 'Unit number is required'),
 	unitValue: z.string().min(1, 'Unit value is required')
 });
@@ -196,9 +193,9 @@ export const createSale = form(saleSchema, async (data) => {
 		paymentValue: data.paymentValue,
 		bookingFormFile,
 		paymentReceiptFile,
-		dealType: data.dealType,
+		saleType: data.saleType,
 		developer: data.developer,
-		property: data.property,
+		project: data.project,
 		propertyType: data.propertyType,
 		unitType: data.unitType,
 		unitNo: data.unitNo,

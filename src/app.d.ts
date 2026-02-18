@@ -235,9 +235,9 @@ declare global {
 			lastModified: number;
 		} | null;
 
-		dealType: 'off-plan' | 'secondary';
+		saleType: 'off-plan' | 'secondary';
 		developer: string;
-		property: string;
+		project: string;
 		invoiceStage:
 			| 'eligible-first-half'
 			| 'eligible-second-half'
@@ -245,7 +245,7 @@ declare global {
 			| 'not-yet-eligible';
 		tentativeEligibilityDate: string | null;
 		propertyType: 'commercial' | 'residential' | 'plot';
-		unitType: 'studio' | '1br' | '2br' | '3br' | '4br' | '5br' | 'villa' | 'townhouse' | 'office';
+		unitType: 'apartment' | 'townhouse' | 'office';
 		unitNo: string;
 		unitValue: string;
 		createdByUid: string;
