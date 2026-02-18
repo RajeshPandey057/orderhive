@@ -258,6 +258,18 @@
 		{ value: 'office', label: 'Office Space' }
 	];
 
+	const unitSizes = [
+		{ value: 'studio', label: 'Studio' },
+		{ value: '1bed', label: '1 Bed' },
+		{ value: '2bed', label: '2 Bed' },
+		{ value: '3bed', label: '3 Bed' },
+		{ value: '4bed', label: '4 Bed' },
+		{ value: '5bed', label: '5 Bed' },
+		{ value: '6bed', label: '6 Bed' },
+		{ value: '7bed', label: '7 Bed' },
+		{ value: 'not-applicable', label: 'Not Applicable' }
+	];
+
 	const saleTypeLabel = $derived(
 		saleTypes.find((d) => d.value === createSale.fields.saleType.value())?.label ?? 'Deal'
 	);
@@ -270,6 +282,10 @@
 	);
 	const unitTypeLabel = $derived(
 		unitTypes.find((u) => u.value === createSale.fields.unitType.value())?.label ?? 'Unit Type'
+	);
+
+	const unitSizeLabel = $derived(
+		unitSizes.find((u) => u.value === createSale.fields.unitSize.value())?.label ?? 'Unit Size'
 	);
 </script>
 
@@ -512,7 +528,7 @@
 					<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
 
 					<Field.Group>
-						<div class="grid grid-cols-4 gap-4">
+						<div class="grid grid-cols-5 gap-4">
 							<Field.Field id="saleType">
 								<Select.Root
 									type="single"
@@ -609,8 +625,42 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
+							<Field.Field id="unitSize">
+								<Select.Root
+									type="single"
+									value={createSale.fields.unitSize.value() ?? ''}
+									onValueChange={(v) =>
+										createSale.fields.unitSize.set(
+											v as
+												| 'studio'
+												| '1bed'
+												| '2bed'
+												| '3bed'
+												| '4bed'
+												| '5bed'
+												| '6bed'
+												| '7bed'
+												| 'not-applicable'
+										)}
+								>
+									<Select.Trigger id="unitSize">
+										<div class="flex items-center gap-2">
+											<Home />
+											{unitSizeLabel}
+										</div>
+									</Select.Trigger>
+									<Select.Content>
+										{#each unitSizes as unitSize (unitSize.value)}
+											<Select.Item {...unitSize} />
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...createSale.fields.unitSize.as('text')} />
+								{#each createSale.fields.unitSize.issues() as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
 						</div>
-
 						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
 								<InputGroup.Root id="project">

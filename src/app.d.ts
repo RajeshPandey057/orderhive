@@ -246,6 +246,16 @@ declare global {
 		tentativeEligibilityDate: string | null;
 		propertyType: 'commercial' | 'residential' | 'plot';
 		unitType: 'apartment' | 'townhouse' | 'office';
+		unitSize:
+			| 'studio'
+			| '1bed'
+			| '2bed'
+			| '3bed'
+			| '4bed'
+			| '5bed'
+			| '6bed'
+			| '7bed'
+			| 'not-applicable';
 		unitNo: string;
 		unitValue: string;
 		createdByUid: string;

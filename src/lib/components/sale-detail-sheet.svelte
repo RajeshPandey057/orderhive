@@ -864,10 +864,10 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Unit Value
+									Unit Size
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
+									<span class="uppercase">{sale?.unitSize ?? '-'}</span>
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Property Type
@@ -875,6 +875,18 @@
 								<Table.Cell class="font-medium">
 									<span class="capitalize">{sale?.propertyType ?? '-'}</span>
 								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Unit Value
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Commission %
+								</Table.Cell>
+								<Table.Cell class="font-medium">4</Table.Cell>
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
@@ -887,9 +899,11 @@
 									</div>
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Commission %
+									Developer
 								</Table.Cell>
-								<Table.Cell class="font-medium">4</Table.Cell>
+								<Table.Cell class="font-medium">
+									<span class="capitalize">{sale?.developer ?? '-'}</span>
+								</Table.Cell>
 							</Table.Row>
 						</Table.Body>
 					</Table.Root>

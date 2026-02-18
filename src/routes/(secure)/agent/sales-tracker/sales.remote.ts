@@ -74,6 +74,10 @@ const saleSchema = z.object({
 	project: z.string().min(1, 'Project is required'),
 	propertyType: z.enum(['commercial', 'residential', 'plot'], 'Property type is required'),
 	unitType: z.enum(['apartment', 'townhouse', 'office'], 'Unit type is required'),
+	unitSize: z.enum(
+		['studio', '1bed', '2bed', '3bed', '4bed', '5bed', '6bed', '7bed', 'not-applicable'],
+		'Unit size is required'
+	),
 	unitNo: z.string().min(1, 'Unit number is required'),
 	unitValue: z.string().min(1, 'Unit value is required')
 });
@@ -198,6 +202,7 @@ export const createSale = form(saleSchema, async (data) => {
 		project: data.project,
 		propertyType: data.propertyType,
 		unitType: data.unitType,
+		unitSize: data.unitSize,
 		unitNo: data.unitNo,
 		unitValue: data.unitValue,
 		createdByUid,
