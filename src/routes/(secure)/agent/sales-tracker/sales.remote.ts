@@ -57,11 +57,15 @@ const saleSchema = z.object({
 		.min(0, 'Payment value must be at least 0')
 		.max(100, 'Payment value cannot exceed 100'),
 	bookingFormFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
-		message: 'Booking form upload is required'
+		message: 'EOI/Booking form upload is required'
 	}),
 	paymentReceiptFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
 		message: 'Payment receipt upload is required'
 	}),
+
+	// Optional files (can be generated or uploaded)
+	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+	refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 
 	// Project Details
 	invoiceStage: z.enum(
@@ -144,9 +148,10 @@ export const createSale = form(saleSchema, async (data) => {
 	const basePath = `sales/${createdByUid}/${saleId}`;
 
 	// Upload primary buyer documents
-	const [primaryPassportFile, primaryNationalIdFile] = await Promise.all([
+	const [primaryPassportFile, primaryNationalIdFile, primaryAmlFormFile] = await Promise.all([
 		toUploadedFile(data.passportFile, `${basePath}/primary/passport`),
-		toUploadedFile(data.nationalIdFile, `${basePath}/primary/national-id`)
+		toUploadedFile(data.nationalIdFile, `${basePath}/primary/national-id`),
+		toUploadedFile(data.amlFormFile, `${basePath}/primary/aml-form`)
 	]);
 
 	// Upload joint buyer documents
@@ -169,9 +174,10 @@ export const createSale = form(saleSchema, async (data) => {
 	);
 
 	// Upload booking and payment documents
-	const [bookingFormFile, paymentReceiptFile] = await Promise.all([
+	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile] = await Promise.all([
 		toUploadedFile(data.bookingFormFile, `${basePath}/booking-form`),
-		toUploadedFile(data.paymentReceiptFile, `${basePath}/payment-receipt`)
+		toUploadedFile(data.paymentReceiptFile, `${basePath}/payment-receipt`),
+		toUploadedFile(data.refferalAgreementFile, `${basePath}/referral-agreement`)
 	]);
 
 	const saleRecord = {
@@ -188,7 +194,8 @@ export const createSale = form(saleSchema, async (data) => {
 			email: data.email,
 			phone: data.phone,
 			passportFile: primaryPassportFile,
-			nationalIdFile: primaryNationalIdFile
+			nationalIdFile: primaryNationalIdFile,
+			amlFormFile: primaryAmlFormFile
 		},
 		jointBuyers,
 		dealOwners: data.dealOwners,
@@ -197,6 +204,7 @@ export const createSale = form(saleSchema, async (data) => {
 		paymentValue: data.paymentValue,
 		bookingFormFile,
 		paymentReceiptFile,
+		refferalAgreementFile,
 		saleType: data.saleType,
 		developer: data.developer,
 		project: data.project,

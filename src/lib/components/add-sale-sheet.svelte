@@ -92,13 +92,18 @@
 	let uploadedFiles = $state<Record<string, File | null>>({
 		passportFile: null,
 		nationalIdFile: null,
+		amlFormFile: null,
 		bookingFormFile: null,
-		paymentReceiptFile: null
+		paymentReceiptFile: null,
+		refferalAgreementFile: null
 	});
 
 	// Track uploaded files for joint buyers
 	let jointBuyerFiles = $state<
-		Record<number, { passportFile: File | null; nationalIdFile: File | null }>
+		Record<
+			number,
+			{ passportFile: File | null; nationalIdFile: File | null; amlFormFile: File | null }
+		>
 	>({});
 
 	// Track phone countries and values for joint buyers
@@ -129,7 +134,7 @@
 	const addJointBuyer = () => {
 		const newKey = nextJointKey++;
 		jointBuyers = [...jointBuyers, { key: newKey }];
-		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null };
+		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 		jointBuyerPhoneCountries[newKey] = 'AE';
 		jointBuyerPhoneValues[newKey] = '';
 	};
@@ -153,19 +158,22 @@
 
 	const handleJointBuyerFileUpload = (
 		buyerKey: number,
-		fieldName: 'passportFile' | 'nationalIdFile',
+		fieldName: 'passportFile' | 'nationalIdFile' | 'amlFormFile',
 		event: Event
 	) => {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
 			if (!jointBuyerFiles[buyerKey]) {
-				jointBuyerFiles[buyerKey] = { passportFile: null, nationalIdFile: null };
+				jointBuyerFiles[buyerKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 			}
 			jointBuyerFiles[buyerKey][fieldName] = input.files[0];
 		}
 	};
 
-	const removeJointBuyerFile = (buyerKey: number, fieldName: 'passportFile' | 'nationalIdFile') => {
+	const removeJointBuyerFile = (
+		buyerKey: number,
+		fieldName: 'passportFile' | 'nationalIdFile' | 'amlFormFile'
+	) => {
 		if (jointBuyerFiles[buyerKey]) {
 			jointBuyerFiles[buyerKey][fieldName] = null;
 		}
@@ -386,123 +394,122 @@
 						</Field.Legend>
 						<Field.Group class="space-y-4">
 							<div class="grid gap-4 xl:grid-cols-2">
-								<div class="space-y-4">
-									<div class="flex items-center gap-4">
-										<span
-											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-										>
-											1
-										</span>
+								<div class="flex items-center gap-4">
+									<span
+										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+									>
+										1
+									</span>
 
-										<Field.Field class="w-full">
-											{#if uploadedFiles.passportFile}
-												<h3 class="text-sm font-medium">Passport</h3>
+									<Field.Field class="w-full">
+										{#if uploadedFiles.passportFile}
+											<h3 class="text-sm font-medium">Passport</h3>
 
-												<div
-													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-												>
-													<div class="flex items-center gap-3">
-														<FileText class="h-10 w-10 text-orange-500" />
-														<div class="flex flex-col">
-															<span class="text-sm font-medium"
-																>{uploadedFiles.passportFile.name}</span
-															>
-															<span class="text-xs text-muted-foreground"
-																>{formatFileSize(uploadedFiles.passportFile.size)}</span
-															>
-														</div>
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium"
+															>{uploadedFiles.passportFile.name}</span
+														>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(uploadedFiles.passportFile.size)}</span
+														>
 													</div>
-													<button
-														type="button"
-														onclick={() => removeFile('passportFile')}
-														class="text-destructive hover:text-destructive/80"
-													>
-														<Trash2 class="h-5 w-5" />
-													</button>
 												</div>
-											{:else}
-												<label
-													for="passportFile"
-													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												<button
+													type="button"
+													onclick={() => removeFile('passportFile')}
+													class="text-destructive hover:text-destructive/80"
 												>
-													<Upload class="h-5 w-5 text-gray-600" />
-													<span class="text-sm font-medium">Upload Passport</span>
-												</label>
-											{/if}
-											<Input
-												id="passportFile"
-												class="sr-only"
-												{...createSale.fields.passportFile.as('file')}
-												files={undefined}
-												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-												onchange={(e) => handleFileUpload('passportFile', e)}
-											/>
-											{#each createSale.fields.passportFile.issues() as issue, i (i)}
-												<Field.Error class="text-sm text-destructive">
-													{issue.message}
-												</Field.Error>
-											{/each}
-										</Field.Field>
-									</div>
-
-									<div class="flex items-center gap-4">
-										<span
-											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-										>
-											2
-										</span>
-										<Field.Field class="w-full">
-											{#if uploadedFiles.nationalIdFile}
-												<h3 class="text-sm font-medium">National ID</h3>
-
-												<div
-													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-												>
-													<div class="flex items-center gap-3">
-														<FileText class="h-10 w-10 text-orange-500" />
-														<div class="flex flex-col">
-															<span class="text-sm font-medium"
-																>{uploadedFiles.nationalIdFile.name}</span
-															>
-															<span class="text-xs text-muted-foreground"
-																>{formatFileSize(uploadedFiles.nationalIdFile.size)}</span
-															>
-														</div>
-													</div>
-													<button
-														type="button"
-														onclick={() => removeFile('nationalIdFile')}
-														class="text-destructive hover:text-destructive/80"
-													>
-														<Trash2 class="h-5 w-5" />
-													</button>
-												</div>
-											{:else}
-												<label
-													for="nationalIdFile"
-													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-												>
-													<Upload class="h-5 w-5 text-gray-600" />
-													<span class="text-sm font-medium">
-														Upload National ID <br />(Emirates ID)
-													</span>
-												</label>
-											{/if}
-											<Input
-												id="nationalIdFile"
-												class="sr-only"
-												{...createSale.fields.nationalIdFile.as('file')}
-												files={undefined}
-												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-												onchange={(e) => handleFileUpload('nationalIdFile', e)}
-											/>
-											{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
-												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-											{/each}
-										</Field.Field>
-									</div>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											</div>
+										{:else}
+											<label
+												for="passportFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload Passport</span>
+											</label>
+										{/if}
+										<Input
+											id="passportFile"
+											class="sr-only"
+											{...createSale.fields.passportFile.as('file')}
+											files={undefined}
+											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+											onchange={(e) => handleFileUpload('passportFile', e)}
+										/>
+										{#each createSale.fields.passportFile.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">
+												{issue.message}
+											</Field.Error>
+										{/each}
+									</Field.Field>
 								</div>
-								<div class="flex w-full flex-col items-center gap-4">
+
+								<div class="flex items-center gap-4">
+									<span
+										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+									>
+										2
+									</span>
+									<Field.Field class="w-full">
+										{#if uploadedFiles.nationalIdFile}
+											<h3 class="text-sm font-medium">National ID</h3>
+
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium"
+															>{uploadedFiles.nationalIdFile.name}</span
+														>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(uploadedFiles.nationalIdFile.size)}</span
+														>
+													</div>
+												</div>
+												<button
+													type="button"
+													onclick={() => removeFile('nationalIdFile')}
+													class="text-destructive hover:text-destructive/80"
+												>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											</div>
+										{:else}
+											<label
+												for="nationalIdFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">
+													Upload National ID <br />(Emirates ID)
+												</span>
+											</label>
+										{/if}
+										<Input
+											id="nationalIdFile"
+											class="sr-only"
+											{...createSale.fields.nationalIdFile.as('file')}
+											files={undefined}
+											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+											onchange={(e) => handleFileUpload('nationalIdFile', e)}
+										/>
+										{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+								</div>
+
+								<div class="col-span-2 flex w-full flex-col items-center gap-4">
 									<div class="flex w-full flex-row gap-4">
 										<span
 											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
@@ -512,10 +519,51 @@
 										<p class="text-sm font-medium">AML Form</p>
 									</div>
 
-									<Button variant="outline" type="button" class="w-full bg-orange-50/40">
-										<PlusRound class="h-4 w-4" />
-										Generate Now
-									</Button>
+									{#if uploadedFiles.amlFormFile}
+										<div
+											class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+										>
+											<div class="flex items-center gap-3">
+												<FileText class="h-10 w-10 text-orange-500" />
+												<div class="flex flex-col">
+													<span class="text-sm font-medium">{uploadedFiles.amlFormFile.name}</span>
+													<span class="text-xs text-muted-foreground"
+														>{formatFileSize(uploadedFiles.amlFormFile.size)}</span
+													>
+												</div>
+											</div>
+											<button
+												type="button"
+												onclick={() => removeFile('amlFormFile')}
+												class="text-destructive hover:text-destructive/80"
+											>
+												<Trash2 class="h-5 w-5" />
+											</button>
+										</div>
+									{:else}
+										<div class="flex w-full flex-row gap-2">
+											<Button variant="outline" type="button" class="flex-1 bg-orange-50/40">
+												<PlusRound class="h-4 w-4" />
+												Generate Now
+											</Button>
+											<span class="self-center text-center text-xs text-muted-foreground">or</span>
+											<label
+												for="amlFormFile"
+												class=" flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload manually</span>
+											</label>
+										</div>
+									{/if}
+									<Input
+										id="amlFormFile"
+										class="sr-only"
+										{...createSale.fields.amlFormFile.as('file')}
+										files={undefined}
+										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+										onchange={(e) => handleFileUpload('amlFormFile', e)}
+									/>
 								</div>
 							</div>
 						</Field.Group>
@@ -745,9 +793,37 @@
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
 								</Field.Field>
+							</div>
+							<HorizontalSeparator text="OR" class="mx-4" />
+							<div class="flex w-full flex-col gap-2">
+								<Field.Field orientation="horizontal">
+									<RadioGroup.Item value="booking" id="deal-booking" />
+									<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label>
+								</Field.Field>
+								<Field.Field>
+									<DealPercentage
+										bind:value={
+											() => createSale.fields.paymentValue.value() ?? 0,
+											(v) => createSale.fields.paymentValue.set(Number(v) || 0)
+										}
+										disabled={createSale.fields.dealStage.value() !== 'booking'}
+									/>
+									{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+							</div>
+						</RadioGroup.Root>
+						<input class="sr-only" {...createSale.fields.dealStage.as('text')} />
+
+						<!-- File Uploads - Only show when a stage is selected -->
+						{#if createSale.fields.dealStage.value()}
+							<div class="space-y-4 pt-2">
 								<Field.Field class="w-full">
 									{#if uploadedFiles.bookingFormFile}
-										<h3 class="text-sm font-medium">Booking Form</h3>
+										<h3 class="text-sm font-medium">
+											{createSale.fields.dealStage.value() === 'eoi' ? 'EOI Form' : 'Booking Form'}
+										</h3>
 
 										<div
 											class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
@@ -777,7 +853,11 @@
 											class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
 										>
 											<Upload class="h-5 w-5 text-gray-600" />
-											<span class="text-sm font-medium">Upload booking form</span>
+											<span class="text-sm font-medium">
+												{createSale.fields.dealStage.value() === 'eoi'
+													? 'Upload EOI form'
+													: 'Upload booking form'}
+											</span>
 										</label>
 									{/if}
 									<Input
@@ -793,7 +873,9 @@
 											{issue.message}
 										</Field.Error>
 									{/each}
-								</Field.Field><Field.Field class="w-full">
+								</Field.Field>
+
+								<Field.Field class="w-full">
 									{#if uploadedFiles.paymentReceiptFile}
 										<h3 class="text-sm font-medium">Payment Receipt</h3>
 
@@ -843,27 +925,7 @@
 									{/each}
 								</Field.Field>
 							</div>
-							<HorizontalSeparator text="OR" class="mx-4" />
-							<div class="flex w-full flex-col gap-2">
-								<Field.Field orientation="horizontal">
-									<RadioGroup.Item value="booking" id="deal-booking" />
-									<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label>
-								</Field.Field>
-								<Field.Field>
-									<DealPercentage
-										bind:value={
-											() => createSale.fields.paymentValue.value() ?? 0,
-											(v) => createSale.fields.paymentValue.set(Number(v) || 0)
-										}
-										disabled={createSale.fields.dealStage.value() !== 'booking'}
-									/>
-									{#each createSale.fields.paymentValue.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-							</div>
-						</RadioGroup.Root>
-						<input class="sr-only" {...createSale.fields.dealStage.as('text')} />
+						{/if}
 					</Field.Group>
 				</Field.Set>
 				<Field.Separator />
@@ -874,10 +936,54 @@
 						Refferal Agreement
 					</Field.Legend>
 					<Field.Group class="space-y-4">
-						<Button variant="outline" type="button" class="w-xs bg-orange-50/40">
-							<PlusRound class="h-4 w-4" />
-							Generate Referral Agreement
-						</Button>
+						{#if uploadedFiles.refferalAgreementFile}
+							<h3 class="text-sm font-medium">Referral Agreement</h3>
+							<div
+								class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+							>
+								<div class="flex items-center gap-3">
+									<FileText class="h-10 w-10 text-orange-500" />
+									<div class="flex flex-col">
+										<span class="text-sm font-medium"
+											>{uploadedFiles.refferalAgreementFile.name}</span
+										>
+										<span class="text-xs text-muted-foreground"
+											>{formatFileSize(uploadedFiles.refferalAgreementFile.size)}</span
+										>
+									</div>
+								</div>
+								<button
+									type="button"
+									onclick={() => removeFile('refferalAgreementFile')}
+									class="text-destructive hover:text-destructive/80"
+								>
+									<Trash2 class="h-5 w-5" />
+								</button>
+							</div>
+						{:else}
+							<div class="flex w-full flex-row gap-2">
+								<Button variant="outline" type="button" class="flex-1 bg-orange-50/40">
+									<PlusRound class="h-4 w-4" />
+									Generate Referral Agreement
+								</Button>
+								<span class="self-center text-center text-xs text-muted-foreground">or</span>
+								<label
+									for="refferalAgreementFile"
+									class="flex w-full flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+								>
+									<Upload class="h-5 w-5 text-gray-600" />
+									<span class="text-sm font-medium">Upload manually</span>
+								</label>
+							</div>
+						{/if}
+						<Input
+							id="refferalAgreementFile"
+							class="sr-only"
+							{...createSale.fields.refferalAgreementFile.as('file')}
+							files={undefined}
+							accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+							onchange={(e) => handleFileUpload('refferalAgreementFile', e)}
+						/>
 					</Field.Group>
 				</Field.Set>
 				<Field.Separator />
@@ -1347,10 +1453,57 @@
 												<p class="text-sm font-medium">AML Form</p>
 											</div>
 
-											<Button variant="outline" type="button" class="w-full bg-orange-50/40">
-												<PlusRound class="h-4 w-4" />
-												Generate Now
-											</Button>
+											{#if jointBuyerFiles[buyer.key]?.amlFormFile}
+												<div
+													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<div class="flex items-center gap-3">
+														<FileText class="h-10 w-10 text-orange-500" />
+														<div class="flex flex-col">
+															<span class="text-sm font-medium"
+																>{jointBuyerFiles[buyer.key]?.amlFormFile?.name ?? ''}</span
+															>
+															<span class="text-xs text-muted-foreground"
+																>{jointBuyerFiles[buyer.key]?.amlFormFile
+																	? formatFileSize(
+																			jointBuyerFiles[buyer.key]?.amlFormFile?.size ?? 0
+																		)
+																	: ''}</span
+															>
+														</div>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeJointBuyerFile(buyer.key, 'amlFormFile')}
+														class="text-destructive hover:text-destructive/80"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{:else}
+												<div class="flex w-full flex-col gap-2">
+													<Button variant="outline" type="button" class="w-full bg-orange-50/40">
+														<PlusRound class="h-4 w-4" />
+														Generate Now
+													</Button>
+													<span class="text-center text-xs text-muted-foreground">or</span>
+													<label
+														for={`joint-amlFormFile-${buyer.key}`}
+														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+													>
+														<Upload class="h-5 w-5 text-gray-600" />
+														<span class="text-sm font-medium">Upload manually</span>
+													</label>
+												</div>
+											{/if}
+											<Input
+												id={`joint-amlFormFile-${buyer.key}`}
+												name={`jointBuyers[${index}].amlFormFile`}
+												class="sr-only"
+												type="file"
+												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+												onchange={(e) => handleJointBuyerFileUpload(buyer.key, 'amlFormFile', e)}
+											/>
 										</div>
 									</div>
 								</Field.Group>
