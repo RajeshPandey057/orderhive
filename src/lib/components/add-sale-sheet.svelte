@@ -30,6 +30,7 @@
 	import Traffic from '~icons/lucide/traffic-cone';
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
+	import { generateAmlForm } from '../../routes/(secure)/agent/sales-tracker/aml.remote.js';
 	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	let sheetOpen = $state(false);
@@ -112,6 +113,11 @@
 	let clientPhoneCountry = $state<string>('AE');
 	let clientPhoneValue = $state<string>('');
 
+	// Track AML generation state
+	let amlGenerating = $state<Record<string, boolean>>({
+		primary: false
+	});
+
 	const handleFileUpload = (fieldName: string, event: Event) => {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
@@ -137,6 +143,7 @@
 		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 		jointBuyerPhoneCountries[newKey] = 'AE';
 		jointBuyerPhoneValues[newKey] = '';
+		amlGenerating[`joint-${newKey}`] = false;
 	};
 
 	const removeJointBuyer = (key: number) => {
@@ -542,9 +549,66 @@
 										</div>
 									{:else}
 										<div class="flex w-full flex-row gap-2">
-											<Button variant="outline" type="button" class="flex-1 bg-orange-50/40">
-												<PlusRound class="h-4 w-4" />
-												Generate Now
+											<Button
+												variant="outline"
+												type="button"
+												class="flex-1 bg-orange-50/40"
+												disabled={amlGenerating.primary}
+												onclick={async () => {
+													// Validate required fields
+													const firstName = createSale.fields.firstName.value();
+													const lastName = createSale.fields.lastName.value();
+													const email = createSale.fields.email.value();
+													const phone = getE164number(clientPhoneValue, clientPhoneCountry);
+
+													if (!firstName || !lastName || !email || !phone) {
+														toast.error(
+															'Please fill in buyer name, email, and phone before generating AML form'
+														);
+														return;
+													}
+
+													amlGenerating.primary = true;
+													toast.info('Generating and sending AML form...');
+
+													try {
+														const result = await generateAmlForm({
+															firstName,
+															lastName,
+															email,
+															phone,
+															buyerType: 'primary' as const
+														});
+
+														if (result?.success && result?.file) {
+															// Create File object from uploaded data
+															const fileObj = new File([], result.file.name, {
+																type: result.file.contentType,
+																lastModified: result.file.lastModified
+															});
+
+															uploadedFiles.amlFormFile = fileObj;
+															toast.success(
+																`AML form generated and sent to ${email} for signature`
+															);
+														} else {
+															toast.error(result?.error || 'Failed to generate AML form');
+														}
+													} catch (err) {
+														toast.error('Failed to generate AML form');
+														console.error('AML generation error:', err);
+													} finally {
+														amlGenerating.primary = false;
+													}
+												}}
+											>
+												{#if amlGenerating.primary}
+													<Loader2 class="h-4 w-4 animate-spin" />
+													Generating...
+												{:else}
+													<PlusRound class="h-4 w-4" />
+													Generate Now
+												{/if}
 											</Button>
 											<span class="self-center text-center text-xs text-muted-foreground">or</span>
 											<label
@@ -1482,9 +1546,90 @@
 												</div>
 											{:else}
 												<div class="flex w-full flex-col gap-2">
-													<Button variant="outline" type="button" class="w-full bg-orange-50/40">
-														<PlusRound class="h-4 w-4" />
-														Generate Now
+													<Button
+														variant="outline"
+														type="button"
+														class="w-full bg-orange-50/40"
+														disabled={amlGenerating[`joint-${buyer.key}`]}
+														onclick={async () => {
+															// Get joint buyer data from form fields
+															const firstNameInput = document.getElementById(
+																`joint-firstName-${buyer.key}`
+															) as HTMLInputElement;
+															const lastNameInput = document.getElementById(
+																`joint-lastName-${buyer.key}`
+															) as HTMLInputElement;
+															const emailInput = document.getElementById(
+																`joint-email-${buyer.key}`
+															) as HTMLInputElement;
+
+															const firstName = firstNameInput?.value;
+															const lastName = lastNameInput?.value;
+															const email = emailInput?.value;
+															const phone = getE164number(
+																jointBuyerPhoneValues[buyer.key] || '',
+																jointBuyerPhoneCountries[buyer.key] || 'AE'
+															);
+
+															if (!firstName || !lastName || !email || !phone) {
+																toast.error(
+																	'Please fill in joint buyer name, email, and phone before generating AML form'
+																);
+																return;
+															}
+
+															amlGenerating[`joint-${buyer.key}`] = true;
+															toast.info('Generating and sending AML form...');
+
+															try {
+																const jointBuyerIndex = jointBuyers.findIndex(
+																	(b) => b.key === buyer.key
+																);
+																const result = await generateAmlForm({
+																	firstName,
+																	lastName,
+																	email,
+																	phone,
+																	buyerType: 'joint' as const,
+																	buyerIndex: jointBuyerIndex
+																});
+
+																if (result?.success && result?.file) {
+																	// Create File object from uploaded data
+																	const fileObj = new File([], result.file.name, {
+																		type: result.file.contentType,
+																		lastModified: result.file.lastModified
+																	});
+
+																	if (!jointBuyerFiles[buyer.key]) {
+																		jointBuyerFiles[buyer.key] = {
+																			passportFile: null,
+																			nationalIdFile: null,
+																			amlFormFile: null
+																		};
+																	}
+																	jointBuyerFiles[buyer.key].amlFormFile = fileObj;
+																	toast.success(
+																		`AML form generated and sent to ${email} for signature`
+																	);
+																} else {
+																	toast.error(result?.error || 'Failed to generate AML form');
+																}
+															} catch (err) {
+																toast.error('Failed to generate AML form');
+																console.error('Joint buyer AML generation error:', err);
+															} finally {
+																amlGenerating[`joint-${buyer.key}`] = false;
+															}
+														}}
+													>
+														{#if amlGenerating[`joint-${buyer.key}`]}
+															<Loader2 class="h-4 w-4 animate-spin" />
+															Generating...
+														{:else}
+															<PlusRound class="h-4 w-4" />
+															Generate Now
+														{/if}
 													</Button>
 													<span class="text-center text-xs text-muted-foreground">or</span>
 													<label
