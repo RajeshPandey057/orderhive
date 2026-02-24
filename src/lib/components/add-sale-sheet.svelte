@@ -280,26 +280,37 @@
 		{ value: 'zaya', label: 'Zaya' }
 	];
 	const propertyTypes = [
+		{ value: 'apartment', label: 'Apartment' },
+		{ value: 'townhouse', label: 'Townhouse' },
+		{ value: 'villa', label: 'Villa' },
 		{ value: 'commercial', label: 'Commercial' },
-		{ value: 'residential', label: 'Residential' },
 		{ value: 'plot', label: 'Plot' }
 	];
-	const unitTypes = [
-		{ value: 'apartment', label: 'Apartment' },
-		{ value: 'townhouse', label: 'Townhouse/Villa' },
-		{ value: 'office', label: 'Office Space' }
-	];
 
-	const unitSizes = [
+	const apartmentBedrooms = [
 		{ value: 'studio', label: 'Studio' },
 		{ value: '1bed', label: '1 Bed' },
+		{ value: '2bed', label: '2 Bed' },
+		{ value: '2bed+maid', label: '2 Bed + Maid' },
+		{ value: '3bed', label: '3 Bed' },
+		{ value: '3bed+maid', label: '3 Bed + Maid' },
+		{ value: '4bed', label: '4 Bed' },
+		{ value: 'duplex', label: 'Duplex' },
+		{ value: 'penthouse', label: 'Penthouse' },
+		{ value: 'podium-townhouse', label: 'Podium Townhouse' }
+	];
+
+	const townhouseVillaBedrooms = [
 		{ value: '2bed', label: '2 Bed' },
 		{ value: '3bed', label: '3 Bed' },
 		{ value: '4bed', label: '4 Bed' },
 		{ value: '5bed', label: '5 Bed' },
-		{ value: '6bed', label: '6 Bed' },
-		{ value: '7bed', label: '7 Bed' },
-		{ value: 'not-applicable', label: 'Not Applicable' }
+		{ value: '6-7bed', label: '6/7 Bed' }
+	];
+
+	const commercialSubTypes = [
+		{ value: 'office', label: 'Office Space' },
+		{ value: 'warehouse', label: 'Warehouse' }
 	];
 
 	const saleTypeLabel = $derived(
@@ -312,12 +323,14 @@
 		propertyTypes.find((p) => p.value === createSale.fields.propertyType.value())?.label ??
 			'Property Type'
 	);
-	const unitTypeLabel = $derived(
-		unitTypes.find((u) => u.value === createSale.fields.unitType.value())?.label ?? 'Unit Type'
+	const bedroomTypeLabel = $derived(
+		[...apartmentBedrooms, ...townhouseVillaBedrooms].find(
+			(b) => b.value === createSale.fields.bedroomType.value()
+		)?.label ?? 'Bedrooms'
 	);
-
-	const unitSizeLabel = $derived(
-		unitSizes.find((u) => u.value === createSale.fields.unitSize.value())?.label ?? 'Unit Size'
+	const commercialSubTypeLabel = $derived(
+		commercialSubTypes.find((c) => c.value === createSale.fields.commercialSubType.value())
+			?.label ?? 'Commercial Type'
 	);
 </script>
 
@@ -657,7 +670,7 @@
 					<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
 
 					<Field.Group>
-						<div class="grid grid-cols-5 gap-4">
+						<div class="grid grid-cols-3 gap-4">
 							<Field.Field id="saleType">
 								<Select.Root
 									type="single"
@@ -711,7 +724,9 @@
 									type="single"
 									value={createSale.fields.propertyType.value() ?? ''}
 									onValueChange={(v) =>
-										createSale.fields.propertyType.set(v as 'commercial' | 'residential' | 'plot')}
+										createSale.fields.propertyType.set(
+											v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
+										)}
 								>
 									<Select.Trigger id="propertyType">
 										<div class="flex items-center gap-2">
@@ -730,65 +745,191 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
-							<Field.Field id="unitType">
-								<Select.Root
-									type="single"
-									value={createSale.fields.unitType.value() ?? ''}
-									onValueChange={(v) =>
-										createSale.fields.unitType.set(v as 'apartment' | 'townhouse' | 'office')}
-								>
-									<Select.Trigger id="unitType">
-										<div class="flex items-center gap-2">
-											<Home />
-											{unitTypeLabel}
-										</div>
-									</Select.Trigger>
-									<Select.Content>
-										{#each unitTypes as unitType (unitType.value)}
-											<Select.Item {...unitType} />
+						</div>
+
+						<!-- Conditional Fields Based on Property Type -->
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							<!-- Apartment Fields -->
+							{#if createSale.fields.propertyType.value() === 'apartment'}
+								<Field.Field id="bedroomType">
+									<Select.Root
+										type="single"
+										value={createSale.fields.bedroomType.value() ?? ''}
+										onValueChange={(v) =>
+											createSale.fields.bedroomType.set(
+												v as unknown as NonNullable<
+													Parameters<typeof createSale.fields.bedroomType.set>[0]
+												>
+											)}
+									>
+										<Select.Trigger id="bedroomType">
+											<div class="flex items-center gap-2">
+												<Home />
+												{bedroomTypeLabel}
+											</div>
+										</Select.Trigger>
+										<Select.Content>
+											{#each apartmentBedrooms as bedroom (bedroom.value)}
+												<Select.Item {...bedroom} />
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
+									{#each createSale.fields.bedroomType.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<InputGroup.Root id="propertySize">
+										<InputGroup.Input
+											{...createSale.fields.propertySize.as('number')}
+											placeholder="Property Size"
+										/>
+										<InputGroup.Addon>
+											<span class="text-xs">Sqft</span>
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.propertySize.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+							{/if}
+
+							<!-- Townhouse/Villa Fields -->
+							{#if createSale.fields.propertyType.value() === 'townhouse' || createSale.fields.propertyType.value() === 'villa'}
+								<Field.Field id="bedroomType">
+									<Select.Root
+										type="single"
+										value={createSale.fields.bedroomType.value() ?? ''}
+										onValueChange={(v) =>
+											createSale.fields.bedroomType.set(
+												v as unknown as NonNullable<
+													Parameters<typeof createSale.fields.bedroomType.set>[0]
+												>
+											)}
+									>
+										<Select.Trigger id="bedroomType">
+											<div class="flex items-center gap-2">
+												<Home />
+												{bedroomTypeLabel}
+											</div>
+										</Select.Trigger>
+										<Select.Content>
+											{#each townhouseVillaBedrooms as bedroom (bedroom.value)}
+												<Select.Item {...bedroom} />
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
+									{#each createSale.fields.bedroomType.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<InputGroup.Root id="plotArea">
+										<InputGroup.Input
+											{...createSale.fields.plotArea.as('number')}
+											placeholder="Plot Area"
+										/>
+										<InputGroup.Addon>
+											<span class="text-xs">Sqft</span>
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.plotArea.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<InputGroup.Root id="builtUpArea">
+										<InputGroup.Input
+											{...createSale.fields.builtUpArea.as('number')}
+											placeholder="Built Up Area"
+										/>
+										<InputGroup.Addon>
+											<span class="text-xs">Sqft</span>
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.builtUpArea.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+							{/if}
+
+							<!-- Commercial Fields -->
+							{#if createSale.fields.propertyType.value() === 'commercial'}
+								<Field.Field id="commercialSubType">
+									<Select.Root
+										type="single"
+										value={createSale.fields.commercialSubType.value() ?? ''}
+										onValueChange={(v) =>
+											createSale.fields.commercialSubType.set(v as 'office' | 'warehouse')}
+									>
+										<Select.Trigger id="commercialSubType">
+											<div class="flex items-center gap-2">
+												<Building />
+												{commercialSubTypeLabel}
+											</div>
+										</Select.Trigger>
+										<Select.Content>
+											{#each commercialSubTypes as subType (subType.value)}
+												<Select.Item {...subType} />
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<input type="hidden" {...createSale.fields.commercialSubType.as('text')} />
+									{#each createSale.fields.commercialSubType.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<InputGroup.Root id="propertySize">
+										<InputGroup.Input
+											{...createSale.fields.propertySize.as('number')}
+											placeholder="Property Size"
+										/>
+										<InputGroup.Addon>
+											<span class="text-xs">Sqft</span>
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.propertySize.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								{#if createSale.fields.commercialSubType.value() === 'warehouse'}
+									<Field.Field>
+										<InputGroup.Root id="grossFloorArea">
+											<InputGroup.Input
+												{...createSale.fields.grossFloorArea.as('number')}
+												placeholder="Gross Floor Area"
+											/>
+											<InputGroup.Addon>
+												<span class="text-xs">Sqft</span>
+											</InputGroup.Addon>
+										</InputGroup.Root>
+										{#each createSale.fields.grossFloorArea.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.unitType.as('text')} />
-								{#each createSale.fields.unitType.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field id="unitSize">
-								<Select.Root
-									type="single"
-									value={createSale.fields.unitSize.value() ?? ''}
-									onValueChange={(v) =>
-										createSale.fields.unitSize.set(
-											v as
-												| 'studio'
-												| '1bed'
-												| '2bed'
-												| '3bed'
-												| '4bed'
-												| '5bed'
-												| '6bed'
-												| '7bed'
-												| 'not-applicable'
-										)}
-								>
-									<Select.Trigger id="unitSize">
-										<div class="flex items-center gap-2">
-											<Home />
-											{unitSizeLabel}
-										</div>
-									</Select.Trigger>
-									<Select.Content>
-										{#each unitSizes as unitSize (unitSize.value)}
-											<Select.Item {...unitSize} />
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.unitSize.as('text')} />
-								{#each createSale.fields.unitSize.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
+									</Field.Field>
+								{/if}
+							{/if}
+
+							<!-- Plot Fields -->
+							{#if createSale.fields.propertyType.value() === 'plot'}
+								<Field.Field>
+									<InputGroup.Root id="propertySize">
+										<InputGroup.Input
+											{...createSale.fields.propertySize.as('number')}
+											placeholder="Property Size"
+										/>
+										<InputGroup.Addon>
+											<span class="text-xs">Sqft</span>
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.propertySize.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+							{/if}
 						</div>
 						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
@@ -1017,6 +1158,68 @@
 						Refferal Agreement
 					</Field.Legend>
 					<Field.Group class="space-y-4">
+						<!-- Referral Amount Section -->
+						<div class="space-y-3 rounded-lg border border-border/60 bg-background/60 p-4">
+							<h3 class="text-sm font-medium">Referral Amount</h3>
+							<RadioGroup.Root
+								class="flex w-full flex-row gap-4"
+								value={createSale.fields.referralAmountType.value() ?? ''}
+								onValueChange={(v) =>
+									createSale.fields.referralAmountType.set(v as 'percentage' | 'amount')}
+							>
+								<Field.Field orientation="horizontal">
+									<RadioGroup.Item value="percentage" id="percentage" />
+									<Field.Label for="percentage">Percentage (%)</Field.Label>
+								</Field.Field>
+								<Field.Field orientation="horizontal">
+									<RadioGroup.Item value="amount" id="amount" />
+									<Field.Label for="amount">Fixed Amount</Field.Label>
+								</Field.Field>
+							</RadioGroup.Root>
+							<input class="sr-only" {...createSale.fields.referralAmountType.as('text')} />
+							{#if createSale.fields.referralAmountType.value()}
+								<Field.Field>
+									<InputGroup.Root id="referralAmount">
+										<InputGroup.Input
+											{...createSale.fields.referralAmount.as('number')}
+											placeholder={createSale.fields.referralAmountType.value() === 'percentage'
+												? 'Enter percentage (e.g., 2.5)'
+												: 'Enter amount (e.g., 50000)'}
+										/>
+										<InputGroup.Addon>
+											{#if createSale.fields.referralAmountType.value() === 'percentage'}
+												<span class="text-xs">%</span>
+											{:else}
+												<span class="text-xs">AED</span>
+											{/if}
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.referralAmount.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.unitValue.value()}
+										{@const unitValue = parseFloat(
+											createSale.fields.unitValue.value().replace(/,/g, '')
+										)}
+										{@const percentage = createSale.fields.referralAmount.value()}
+										{@const calculatedAmount = (unitValue * percentage) / 100}
+										{#if !isNaN(calculatedAmount) && calculatedAmount > 0}
+											<div class="mt-2 rounded-md bg-muted/50 p-3 text-sm">
+												<div class="flex items-center justify-between">
+													<span class="text-muted-foreground">Calculated Amount:</span>
+													<span class="font-semibold text-foreground">
+														AED {calculatedAmount.toLocaleString('en-US', {
+															minimumFractionDigits: 2,
+															maximumFractionDigits: 2
+														})}
+													</span>
+												</div>
+											</div>
+										{/if}
+									{/if}
+								</Field.Field>
+							{/if}
+						</div>
 						{#if uploadedFiles.refferalAgreementFile}
 							<h3 class="text-sm font-medium">Referral Agreement</h3>
 							<div

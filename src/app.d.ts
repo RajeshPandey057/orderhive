@@ -244,20 +244,28 @@ declare global {
 			| 'eligible-full'
 			| 'not-yet-eligible';
 		tentativeEligibilityDate: string | null;
-		propertyType: 'commercial' | 'residential' | 'plot';
-		unitType: 'apartment' | 'townhouse' | 'office';
-		unitSize:
+		propertyType: 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
+		bedroomType?:
 			| 'studio'
 			| '1bed'
 			| '2bed'
+			| '2bed+maid'
 			| '3bed'
+			| '3bed+maid'
 			| '4bed'
 			| '5bed'
-			| '6bed'
-			| '7bed'
-			| 'not-applicable';
+			| '6-7bed'
+			| 'duplex'
+			| 'penthouse'
+			| 'podium-townhouse';
+		commercialSubType?: 'office' | 'warehouse';
+		propertySize?: number;
+		plotArea?: number;
+		builtUpArea?: number;
+		grossFloorArea?: number;
 		unitNo: string;
 		unitValue: string;
+		referralAmount?: number;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

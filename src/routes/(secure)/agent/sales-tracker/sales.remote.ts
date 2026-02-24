@@ -24,67 +24,169 @@ const dealOwnerSchema = z.object({
 	split: z.number().min(0, 'Split must be at least 0').max(100, 'Split cannot exceed 100')
 });
 
-const saleSchema = z.object({
-	// Primary Buyer (marked as primary)
-	firstName: buyerSchema.shape.firstName,
-	lastName: buyerSchema.shape.lastName,
-	email: buyerSchema.shape.email,
-	phone: buyerSchema.shape.phone,
-	passportFile: buyerSchema.shape.passportFile,
-	nationalIdFile: buyerSchema.shape.nationalIdFile,
+const saleSchema = z
+	.object({
+		// Primary Buyer (marked as primary)
+		firstName: buyerSchema.shape.firstName,
+		lastName: buyerSchema.shape.lastName,
+		email: buyerSchema.shape.email,
+		phone: buyerSchema.shape.phone,
+		passportFile: buyerSchema.shape.passportFile,
+		nationalIdFile: buyerSchema.shape.nationalIdFile,
 
-	// Deal Owners
-	dealOwners: z
-		.array(dealOwnerSchema)
-		.min(1, 'At least one deal owner is required')
-		.superRefine((owners, ctx) => {
-			const total = owners.reduce((sum, owner) => sum + owner.split, 0);
+		// Deal Owners
+		dealOwners: z
+			.array(dealOwnerSchema)
+			.min(1, 'At least one deal owner is required')
+			.superRefine((owners, ctx) => {
+				const total = owners.reduce((sum, owner) => sum + owner.split, 0);
 
-			if (Math.round(total * 100) / 100 !== 100) {
-				ctx.addIssue({
-					code: 'custom',
-					message: 'Deal owner split must total 100%'
-				});
-			}
+				if (Math.round(total * 100) / 100 !== 100) {
+					ctx.addIssue({
+						code: 'custom',
+						message: 'Deal owner split must total 100%'
+					});
+				}
+			}),
+
+		// Joint Buyers (unlimited)
+		jointBuyers: z.array(buyerSchema).default([]),
+		// Deal Status
+		dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
+		paymentValue: z
+			.number()
+			.min(0, 'Payment value must be at least 0')
+			.max(100, 'Payment value cannot exceed 100'),
+		bookingFormFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
+			message: 'EOI/Booking form upload is required'
+		}),
+		paymentReceiptFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
+			message: 'Payment receipt upload is required'
 		}),
 
-	// Joint Buyers (unlimited)
-	jointBuyers: z.array(buyerSchema).default([]),
-	// Deal Status
-	dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
-	paymentValue: z
-		.number()
-		.min(0, 'Payment value must be at least 0')
-		.max(100, 'Payment value cannot exceed 100'),
-	bookingFormFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
-		message: 'EOI/Booking form upload is required'
-	}),
-	paymentReceiptFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
-		message: 'Payment receipt upload is required'
-	}),
+		// Optional files (can be generated or uploaded)
+		amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 
-	// Optional files (can be generated or uploaded)
-	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
-	refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		// Project Details
+		invoiceStage: z.enum(
+			['eligible-first-half', 'eligible-second-half', 'eligible-full', 'not-yet-eligible'],
+			'Invoice stage is required'
+		),
+		tentativeEligibilityDate: z.string().optional(),
+		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
+		developer: z.string().min(1, 'Developer is required'),
+		project: z.string().min(1, 'Project is required'),
+		propertyType: z.enum(
+			['apartment', 'townhouse', 'villa', 'commercial', 'plot'],
+			'Property type is required'
+		),
+		bedroomType: z
+			.enum([
+				'studio',
+				'1bed',
+				'2bed',
+				'2bed+maid',
+				'3bed',
+				'3bed+maid',
+				'4bed',
+				'5bed',
+				'6-7bed',
+				'duplex',
+				'penthouse',
+				'podium-townhouse'
+			])
+			.optional(),
+		commercialSubType: z.enum(['office', 'warehouse']).optional(),
+		propertySize: z.number().optional(),
+		plotArea: z.number().optional(),
+		builtUpArea: z.number().optional(),
+		grossFloorArea: z.number().optional(),
+		unitNo: z.string().min(1, 'Unit number is required'),
+		unitValue: z.string().min(1, 'Unit value is required'),
+		referralAmountType: z.enum(['percentage', 'amount']).optional(),
+		referralAmount: z.number().optional()
+	})
+	.superRefine((data, ctx) => {
+		// Apartment validation
+		if (data.propertyType === 'apartment') {
+			if (!data.bedroomType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['bedroomType'],
+					message: 'Number of bedrooms is required for apartments'
+				});
+			}
+			if (!data.propertySize) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['propertySize'],
+					message: 'Property size is required for apartments'
+				});
+			}
+		}
 
-	// Project Details
-	invoiceStage: z.enum(
-		['eligible-first-half', 'eligible-second-half', 'eligible-full', 'not-yet-eligible'],
-		'Invoice stage is required'
-	),
-	tentativeEligibilityDate: z.string().optional(),
-	saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
-	developer: z.string().min(1, 'Developer is required'),
-	project: z.string().min(1, 'Project is required'),
-	propertyType: z.enum(['commercial', 'residential', 'plot'], 'Property type is required'),
-	unitType: z.enum(['apartment', 'townhouse', 'office'], 'Unit type is required'),
-	unitSize: z.enum(
-		['studio', '1bed', '2bed', '3bed', '4bed', '5bed', '6bed', '7bed', 'not-applicable'],
-		'Unit size is required'
-	),
-	unitNo: z.string().min(1, 'Unit number is required'),
-	unitValue: z.string().min(1, 'Unit value is required')
-});
+		// Townhouse/Villa validation
+		if (data.propertyType === 'townhouse' || data.propertyType === 'villa') {
+			if (!data.bedroomType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['bedroomType'],
+					message: 'Number of bedrooms is required for townhouse/villa'
+				});
+			}
+			if (!data.plotArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['plotArea'],
+					message: 'Plot area is required for townhouse/villa'
+				});
+			}
+			if (!data.builtUpArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['builtUpArea'],
+					message: 'Built up area is required for townhouse/villa'
+				});
+			}
+		}
+
+		// Commercial validation
+		if (data.propertyType === 'commercial') {
+			if (!data.commercialSubType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['commercialSubType'],
+					message: 'Commercial type is required'
+				});
+			}
+			if (!data.propertySize) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['propertySize'],
+					message: 'Property size is required for commercial properties'
+				});
+			}
+			if (data.commercialSubType === 'warehouse' && !data.grossFloorArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['grossFloorArea'],
+					message: 'Gross floor area is required for warehouses'
+				});
+			}
+		}
+
+		// Plot validation
+		if (data.propertyType === 'plot') {
+			if (!data.propertySize) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['propertySize'],
+					message: 'Property size is required for plots'
+				});
+			}
+		}
+	});
 
 const toUploadedFile = async (file: File | null | undefined, path: string) => {
 	if (!file || file.size <= 0) return null;
@@ -180,6 +282,21 @@ export const createSale = form(saleSchema, async (data) => {
 		toUploadedFile(data.refferalAgreementFile, `${basePath}/referral-agreement`)
 	]);
 
+	// Calculate final referral amount
+	let finalReferralAmount: number | undefined;
+	if (data.referralAmountType && data.referralAmount) {
+		if (data.referralAmountType === 'percentage') {
+			// Parse unitValue (remove commas and convert to number)
+			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
+			if (!isNaN(unitValue)) {
+				finalReferralAmount = (unitValue * data.referralAmount) / 100;
+			}
+		} else {
+			// Direct amount
+			finalReferralAmount = data.referralAmount;
+		}
+	}
+
 	const saleRecord = {
 		status: 'pending',
 		financeStatus: 'pending',
@@ -209,10 +326,15 @@ export const createSale = form(saleSchema, async (data) => {
 		developer: data.developer,
 		project: data.project,
 		propertyType: data.propertyType,
-		unitType: data.unitType,
-		unitSize: data.unitSize,
+		...(data.bedroomType && { bedroomType: data.bedroomType }),
+		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
+		...(data.propertySize && { propertySize: data.propertySize }),
+		...(data.plotArea && { plotArea: data.plotArea }),
+		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
+		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
 		unitNo: data.unitNo,
 		unitValue: data.unitValue,
+		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
 		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,
 		createdAt: timestamp,

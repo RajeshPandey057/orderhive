@@ -140,7 +140,7 @@
 					}
 				);
 				return renderSnippet(cellSnippet, {
-					property: row.original.property,
+					property: row.original.project,
 					location: row.original.developer
 				});
 			}
