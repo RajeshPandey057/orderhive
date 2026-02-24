@@ -263,8 +263,8 @@ declare global {
 		plotArea?: number;
 		builtUpArea?: number;
 		grossFloorArea?: number;
-		unitNo: string;
-		unitValue: string;
+		propertyNo: string;
+		propertyValue: string;
 		referralAmount?: number;
 		createdByUid: string;
 		createdByEmail: string;

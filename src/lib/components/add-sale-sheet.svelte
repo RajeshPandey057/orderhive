@@ -947,30 +947,30 @@
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<InputGroup.Root id="unitNo">
+								<InputGroup.Root id="propertyNo">
 									<InputGroup.Input
-										{...createSale.fields.unitNo.as('text')}
-										placeholder="Unit No"
+										{...createSale.fields.propertyNo.as('text')}
+										placeholder="Property No"
 									/>
 									<InputGroup.Addon>
 										<Home />
 									</InputGroup.Addon>
 								</InputGroup.Root>
-								{#each createSale.fields.unitNo.issues() as issue, i (i)}
+								{#each createSale.fields.propertyNo.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<InputGroup.Root id="unitValue">
+								<InputGroup.Root id="propertyValue">
 									<InputGroup.Input
-										{...createSale.fields.unitValue.as('text')}
-										placeholder="Unit Value"
+										{...createSale.fields.propertyValue.as('text')}
+										placeholder="Property Value"
 									/>
 									<InputGroup.Addon>
 										<PriceTag />
 									</InputGroup.Addon>
 								</InputGroup.Root>
-								{#each createSale.fields.unitValue.issues() as issue, i (i)}
+								{#each createSale.fields.propertyValue.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
@@ -1197,12 +1197,12 @@
 									{#each createSale.fields.referralAmount.issues() as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
-									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.unitValue.value()}
-										{@const unitValue = parseFloat(
-											createSale.fields.unitValue.value().replace(/,/g, '')
+									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.propertyValue.value()}
+										{@const propertyValue = parseFloat(
+											createSale.fields.propertyValue.value().replace(/,/g, '')
 										)}
 										{@const percentage = createSale.fields.referralAmount.value()}
-										{@const calculatedAmount = (unitValue * percentage) / 100}
+										{@const calculatedAmount = (propertyValue * percentage) / 100}
 										{#if !isNaN(calculatedAmount) && calculatedAmount > 0}
 											<div class="mt-2 rounded-md bg-muted/50 p-3 text-sm">
 												<div class="flex items-center justify-between">

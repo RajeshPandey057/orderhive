@@ -102,8 +102,8 @@ const saleSchema = z
 		plotArea: z.number().optional(),
 		builtUpArea: z.number().optional(),
 		grossFloorArea: z.number().optional(),
-		unitNo: z.string().min(1, 'Unit number is required'),
-		unitValue: z.string().min(1, 'Unit value is required'),
+		propertyNo: z.string().min(1, 'Property number is required'),
+		propertyValue: z.string().min(1, 'Property value is required'),
 		referralAmountType: z.enum(['percentage', 'amount']).optional(),
 		referralAmount: z.number().optional()
 	})
@@ -286,10 +286,10 @@ export const createSale = form(saleSchema, async (data) => {
 	let finalReferralAmount: number | undefined;
 	if (data.referralAmountType && data.referralAmount) {
 		if (data.referralAmountType === 'percentage') {
-			// Parse unitValue (remove commas and convert to number)
-			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
-			if (!isNaN(unitValue)) {
-				finalReferralAmount = (unitValue * data.referralAmount) / 100;
+			// Parse propertyValue (remove commas and convert to number)
+			const propertyValue = parseFloat(data.propertyValue.replace(/,/g, ''));
+			if (!isNaN(propertyValue)) {
+				finalReferralAmount = (propertyValue * data.referralAmount) / 100;
 			}
 		} else {
 			// Direct amount
@@ -332,8 +332,8 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.plotArea && { plotArea: data.plotArea }),
 		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
 		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
-		unitNo: data.unitNo,
-		unitValue: data.unitValue,
+		propertyNo: data.propertyNo,
+		propertyValue: data.propertyValue,
 		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
 		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,

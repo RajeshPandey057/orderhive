@@ -853,13 +853,15 @@
 								<Table.Cell class="font-medium">{sale?.project ?? '-'}</Table.Cell>
 							</Table.Row>
 							<Table.Row>
-								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">Unit</Table.Cell>
-								<Table.Cell class="font-medium">{sale?.unitNo ?? '-'}</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground"
+									>Property No</Table.Cell
+								>
+								<Table.Cell class="font-medium">{sale?.propertyNo ?? '-'}</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Unit Type
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									<span class="uppercase">{sale?.unitType ?? '-'}</span>
+									<span class="uppercase">{sale?.propertyType ?? '-'}</span>
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>
@@ -867,7 +869,7 @@
 									Unit Size
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									<span class="uppercase">{sale?.unitSize ?? '-'}</span>
+									<span class="uppercase">{sale?.propertySize ?? '-'}</span>
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Property Type
@@ -881,7 +883,7 @@
 									Unit Value
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
+									{sale?.propertyValue ? Number(sale.propertyValue).toLocaleString() : '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Commission %
