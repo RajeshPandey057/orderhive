@@ -858,7 +858,7 @@
 								>
 								<Table.Cell class="font-medium">{sale?.propertyNo ?? '-'}</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Unit Type
+									Property Type
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									<span class="uppercase">{sale?.propertyType ?? '-'}</span>
@@ -866,29 +866,67 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Unit Size
+									Property Size
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									<span class="uppercase">{sale?.propertySize ?? '-'}</span>
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Property Type
+									Bedroom Type
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									<span class="capitalize">{sale?.propertyType ?? '-'}</span>
+									<span class="capitalize">{sale?.bedroomType ?? '-'}</span>
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Unit Value
+									Commercial SubType
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									<span class="capitalize">{sale?.commercialSubType ?? '-'}</span>
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Plot Area
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.plotArea ?? '-'}
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Built Up Area
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.builtUpArea ?? '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Gross Floor Area
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.grossFloorArea ?? '-'}
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Property Value
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									{sale?.propertyValue ? Number(sale.propertyValue).toLocaleString() : '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Referral Amount
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.referralAmount ? Number(sale.referralAmount).toLocaleString() : '-'}
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Commission %
 								</Table.Cell>
 								<Table.Cell class="font-medium">4</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground"></Table.Cell>
+								<Table.Cell class="font-medium"></Table.Cell>
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
