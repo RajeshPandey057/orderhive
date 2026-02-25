@@ -25,9 +25,9 @@
 <svelte:body oncopy={preventCopy} oncut={preventCopy} oncontextmenu={preventContextMenu} />
 
 <SEO
-	title="Latest Financial News & AI Insights"
-	description="Stay updated with the latest financial news, market trends, and AI-powered analysis. Polygram delivers expert coverage on stocks, investments, and global finance."
-	image="/images/financial-news/ai-insights.webp"
+	title="OrderHive - Indglobal Realty Order Management"
+	description="Streamline your real estate sales operations with OrderHive. Manage orders, track sales, ensure compliance, and coordinate teams efficiently for Indglobal Realty."
+	image="/og.png"
 />
 <!-- <ModeWatcher /> -->
 <FirebaseApp>
