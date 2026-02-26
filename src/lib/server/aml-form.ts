@@ -127,7 +127,7 @@ function fillTemplate(data: AmlFormData): Buffer {
 			firstPropertyTransaction:
 				data.firstPropertyTransaction === true ? '☑ Yes    ☐ No' : '☐ Yes    ☑ No',
 			firstPropertyYes: data.firstPropertyTransaction === true ? '☑' : '☐',
-			firstPropertyNo: data.firstPropertyTransaction === false ? '☑' : '☐',
+			firstunitNo: data.firstPropertyTransaction === false ? '☑' : '☐',
 			previousTransactionDetails: data.previousTransactionDetails || '',
 
 			transactionForSelf: data.transactionForSelf === true ? 'Yourself' : 'Another',

@@ -238,6 +238,7 @@ declare global {
 		saleType: 'off-plan' | 'secondary';
 		developer: string;
 		project: string;
+		community?: string;
 		invoiceStage:
 			| 'eligible-first-half'
 			| 'eligible-second-half'
@@ -263,9 +264,11 @@ declare global {
 		plotArea?: number;
 		builtUpArea?: number;
 		grossFloorArea?: number;
-		propertyNo: string;
-		propertyValue: string;
+		unitNo: string;
+		unitValue: string;
 		referralAmount?: number;
+		relationshipManagerName?: string;
+		relationshipManagerEmail?: string;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

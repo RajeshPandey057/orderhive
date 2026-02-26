@@ -854,9 +854,9 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground"
-									>Property No</Table.Cell
+									>Unit No</Table.Cell
 								>
-								<Table.Cell class="font-medium">{sale?.propertyNo ?? '-'}</Table.Cell>
+								<Table.Cell class="font-medium">{sale?.unitNo ?? '-'}</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Property Type
 								</Table.Cell>
@@ -908,16 +908,30 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Property Value
+									Unit Value
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.propertyValue ? Number(sale.propertyValue).toLocaleString() : '-'}
+									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Referral Amount
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									{sale?.referralAmount ? Number(sale.referralAmount).toLocaleString() : '-'}
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									RM Name
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.relationshipManagerName ?? '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									RM Email
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.relationshipManagerEmail ?? '-'}
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>

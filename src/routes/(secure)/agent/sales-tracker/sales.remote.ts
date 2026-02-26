@@ -77,6 +77,7 @@ const saleSchema = z
 		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
 		developer: z.string().min(1, 'Developer is required'),
 		project: z.string().min(1, 'Project is required'),
+		community: z.string().optional(),
 		propertyType: z.enum(
 			['apartment', 'townhouse', 'villa', 'commercial', 'plot'],
 			'Property type is required'
@@ -102,10 +103,16 @@ const saleSchema = z
 		plotArea: z.number().optional(),
 		builtUpArea: z.number().optional(),
 		grossFloorArea: z.number().optional(),
-		propertyNo: z.string().min(1, 'Property number is required'),
-		propertyValue: z.string().min(1, 'Property value is required'),
+		unitNo: z.string().min(1, 'Unit number is required'),
+		unitValue: z.string().min(1, 'Unit value is required'),
 		referralAmountType: z.enum(['percentage', 'amount']).optional(),
-		referralAmount: z.number().optional()
+		referralAmount: z.number().optional(),
+		relationshipManagerName: z.string().optional(),
+		relationshipManagerEmail: z
+			.string()
+			.email('Valid email is required')
+			.optional()
+			.or(z.literal(''))
 	})
 	.superRefine((data, ctx) => {
 		// Apartment validation
@@ -286,10 +293,10 @@ export const createSale = form(saleSchema, async (data) => {
 	let finalReferralAmount: number | undefined;
 	if (data.referralAmountType && data.referralAmount) {
 		if (data.referralAmountType === 'percentage') {
-			// Parse propertyValue (remove commas and convert to number)
-			const propertyValue = parseFloat(data.propertyValue.replace(/,/g, ''));
-			if (!isNaN(propertyValue)) {
-				finalReferralAmount = (propertyValue * data.referralAmount) / 100;
+			// Parse unitValue (remove commas and convert to number)
+			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
+			if (!isNaN(unitValue)) {
+				finalReferralAmount = (unitValue * data.referralAmount) / 100;
 			}
 		} else {
 			// Direct amount
@@ -325,6 +332,7 @@ export const createSale = form(saleSchema, async (data) => {
 		saleType: data.saleType,
 		developer: data.developer,
 		project: data.project,
+		...(data.community && { community: data.community }),
 		propertyType: data.propertyType,
 		...(data.bedroomType && { bedroomType: data.bedroomType }),
 		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
@@ -332,9 +340,13 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.plotArea && { plotArea: data.plotArea }),
 		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
 		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
-		propertyNo: data.propertyNo,
-		propertyValue: data.propertyValue,
+		unitNo: data.unitNo,
+		unitValue: data.unitValue,
 		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
+		...(data.relationshipManagerName && { relationshipManagerName: data.relationshipManagerName }),
+		...(data.relationshipManagerEmail && {
+			relationshipManagerEmail: data.relationshipManagerEmail
+		}),
 		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,
 		createdAt: timestamp,

@@ -4,6 +4,7 @@
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
+	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -33,12 +34,23 @@
 	import { generateAmlForm } from '../../routes/(secure)/agent/sales-tracker/aml.remote.js';
 	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
+	let { userRole }: { userRole?: 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin' } =
+		$props();
+
+	const canUploadManually = $derived(
+		userRole === 'admin' || userRole === 'compliance' || userRole === 'super-admin'
+	);
+
 	let sheetOpen = $state(false);
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
 	let nextOwnerKey = 0;
 	let tentativeEligibilityDate = $state<DateValue | undefined>(undefined);
 	let popoverOpen = $state(false);
+	let developerPopoverOpen = $state(false);
+	let developerSearchValue = $state('');
+	let communityPopoverOpen = $state(false);
+	let communitySearchValue = $state('');
 
 	type FirestoreUser = {
 		id: string;
@@ -279,6 +291,28 @@
 		{ value: 'vision', label: 'Vision' },
 		{ value: 'zaya', label: 'Zaya' }
 	];
+	const communities = [
+		{ value: 'arabian-ranches', label: 'Arabian Ranches' },
+		{ value: 'business-bay', label: 'Business Bay' },
+		{ value: 'creek-harbour', label: 'Creek Harbour' },
+		{ value: 'damac-hills', label: 'DAMAC Hills' },
+		{ value: 'dubai-creek-island', label: 'Dubai Creek Island' },
+		{ value: 'dubai-hills-estate', label: 'Dubai Hills Estate' },
+		{ value: 'dubai-marina', label: 'Dubai Marina' },
+		{ value: 'dubai-south', label: 'Dubai South' },
+		{ value: 'downtown-dubai', label: 'Downtown Dubai' },
+		{ value: 'emirates-hills', label: 'Emirates Hills' },
+		{ value: 'jbr', label: 'JBR (Jumeirah Beach Residence)' },
+		{ value: 'jlt', label: 'JLT (Jumeirah Lake Towers)' },
+		{ value: 'jvc', label: 'JVC (Jumeirah Village Circle)' },
+		{ value: 'meydan', label: 'Meydan' },
+		{ value: 'mirdif', label: 'Mirdif' },
+		{ value: 'palm-jumeirah', label: 'Palm Jumeirah' },
+		{ value: 'silicon-oasis', label: 'Silicon Oasis' },
+		{ value: 'sports-city', label: 'Sports City' },
+		{ value: 'tilal-al-ghaf', label: 'Tilal Al Ghaf' },
+		{ value: 'town-square', label: 'Town Square' }
+	];
 	const propertyTypes = [
 		{ value: 'apartment', label: 'Apartment' },
 		{ value: 'townhouse', label: 'Townhouse' },
@@ -314,10 +348,28 @@
 	];
 
 	const saleTypeLabel = $derived(
-		saleTypes.find((d) => d.value === createSale.fields.saleType.value())?.label ?? 'Deal'
+		saleTypes.find((d) => d.value === createSale.fields.saleType.value())?.label ?? 'Sale Type'
 	);
 	const developerLabel = $derived(
 		developers.find((d) => d.value === createSale.fields.developer.value())?.label ?? 'Developer'
+	);
+	const filteredDevelopers = $derived(
+		developerSearchValue
+			? developers.filter((dev) =>
+					dev.label.toLowerCase().includes(developerSearchValue.toLowerCase())
+				)
+			: developers
+	);
+	const filteredCommunities = $derived(
+		communitySearchValue
+			? communities.filter((comm) =>
+					comm.label.toLowerCase().includes(communitySearchValue.toLowerCase())
+				)
+			: communities
+	);
+	const communityLabel = $derived(
+		communities.find((c) => c.value === createSale.fields.community?.value())?.label ??
+			'Community (Optional)'
 	);
 	const propertyTypeLabel = $derived(
 		propertyTypes.find((p) => p.value === createSale.fields.propertyType.value())?.label ??
@@ -640,14 +692,17 @@
 													Generate Now
 												{/if}
 											</Button>
-											<span class="self-center text-center text-xs text-muted-foreground">or</span>
-											<label
-												for="amlFormFile"
-												class=" flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload manually</span>
-											</label>
+											{#if canUploadManually}
+												<span class="self-center text-center text-xs text-muted-foreground">or</span
+												>
+												<label
+													for="amlFormFile"
+													class=" flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 text-gray-600" />
+													<span class="text-sm font-medium">Upload manually</span>
+												</label>
+											{/if}
 										</div>
 									{/if}
 									<Input
@@ -657,6 +712,7 @@
 										files={undefined}
 										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 										onchange={(e) => handleFileUpload('amlFormFile', e)}
+										disabled={!canUploadManually}
 									/>
 								</div>
 							</div>
@@ -696,29 +752,101 @@
 								{/each}
 							</Field.Field>
 							<Field.Field id="developer">
-								<Select.Root
-									type="single"
-									value={createSale.fields.developer.value() ?? ''}
-									onValueChange={(v) => createSale.fields.developer.set(v as string)}
-								>
-									<Select.Trigger id="developer">
-										<div class="flex items-center gap-2">
-											<Hammer />
-											{developerLabel}
-										</div>
-									</Select.Trigger>
-									<Select.Content>
-										{#each developers as developer (developer.value)}
-											<Select.Item {...developer} />
-										{/each}
-									</Select.Content>
-								</Select.Root>
+								<Popover.Root bind:open={developerPopoverOpen}>
+									<Popover.Trigger class="w-full">
+										<Button
+											variant="outline"
+											type="button"
+											role="combobox"
+											aria-expanded={developerPopoverOpen}
+											class="w-full justify-start gap-2"
+										>
+											<Hammer class="h-4 w-4" />
+											<span class="truncate">{developerLabel}</span>
+										</Button>
+									</Popover.Trigger>
+									<Popover.Content class="w-50 p-0" align="start">
+										<Command.Root>
+											<Command.Input
+												placeholder="Search developer..."
+												bind:value={developerSearchValue}
+											/>
+											<Command.List>
+												<Command.Empty>No developer found.</Command.Empty>
+												<Command.Group>
+													{#each filteredDevelopers as developer (developer.value)}
+														<Command.Item
+															value={developer.value}
+															onSelect={() => {
+																createSale.fields.developer.set(developer.value);
+																developerPopoverOpen = false;
+																developerSearchValue = '';
+															}}
+														>
+															{developer.label}
+														</Command.Item>
+													{/each}
+												</Command.Group>
+											</Command.List>
+										</Command.Root>
+									</Popover.Content>
+								</Popover.Root>
 								<input type="hidden" {...createSale.fields.developer.as('text')} />
 								{#each createSale.fields.developer.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 
+							<Field.Field id="community">
+								<Popover.Root bind:open={communityPopoverOpen}>
+									<Popover.Trigger class="w-full">
+										<Button
+											variant="outline"
+											type="button"
+											role="combobox"
+											aria-expanded={communityPopoverOpen}
+											class="w-full justify-start gap-2"
+										>
+											<Home class="h-4 w-4" />
+											<span class="truncate">{communityLabel}</span>
+										</Button>
+									</Popover.Trigger>
+									<Popover.Content class="w-50 p-0" align="start">
+										<Command.Root>
+											<Command.Input
+												placeholder="Search community..."
+												bind:value={communitySearchValue}
+											/>
+											<Command.List>
+												<Command.Empty>No community found.</Command.Empty>
+												<Command.Group>
+													{#each filteredCommunities as community (community.value)}
+														<Command.Item
+															value={community.value}
+															onSelect={() => {
+																createSale.fields.community?.set(community.value);
+																communityPopoverOpen = false;
+																communitySearchValue = '';
+															}}
+														>
+															{community.label}
+														</Command.Item>
+													{/each}
+												</Command.Group>
+											</Command.List>
+										</Command.Root>
+									</Popover.Content>
+								</Popover.Root>
+								<input type="hidden" {...createSale.fields.community?.as('text')} />
+								{#each createSale.fields.community?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+						</div>
+					</Field.Group>
+
+					<Field.Group>
+						<div class="grid grid-cols-2 gap-4">
 							<Field.Field id="propertyType">
 								<Select.Root
 									type="single"
@@ -947,30 +1075,71 @@
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<InputGroup.Root id="propertyNo">
+								<InputGroup.Root id="unitNo">
 									<InputGroup.Input
-										{...createSale.fields.propertyNo.as('text')}
-										placeholder="Property No"
+										{...createSale.fields.unitNo.as('text')}
+										placeholder="Unit No"
 									/>
 									<InputGroup.Addon>
 										<Home />
 									</InputGroup.Addon>
 								</InputGroup.Root>
-								{#each createSale.fields.propertyNo.issues() as issue, i (i)}
+								{#each createSale.fields.unitNo.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<InputGroup.Root id="propertyValue">
+								<InputGroup.Root id="unitValue">
 									<InputGroup.Input
-										{...createSale.fields.propertyValue.as('text')}
-										placeholder="Property Value"
+										{...createSale.fields.unitValue.as('text')}
+										placeholder="Unit Value"
 									/>
 									<InputGroup.Addon>
 										<PriceTag />
 									</InputGroup.Addon>
 								</InputGroup.Root>
-								{#each createSale.fields.propertyValue.issues() as issue, i (i)}
+								{#each createSale.fields.unitValue.issues() as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+						</div>
+					</Field.Group>
+				</Field.Set>
+				<Field.Separator />
+
+				<!-- Relationship Manager Section -->
+				<Field.Set>
+					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+						Relationship Manager Details
+					</Field.Legend>
+					<Field.Group>
+						<div class="grid grid-cols-2 gap-4">
+							<Field.Field>
+								<Field.Label for="relationshipManagerName"
+									>Relationship Manager Name <span class="text-muted-foreground">(Optional)</span
+									></Field.Label
+								>
+								<Input
+									id="relationshipManagerName"
+									{...createSale.fields.relationshipManagerName?.as('text')}
+									placeholder="Enter manager name"
+								/>
+								{#each createSale.fields.relationshipManagerName?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="relationshipManagerEmail"
+									>Relationship Manager Email <span class="text-muted-foreground">(Optional)</span
+									></Field.Label
+								>
+								<Input
+									id="relationshipManagerEmail"
+									type="email"
+									{...createSale.fields.relationshipManagerEmail?.as('text')}
+									placeholder="manager@example.com"
+								/>
+								{#each createSale.fields.relationshipManagerEmail?.issues() ?? [] as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
@@ -1197,12 +1366,12 @@
 									{#each createSale.fields.referralAmount.issues() as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
-									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.propertyValue.value()}
-										{@const propertyValue = parseFloat(
-											createSale.fields.propertyValue.value().replace(/,/g, '')
+									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.unitValue.value()}
+										{@const unitValue = parseFloat(
+											createSale.fields.unitValue.value().replace(/,/g, '')
 										)}
 										{@const percentage = createSale.fields.referralAmount.value()}
-										{@const calculatedAmount = (propertyValue * percentage) / 100}
+										{@const calculatedAmount = (unitValue * percentage) / 100}
 										{#if !isNaN(calculatedAmount) && calculatedAmount > 0}
 											<div class="mt-2 rounded-md bg-muted/50 p-3 text-sm">
 												<div class="flex items-center justify-between">
@@ -1250,14 +1419,16 @@
 									<PlusRound class="h-4 w-4" />
 									Generate Referral Agreement
 								</Button>
-								<span class="self-center text-center text-xs text-muted-foreground">or</span>
-								<label
-									for="refferalAgreementFile"
-									class="flex w-full flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-								>
-									<Upload class="h-5 w-5 text-gray-600" />
-									<span class="text-sm font-medium">Upload manually</span>
-								</label>
+								{#if canUploadManually}
+									<span class="self-center text-center text-xs text-muted-foreground">or</span>
+									<label
+										for="refferalAgreementFile"
+										class="flex w-full flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+									>
+										<Upload class="h-5 w-5 text-gray-600" />
+										<span class="text-sm font-medium">Upload manually</span>
+									</label>
+								{/if}
 							</div>
 						{/if}
 						<Input
@@ -1267,6 +1438,7 @@
 							files={undefined}
 							accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 							onchange={(e) => handleFileUpload('refferalAgreementFile', e)}
+							disabled={!canUploadManually}
 						/>
 					</Field.Group>
 				</Field.Set>
@@ -1851,14 +2023,16 @@
 															Generate Now
 														{/if}
 													</Button>
-													<span class="text-center text-xs text-muted-foreground">or</span>
-													<label
-														for={`joint-amlFormFile-${buyer.key}`}
-														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-													>
-														<Upload class="h-5 w-5 text-gray-600" />
-														<span class="text-sm font-medium">Upload manually</span>
-													</label>
+													{#if canUploadManually}
+														<span class="text-center text-xs text-muted-foreground">or</span>
+														<label
+															for={`joint-amlFormFile-${buyer.key}`}
+															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+														>
+															<Upload class="h-5 w-5 text-gray-600" />
+															<span class="text-sm font-medium">Upload manually</span>
+														</label>
+													{/if}
 												</div>
 											{/if}
 											<Input
@@ -1868,6 +2042,7 @@
 												type="file"
 												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
 												onchange={(e) => handleJointBuyerFileUpload(buyer.key, 'amlFormFile', e)}
+												disabled={!canUploadManually}
 											/>
 										</div>
 									</div>
