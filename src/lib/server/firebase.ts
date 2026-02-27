@@ -6,9 +6,11 @@ import {
 } from '$env/static/private';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type SessionCookieOptions } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { randomUUID } from 'node:crypto';
+
+export { FieldValue };
 
 export const firebaseApp =
 	getApps().find((it) => it.name === 'firebase-admin-app') ??

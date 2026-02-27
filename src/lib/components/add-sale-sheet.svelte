@@ -19,8 +19,10 @@
 	import { firekitCollection, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
+	import CheckCircled from '~icons/lucide/check-circle-2';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Upload from '~icons/lucide/cloud-upload';
+	import ExternalLink from '~icons/lucide/external-link';
 	import FileText from '~icons/lucide/file-text';
 	import Hammer from '~icons/lucide/hammer';
 	import Home from '~icons/lucide/home';
@@ -171,6 +173,15 @@
 	let amlGenerating = $state<Record<string, boolean>>({
 		primary: false
 	});
+
+	// Track generated AML envelope IDs
+	let amlEnvelopes = $state<Record<string, { envelopeId: string; recipientEmail: string } | null>>({
+		primary: null
+	});
+
+	// Track referral agreement generation state
+	let referralGenerating = $state(false);
+	let referralEnvelope = $state<{ envelopeId: string; recipientEmail: string } | null>(null);
 
 	const handleFileUpload = (fieldName: string, event: Event) => {
 		const input = event.target as HTMLInputElement;
@@ -696,7 +707,39 @@
 													toast.info('Generating and sending AML form...');
 
 													try {
-														// TODO: Implement actual AML form generation and sending logic here
+														// Call API to generate and send AML form
+														const response = await fetch('/api/generate-aml', {
+															method: 'POST',
+															headers: {
+																'Content-Type': 'application/json'
+															},
+															body: JSON.stringify({
+																buyerData: {
+																	firstName,
+																	lastName,
+																	email,
+																	phone
+																},
+																buyerType: 'primary'
+															})
+														});
+
+														if (!response.ok) {
+															const errorData = await response.json();
+															throw new Error(errorData.message || 'Failed to generate AML form');
+														}
+
+														const result = await response.json();
+
+														// Store envelope ID
+														amlEnvelopes.primary = {
+															envelopeId: result.envelopeId,
+															recipientEmail: email
+														};
+
+														toast.success(
+															`AML form sent successfully to ${email}. They will receive a DocuSign email.`
+														);
 													} catch (err) {
 														toast.error('Failed to generate AML form');
 														console.error('AML generation error:', err);
@@ -708,12 +751,34 @@
 												{#if amlGenerating.primary}
 													<Loader2 class="h-4 w-4 animate-spin" />
 													Generating...
+												{:else if amlEnvelopes.primary}
+													<CheckCircled class="h-4 w-4 text-green-600" />
+													AML form sent
 												{:else}
 													<PlusRound class="h-4 w-4" />
 													Generate Now
 												{/if}
 											</Button>
-											{#if canUploadManually}
+											{#if amlEnvelopes.primary}
+												<Button
+													variant="outline"
+													type="button"
+													class="flex-1"
+													onclick={() => {
+														const envelopeId = amlEnvelopes.primary?.envelopeId;
+														if (envelopeId) {
+															window.open(
+																`/api/get-docusign-document?envelopeId=${envelopeId}`,
+																'_blank'
+															);
+														}
+													}}
+												>
+													<ExternalLink class="h-4 w-4" />
+													Open Generated AML
+												</Button>
+											{/if}
+											{#if canUploadManually && !amlEnvelopes.primary}
 												<span class="self-center text-center text-xs text-muted-foreground">or</span
 												>
 												<label
@@ -1436,11 +1501,131 @@
 							</div>
 						{:else}
 							<div class="flex w-full flex-row gap-2">
-								<Button variant="outline" type="button" class="flex-1 bg-orange-50/40">
-									<PlusRound class="h-4 w-4" />
-									Generate Referral Agreement
+								<Button
+									variant="outline"
+									type="button"
+									class="flex-1 bg-orange-50/40"
+									disabled={referralGenerating}
+									onclick={async () => {
+										// Get deal owner and property data
+										const dealOwners = createSale.fields.dealOwners.value();
+										const project = createSale.fields.project.value();
+										const developer = createSale.fields.developer.value();
+										const referralAmount = createSale.fields.referralAmount.value();
+										const referralAmountType = createSale.fields.referralAmountType.value();
+										const unitValue = createSale.fields.unitValue.value();
+
+										if (!dealOwners || dealOwners.length === 0) {
+											toast.error(
+												'Please add at least one deal owner before generating referral agreement'
+											);
+											return;
+										}
+
+										if (!project || !developer) {
+											toast.error('Please fill in project and developer information');
+											return;
+										}
+
+										// Use first deal owner as referrer
+										const referrerEmail = dealOwners[0].email;
+										const referrerName = referrerEmail.split('@')[0]; // Simplified, could be improved
+
+										// Calculate referral fee percentage
+										let referralFeePercentage = '2%'; // Default
+										if (referralAmountType === 'percentage' && referralAmount) {
+											referralFeePercentage = `${referralAmount}%`;
+										} else if (referralAmountType === 'amount' && referralAmount && unitValue) {
+											const percentage = (Number(referralAmount) / Number(unitValue)) * 100;
+											referralFeePercentage = `${percentage.toFixed(2)}%`;
+										}
+
+										const todayDate = new Date().toLocaleDateString('en-US', {
+											day: 'numeric',
+											month: 'short',
+											year: 'numeric'
+										});
+
+										referralGenerating = true;
+										toast.info('Generating and sending referral agreement...');
+
+										try {
+											const response = await fetch('/api/generate-referral', {
+												method: 'POST',
+												headers: {
+													'Content-Type': 'application/json'
+												},
+												body: JSON.stringify({
+													referralData: {
+														srNo: Math.floor(Math.random() * 1000).toString(),
+														referrerName,
+														referrerNationality: 'UAE', // Default, could be improved
+														referrerEidNo: '', // Would need to be collected
+														agreementDate: todayDate,
+														propertyName: `${project} by ${developer}`,
+														referralFeePercentage,
+														firstPartyDate: todayDate,
+														secondPartyDate: todayDate
+													}
+												})
+											});
+
+											if (!response.ok) {
+												const errorData = await response.json();
+												throw new Error(
+													errorData.message || 'Failed to generate referral agreement'
+												);
+											}
+
+											const result = await response.json();
+
+											// Store envelope ID
+											referralEnvelope = {
+												envelopeId: result.envelopeId,
+												recipientEmail: referrerEmail
+											};
+
+											toast.success(
+												`Referral agreement sent successfully to ${referrerEmail}. They will receive a DocuSign email.`
+											);
+										} catch (err) {
+											toast.error('Failed to generate referral agreement');
+											console.error('Referral agreement generation error:', err);
+										} finally {
+											referralGenerating = false;
+										}
+									}}
+								>
+									{#if referralGenerating}
+										<Loader2 class="h-4 w-4 animate-spin" />
+										Generating...
+									{:else if referralEnvelope}
+										<CheckCircled class="h-4 w-4 text-green-600" />
+										Referral agreement sent
+									{:else}
+										<PlusRound class="h-4 w-4" />
+										Generate Referral Agreement
+									{/if}
 								</Button>
-								{#if canUploadManually}
+								{#if referralEnvelope}
+									<Button
+										variant="outline"
+										type="button"
+										class="flex-1"
+										onclick={() => {
+											if (referralEnvelope?.envelopeId) {
+												window.open(
+													`/api/get-docusign-document?envelopeId=${referralEnvelope.envelopeId}`,
+													'_blank'
+												);
+											}
+										}}
+									>
+										<ExternalLink class="h-4 w-4" />
+										Open Generated Agreement
+									</Button>
+								{/if}
+								{#if canUploadManually && !referralEnvelope}
 									<span class="self-center text-center text-xs text-muted-foreground">or</span>
 									<label
 										for="refferalAgreementFile"
@@ -2023,7 +2208,41 @@
 															toast.info('Generating and sending AML form...');
 
 															try {
-																// TODO: Replace with actual API call to generate AML form and send email
+																// Call API to generate and send AML form
+																const response = await fetch('/api/generate-aml', {
+																	method: 'POST',
+																	headers: {
+																		'Content-Type': 'application/json'
+																	},
+																	body: JSON.stringify({
+																		buyerData: {
+																			firstName,
+																			lastName,
+																			email,
+																			phone
+																		},
+																		buyerType: `joint-${buyer.key}`
+																	})
+																});
+
+																if (!response.ok) {
+																	const errorData = await response.json();
+																	throw new Error(
+																		errorData.message || 'Failed to generate AML form'
+																	);
+																}
+
+																const result = await response.json();
+
+																// Store envelope ID
+																amlEnvelopes[`joint-${buyer.key}`] = {
+																	envelopeId: result.envelopeId,
+																	recipientEmail: email
+																};
+
+																toast.success(
+																	`AML form sent successfully to ${email}. They will receive a DocuSign email.`
+																);
 															} catch (err) {
 																toast.error('Failed to generate AML form');
 																console.error('Joint buyer AML generation error:', err);
@@ -2035,12 +2254,34 @@
 														{#if amlGenerating[`joint-${buyer.key}`]}
 															<Loader2 class="h-4 w-4 animate-spin" />
 															Generating...
+														{:else if amlEnvelopes[`joint-${buyer.key}`]}
+															<CheckCircled class="h-4 w-4 text-green-600" />
+															AML form sent
 														{:else}
 															<PlusRound class="h-4 w-4" />
 															Generate Now
 														{/if}
 													</Button>
-													{#if canUploadManually}
+													{#if amlEnvelopes[`joint-${buyer.key}`]}
+														<Button
+															variant="outline"
+															type="button"
+															class="w-full"
+															onclick={() => {
+																const envelopeId = amlEnvelopes[`joint-${buyer.key}`]?.envelopeId;
+																if (envelopeId) {
+																	window.open(
+																		`/api/get-docusign-document?envelopeId=${envelopeId}`,
+																		'_blank'
+																	);
+																}
+															}}
+														>
+															<ExternalLink class="h-4 w-4" />
+															Open Generated AML
+														</Button>
+													{/if}
+													{#if canUploadManually && !amlEnvelopes[`joint-${buyer.key}`]}
 														<span class="text-center text-xs text-muted-foreground">or</span>
 														<label
 															for={`joint-amlFormFile-${buyer.key}`}
