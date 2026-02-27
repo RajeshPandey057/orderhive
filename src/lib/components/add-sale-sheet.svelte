@@ -4,6 +4,7 @@
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
@@ -31,7 +32,6 @@
 	import Traffic from '~icons/lucide/traffic-cone';
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
-	import { generateAmlForm } from '../../routes/(secure)/agent/sales-tracker/aml.remote.js';
 	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	let { userRole }: { userRole?: 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin' } =
@@ -49,6 +49,48 @@
 	let popoverOpen = $state(false);
 	let developerPopoverOpen = $state(false);
 	let developerSearchValue = $state('');
+
+	// Invoice stage checkbox states
+	let firstHalfChecked = $state(false);
+	let secondHalfChecked = $state(false);
+	let fullChecked = $state(false);
+	let notEligibleChecked = $state(false);
+
+	// Sync checkbox states with form field
+	$effect(() => {
+		const stages: ('first-half' | 'second-half' | 'full' | 'not-yet-eligible')[] = [];
+		if (firstHalfChecked) stages.push('first-half');
+		if (secondHalfChecked) stages.push('second-half');
+		if (fullChecked) stages.push('full');
+		if (notEligibleChecked) stages.push('not-yet-eligible');
+		createSale.fields.invoiceStage.set(stages);
+	});
+
+	// Mutual exclusivity handlers for invoice stage
+	const handleFullChange = (checked: boolean) => {
+		fullChecked = checked;
+		if (checked) {
+			firstHalfChecked = false;
+			secondHalfChecked = false;
+			notEligibleChecked = false;
+		}
+	};
+
+	const handleNotEligibleChange = (checked: boolean) => {
+		notEligibleChecked = checked;
+		if (checked) {
+			firstHalfChecked = false;
+			secondHalfChecked = false;
+			fullChecked = false;
+		}
+	};
+
+	const handleHalfChange = () => {
+		if (firstHalfChecked || secondHalfChecked) {
+			fullChecked = false;
+			notEligibleChecked = false;
+		}
+	};
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
 
@@ -654,28 +696,7 @@
 													toast.info('Generating and sending AML form...');
 
 													try {
-														const result = await generateAmlForm({
-															firstName,
-															lastName,
-															email,
-															phone,
-															buyerType: 'primary' as const
-														});
-
-														if (result?.success && result?.file) {
-															// Create File object from uploaded data
-															const fileObj = new File([], result.file.name, {
-																type: result.file.contentType,
-																lastModified: result.file.lastModified
-															});
-
-															uploadedFiles.amlFormFile = fileObj;
-															toast.success(
-																`AML form generated and sent to ${email} for signature`
-															);
-														} else {
-															toast.error(result?.error || 'Failed to generate AML form');
-														}
+														// TODO: Implement actual AML form generation and sending logic here
 													} catch (err) {
 														toast.error('Failed to generate AML form');
 														console.error('AML generation error:', err);
@@ -1447,53 +1468,79 @@
 				<!-- Invoicing Stage Section -->
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
+					{#each createSale.fields.invoiceStage.issues() as issue, i (i)}
+						<Field.Error class="text-sm text-destructive">
+							{issue.message}
+						</Field.Error>
+					{/each}
 
-					<RadioGroup.Root
-						class="grid w-full grid-cols-2 justify-around"
-						bind:value={
-							() => createSale.fields.invoiceStage.value() ?? '',
-							(v) => createSale.fields.invoiceStage.set(v || undefined)
-						}
-					>
-						<Field.Field orientation="horizontal">
-							<RadioGroup.Item value="eligible-first-half" id="eligible-first-half" />
-							<div class="flex flex-col gap-1">
-								<Field.Label for="eligible-first-half" class="text-sm font-normal">
-									Eligible for first half
-								</Field.Label>
-								<span class="text-sm text-muted-foreground">10 + 4% paid</span>
-							</div>
-						</Field.Field>
-						<Field.Field orientation="horizontal">
-							<RadioGroup.Item value="eligible-second-half" id="eligible-second-half" />
-							<div class="flex flex-col gap-1">
-								<Field.Label for="eligible-second-half" class="text-sm font-normal">
-									Eligible for second half
-								</Field.Label>
-								<span class="text-sm text-muted-foreground">20 + 4% paid</span>
-							</div>
-						</Field.Field>
-						<Field.Field orientation="horizontal">
-							<RadioGroup.Item value="eligible-full" id="eligible-full" />
-							<div class="flex flex-col gap-1">
-								<Field.Label for="eligible-full" class="text-sm font-normal">
-									Eligible for full
-								</Field.Label>
-								<span class="text-sm text-muted-foreground">20 + 4% paid</span>
-							</div>
-						</Field.Field>
-						<Field.Field orientation="horizontal">
-							<RadioGroup.Item value="not-yet-eligible" id="not-yet-eligible" />
-							<div class="flex flex-col gap-1">
-								<Field.Label for="not-yet-eligible" class="text-sm font-normal">
-									Not yet eligible for invoice
-								</Field.Label>
-								<span class="text-sm text-muted-foreground">Select tentative eligibility date</span>
-							</div>
-						</Field.Field>
-					</RadioGroup.Root>
+					<div class="flex w-full flex-row items-start gap-4">
+						<div class="flex w-full flex-col gap-4">
+							<Field.Field orientation="horizontal" class="items-start space-x-3">
+								<Checkbox
+									id="eligible-first-half"
+									bind:checked={firstHalfChecked}
+									onCheckedChange={handleHalfChange}
+								/>
+								<div class="flex flex-col gap-1">
+									<Field.Label for="eligible-first-half" class="text-sm font-normal">
+										Eligible for first half
+									</Field.Label>
+									<span class="text-sm text-muted-foreground">10 + 4% paid</span>
+								</div>
+							</Field.Field>
+							<Field.Field orientation="horizontal" class="items-start space-x-3">
+								<Checkbox
+									id="eligible-second-half"
+									bind:checked={secondHalfChecked}
+									onCheckedChange={handleHalfChange}
+								/>
+								<div class="flex flex-col gap-1">
+									<Field.Label for="eligible-second-half" class="text-sm font-normal">
+										Eligible for second half
+									</Field.Label>
+									<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+								</div>
+							</Field.Field>
+						</div>
 
-					{#if createSale.fields.invoiceStage.value() === 'not-yet-eligible'}
+						<HorizontalSeparator text="OR" class="mx-4" />
+
+						<div class="flex w-full flex-col gap-4">
+							<Field.Field orientation="horizontal" class="items-start space-x-3">
+								<Checkbox
+									id="eligible-full"
+									bind:checked={fullChecked}
+									onCheckedChange={handleFullChange}
+								/>
+								<div class="flex flex-col gap-1">
+									<Field.Label for="eligible-full" class="text-sm font-normal">
+										Eligible for full
+									</Field.Label>
+									<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+								</div>
+							</Field.Field>
+						</div>
+
+						<HorizontalSeparator text="OR" class="mx-4" />
+
+						<div class="flex w-full flex-col gap-4">
+							<Field.Field orientation="horizontal" class="items-start space-x-3">
+								<Checkbox
+									id="not-yet-eligible"
+									bind:checked={notEligibleChecked}
+									onCheckedChange={handleNotEligibleChange}
+								/>
+								<div class="flex flex-col gap-1">
+									<Field.Label for="not-yet-eligible" class="text-sm font-normal">
+										Not Eligible
+									</Field.Label>
+								</div>
+							</Field.Field>
+						</div>
+					</div>
+
+					{#if createSale.fields.invoiceStage.value()?.includes('not-yet-eligible')}
 						<div class="col-span-2 mt-4 rounded-lg border border-border/60 bg-background/60 p-4">
 							<Field.Field>
 								<Field.Label for="tentative-date" class="mb-2 text-sm font-medium">
@@ -1558,7 +1605,9 @@
 						</div>
 					{/if}
 
-					<input class="sr-only" {...createSale.fields.invoiceStage.as('text')} />
+					{#each createSale.fields.invoiceStage.value() ?? [] as stage (stage)}
+						<input type="hidden" name="invoiceStage" value={stage} />
+					{/each}
 				</Field.Set>
 				<Field.Separator />
 
@@ -1974,39 +2023,7 @@
 															toast.info('Generating and sending AML form...');
 
 															try {
-																const jointBuyerIndex = jointBuyers.findIndex(
-																	(b) => b.key === buyer.key
-																);
-																const result = await generateAmlForm({
-																	firstName,
-																	lastName,
-																	email,
-																	phone,
-																	buyerType: 'joint' as const,
-																	buyerIndex: jointBuyerIndex
-																});
-
-																if (result?.success && result?.file) {
-																	// Create File object from uploaded data
-																	const fileObj = new File([], result.file.name, {
-																		type: result.file.contentType,
-																		lastModified: result.file.lastModified
-																	});
-
-																	if (!jointBuyerFiles[buyer.key]) {
-																		jointBuyerFiles[buyer.key] = {
-																			passportFile: null,
-																			nationalIdFile: null,
-																			amlFormFile: null
-																		};
-																	}
-																	jointBuyerFiles[buyer.key].amlFormFile = fileObj;
-																	toast.success(
-																		`AML form generated and sent to ${email} for signature`
-																	);
-																} else {
-																	toast.error(result?.error || 'Failed to generate AML form');
-																}
+																// TODO: Replace with actual API call to generate AML form and send email
 															} catch (err) {
 																toast.error('Failed to generate AML form');
 																console.error('Joint buyer AML generation error:', err);

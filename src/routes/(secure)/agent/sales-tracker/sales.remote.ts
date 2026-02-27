@@ -69,10 +69,25 @@ const saleSchema = z
 		refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 
 		// Project Details
-		invoiceStage: z.enum(
-			['eligible-first-half', 'eligible-second-half', 'eligible-full', 'not-yet-eligible'],
-			'Invoice stage is required'
-		),
+		invoiceStage: z
+			.array(z.enum(['first-half', 'second-half', 'full', 'not-yet-eligible']))
+			.min(1, 'At least one invoice stage must be selected')
+			.refine(
+				(stages) => {
+					// Mutual exclusivity validation
+					if (stages.includes('full') && stages.length > 1) {
+						return false; // 'full' cannot be combined with other options
+					}
+					if (stages.includes('not-yet-eligible') && stages.length > 1) {
+						return false; // 'not-yet-eligible' cannot be combined with other options
+					}
+					return true;
+				},
+				{
+					message:
+						'Invalid combination: "Full" and "Not Yet Eligible" must be selected alone. "First Half" and "Second Half" can be selected together.'
+				}
+			),
 		tentativeEligibilityDate: z.string().optional(),
 		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
 		developer: z.string().min(1, 'Developer is required'),

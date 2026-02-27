@@ -239,11 +239,7 @@ declare global {
 		developer: string;
 		project: string;
 		community?: string;
-		invoiceStage:
-			| 'eligible-first-half'
-			| 'eligible-second-half'
-			| 'eligible-full'
-			| 'not-yet-eligible';
+		invoiceStage: ('first-half' | 'second-half' | 'full' | 'not-yet-eligible')[];
 		tentativeEligibilityDate: string | null;
 		propertyType: 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
 		bedroomType?:

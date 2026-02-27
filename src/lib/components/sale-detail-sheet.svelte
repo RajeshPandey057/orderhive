@@ -1319,7 +1319,9 @@
 								</Table.Cell>
 								<Table.Cell class="font-medium">
 									<span class="capitalize">
-										{sale?.invoiceStage ? sale.invoiceStage.replace(/-/g, ' ') : '-'}
+										{sale?.invoiceStage && sale.invoiceStage.length > 0
+											? sale.invoiceStage.map((s) => s.replace(/-/g, ' ')).join(' + ')
+											: '-'}
 									</span>
 								</Table.Cell>
 								{#if sale?.tentativeEligibilityDate}

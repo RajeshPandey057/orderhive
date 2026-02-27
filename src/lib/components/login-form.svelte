@@ -6,8 +6,6 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 
 	let { class: className, ...restProps }: HTMLAttributes<HTMLDivElement> = $props();
-
-	const id = $props.id();
 </script>
 
 <div class={cn('flex flex-col gap-6', className)} {...restProps}>
