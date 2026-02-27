@@ -184,6 +184,89 @@ export async function createEnvelopeFromHTML(
 	}
 }
 
+export interface CreatePDFEnvelopeOptions {
+	pdfBuffer: Buffer;
+	documentName: string;
+	recipientEmail: string;
+	recipientName: string;
+	emailSubject: string;
+	emailBlurb?: string;
+}
+
+/**
+ * Create a DocuSign envelope with PDF document and send for remote signing
+ * Use this for documents with complex styling (e.g., Tailwind CSS)
+ */
+export async function createEnvelopeFromPDF(
+	options: CreatePDFEnvelopeOptions
+): Promise<EnvelopeResult> {
+	const { pdfBuffer, documentName, recipientEmail, recipientName, emailSubject, emailBlurb } =
+		options;
+
+	try {
+		const apiClient = await getApiClient();
+		const envelopesApi = new docusign.EnvelopesApi(apiClient);
+		const accountId = getAccountId();
+
+		// Create document from PDF
+		const document = new docusign.Document();
+		document.documentBase64 = pdfBuffer.toString('base64');
+		document.name = documentName;
+		document.fileExtension = 'pdf';
+		document.documentId = '1';
+
+		// Create signer recipient
+		const signer = new docusign.Signer();
+		signer.email = recipientEmail;
+		signer.name = recipientName;
+		signer.recipientId = '1';
+		signer.routingOrder = '1';
+
+		// Create recipients object
+		const recipients = new docusign.Recipients();
+		recipients.signers = [signer];
+
+		// Create envelope definition
+		const envelopeDefinition = new docusign.EnvelopeDefinition();
+		envelopeDefinition.emailSubject = emailSubject;
+		envelopeDefinition.emailBlurb =
+			emailBlurb || 'Please review and sign the document using DocuSign.';
+		envelopeDefinition.documents = [document];
+		envelopeDefinition.recipients = recipients;
+		envelopeDefinition.status = 'sent'; // Send immediately
+
+		console.log('📤 Creating DocuSign PDF envelope:');
+		console.log('  Account ID:', accountId);
+		console.log('  Recipient:', recipientEmail);
+		console.log('  Document:', documentName);
+		console.log('  PDF Size:', `${Math.round(pdfBuffer.length / 1024)}KB`);
+
+		// Create envelope
+		const results = await envelopesApi.createEnvelope(accountId, {
+			envelopeDefinition
+		});
+
+		if (!results.envelopeId) {
+			throw new Error('Failed to create envelope: No envelope ID returned');
+		}
+
+		console.log('✅ DocuSign envelope created:', results.envelopeId);
+
+		return {
+			envelopeId: results.envelopeId,
+			status: results.status || 'sent',
+			statusDateTime: results.statusDateTime || new Date().toISOString(),
+			uri: results.uri || ''
+		};
+	} catch (error) {
+		console.error('Failed to create DocuSign PDF envelope:', error);
+		if (error instanceof Error) {
+			throw new Error(`DocuSign PDF envelope creation failed: ${error.message}`);
+		}
+		throw new Error('Failed to create DocuSign PDF envelope');
+	}
+}
+
 /**
  * Get envelope status
  */
@@ -202,9 +285,9 @@ export async function getEnvelopeStatus(envelopeId: string): Promise<unknown> {
 }
 
 /**
- * Get document from envelope (returns HTML content)
+ * Get document from envelope (returns PDF or document as Buffer)
  */
-export async function getEnvelopeDocument(envelopeId: string, documentId = '1'): Promise<string> {
+export async function getEnvelopeDocument(envelopeId: string, documentId = '1'): Promise<Buffer> {
 	try {
 		const apiClient = await getApiClient();
 		const envelopesApi = new docusign.EnvelopesApi(apiClient);
@@ -212,18 +295,18 @@ export async function getEnvelopeDocument(envelopeId: string, documentId = '1'):
 
 		const document = await envelopesApi.getDocument(accountId, envelopeId, documentId, {});
 
-		// Document comes as Buffer, convert to string
+		// Document comes as Buffer
 		if (Buffer.isBuffer(document)) {
-			return document.toString('utf-8');
-		}
-
-		// If it's already a string, return it
-		if (typeof document === 'string') {
 			return document;
 		}
 
-		// Otherwise, try to convert
-		return String(document);
+		// If it's a string or other type, convert to Buffer
+		if (typeof document === 'string') {
+			return Buffer.from(document, 'utf-8');
+		}
+
+		// Otherwise, try to convert to Buffer
+		return Buffer.from(String(document));
 	} catch (error) {
 		console.error('Failed to get envelope document:', error);
 		throw new Error('Failed to retrieve document from envelope');

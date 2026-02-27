@@ -16,13 +16,14 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			throw error(400, 'Envelope ID is required');
 		}
 
-		// Retrieve document HTML from DocuSign
-		const htmlContent = await getEnvelopeDocument(envelopeId, documentId);
+		// Retrieve document PDF from DocuSign
+		const documentBuffer = await getEnvelopeDocument(envelopeId, documentId);
 
-		// Return HTML content with proper content type
-		return new Response(htmlContent, {
+		// Return PDF content with proper content type
+		return new Response(documentBuffer, {
 			headers: {
-				'Content-Type': 'text/html; charset=utf-8'
+				'Content-Type': 'application/pdf',
+				'Content-Disposition': `inline; filename="document-${envelopeId}.pdf"`
 			}
 		});
 	} catch (err) {

@@ -1,6 +1,6 @@
-import { createEnvelopeFromHTML } from '$lib/server/docusign';
+import { createEnvelopeFromPDF } from '$lib/server/docusign';
 import { FieldValue, firestore } from '$lib/server/firebase';
-import { fillAMLTemplate, type BuyerData } from '$lib/server/template-renderer';
+import { generateAMLFormPDF, type BuyerData } from '$lib/server/template-renderer';
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -18,12 +18,16 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw error(400, 'Missing required buyer information');
 		}
 
-		// Generate populated HTML from template
-		const htmlContent = await fillAMLTemplate(buyerData);
+		console.log('📄 Generating AML form PDF for:', `${buyerData.firstName} ${buyerData.lastName}`);
 
-		// Create DocuSign envelope
-		const envelope = await createEnvelopeFromHTML({
-			htmlContent,
+		// Generate PDF from template with proper styling
+		const pdfBuffer = await generateAMLFormPDF(buyerData);
+
+		console.log('✅ PDF generated:', `${Math.round(pdfBuffer.length / 1024)}KB`);
+
+		// Create DocuSign envelope with PDF
+		const envelope = await createEnvelopeFromPDF({
+			pdfBuffer,
 			documentName: `AML Form - ${buyerData.firstName} ${buyerData.lastName}`,
 			recipientEmail: buyerData.email,
 			recipientName: `${buyerData.firstName} ${buyerData.lastName}`,

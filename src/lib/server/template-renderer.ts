@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { generatePDFFromHTML } from './pdf-generator';
 
 export interface BuyerData {
 	firstName: string;
@@ -155,4 +156,42 @@ export async function fillReferralAgreementTemplate(data: ReferralAgreementData)
 	html = setInputValue(html, 'second_party_date', data.secondPartyDate);
 
 	return html;
+}
+
+/**
+ * Generate AML form PDF from buyer data
+ */
+export async function generateAMLFormPDF(buyerData: BuyerData): Promise<Buffer> {
+	const htmlContent = await fillAMLTemplate(buyerData);
+
+	return await generatePDFFromHTML({
+		htmlContent,
+		format: 'A4',
+		printBackground: true,
+		margin: {
+			top: '0mm',
+			right: '0mm',
+			bottom: '0mm',
+			left: '0mm'
+		}
+	});
+}
+
+/**
+ * Generate Referral Agreement PDF from deal data
+ */
+export async function generateReferralAgreementPDF(data: ReferralAgreementData): Promise<Buffer> {
+	const htmlContent = await fillReferralAgreementTemplate(data);
+
+	return await generatePDFFromHTML({
+		htmlContent,
+		format: 'A4',
+		printBackground: true,
+		margin: {
+			top: '0mm',
+			right: '0mm',
+			bottom: '0mm',
+			left: '0mm'
+		}
+	});
 }

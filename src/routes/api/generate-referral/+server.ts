@@ -1,7 +1,7 @@
-import { createEnvelopeFromHTML } from '$lib/server/docusign';
+import { createEnvelopeFromPDF } from '$lib/server/docusign';
 import { FieldValue, firestore } from '$lib/server/firebase';
 import {
-	fillReferralAgreementTemplate,
+	generateReferralAgreementPDF,
 	type ReferralAgreementData
 } from '$lib/server/template-renderer';
 import { error, json } from '@sveltejs/kit';
@@ -25,12 +25,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			throw error(400, 'Missing required information');
 		}
 
-		// Generate populated HTML from template
-		const htmlContent = await fillReferralAgreementTemplate(referralData);
+		console.log('📄 Generating Referral Agreement PDF for:', referralData.referrerName);
 
-		// Create DocuSign envelope
-		const envelope = await createEnvelopeFromHTML({
-			htmlContent,
+		// Generate PDF from template with proper styling
+		const pdfBuffer = await generateReferralAgreementPDF(referralData);
+
+		console.log('✅ PDF generated:', `${Math.round(pdfBuffer.length / 1024)}KB`);
+
+		// Create DocuSign envelope with PDF
+		const envelope = await createEnvelopeFromPDF({
+			pdfBuffer,
 			documentName: `Referral Agreement - ${referralData.propertyName}`,
 			recipientEmail: locals.user.email || '',
 			recipientName: referralData.referrerName,

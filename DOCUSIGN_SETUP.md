@@ -237,14 +237,14 @@ Generates and sends referral agreement via DocuSign
 
 ### `/api/get-docusign-document` (GET)
 
-Retrieves generated document HTML from DocuSign
+Retrieves generated document PDF from DocuSign
 
 **Query Parameters**:
 
 - `envelopeId`: DocuSign envelope ID
 - `documentId`: Document ID (default: "1")
 
-**Response**: HTML content of the document
+**Response**: PDF content of the document with `Content-Type: application/pdf`
 
 ## File Structure
 
@@ -255,7 +255,8 @@ src/
 │   │   └── add-sale-sheet.svelte     # UI with "Generate Now" buttons
 │   └── server/
 │       ├── docusign.ts                # DocuSign SDK wrapper
-│       ├── template-renderer.ts       # HTML template population
+│       ├── template-renderer.ts       # HTML templates → PDF generation
+│       ├── pdf-generator.ts           # Puppeteer PDF conversion
 │       └── firebase.ts                # Firebase integration
 ├── routes/
 │   └── api/
@@ -263,9 +264,23 @@ src/
 │       ├── generate-referral/+server.ts # Referral generation endpoint
 │       └── get-docusign-document/+server.ts # Document retrieval
 └── templates/
-    ├── aml-form-docusign.html         # AML form template
-    └── referral-agreement-docusign.html # Referral agreement template
+    ├── aml-form-docusign.html         # AML form template (Tailwind CSS)
+    └── referral-agreement-docusign.html # Referral agreement template (Tailwind CSS)
 ```
+
+## Document Generation Flow
+
+1. **Template Rendering**: HTML templates with Tailwind CSS are populated with data
+2. **PDF Conversion**: Puppeteer (headless Chrome) renders HTML with full CSS support
+3. **DocuSign Upload**: Generated PDF is sent to DocuSign for signing
+4. **Email Delivery**: DocuSign sends email to recipient with document link
+
+**Why PDF?** DocuSign's HTML renderer has limited CSS support. By converting to PDF first using Puppeteer, we ensure:
+
+- Perfect Tailwind CSS rendering
+- Consistent styling across all platforms
+- Professional document appearance
+- Better browser compatibility
 
 ## Security Considerations
 
