@@ -11,7 +11,7 @@ const TOKEN_EXPIRATION_SECONDS = 3600; // 1 hour
 const DOCUSIGN_INTEGRATION_KEY = env.DOCUSIGN_INTEGRATION_KEY || '';
 const DOCUSIGN_USER_ID = env.DOCUSIGN_USER_ID || '';
 const DOCUSIGN_PRIVATE_KEY = env.DOCUSIGN_PRIVATE_KEY || '';
-const DOCUSIGN_BASE_PATH = env.DOCUSIGN_BASE_PATH || 'https://demo.docusign.net/restapi';
+const DOCUSIGN_BASE_PATH = env.DOCUSIGN_BASE_PATH || '';
 
 let cachedAccessToken: string | null = null;
 let tokenExpirationTime: number | null = null;

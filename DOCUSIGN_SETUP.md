@@ -67,7 +67,7 @@ However, if you want to verify your account ID:
 DOCUSIGN_INTEGRATION_KEY=<your-integration-key>
 DOCUSIGN_USER_ID=<your-user-id-guid>
 DOCUSIGN_PRIVATE_KEY=<your-rsa-private-key>
-DOCUSIGN_BASE_PATH=https://demo.docusign.net
+DOCUSIGN_BASE_PATH=<your-docusign-base-path>
 ```
 
 **Note**: `DOCUSIGN_ACCOUNT_ID` is no longer required as it's automatically retrieved during authentication.
