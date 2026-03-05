@@ -195,6 +195,7 @@ declare global {
 			email: string;
 			name: string;
 			photoURL: string;
+			ownerRole: 'caller' | 'closer';
 			split: number;
 		}[];
 		dealOwnerIds: string[];

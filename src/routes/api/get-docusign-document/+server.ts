@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const documentBuffer = await getEnvelopeDocument(envelopeId, documentId);
 
 		// Return PDF content with proper content type
-		return new Response(documentBuffer, {
+		return new Response(new Uint8Array(documentBuffer), {
 			headers: {
 				'Content-Type': 'application/pdf',
 				'Content-Disposition': `inline; filename="document-${envelopeId}.pdf"`

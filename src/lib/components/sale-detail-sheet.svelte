@@ -1473,6 +1473,12 @@
 										</a>
 									</Table.Cell>
 									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
+										Role
+									</Table.Cell>
+									<Table.Cell class="font-medium capitalize">
+										{owner.ownerRole ?? '-'}
+									</Table.Cell>
+									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
 										% Split
 									</Table.Cell>
 									<Table.Cell class="font-medium">{owner.split}%</Table.Cell>

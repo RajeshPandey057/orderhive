@@ -110,6 +110,7 @@
 		userId: string;
 		email: string;
 		name: string;
+		ownerRole: 'caller' | 'closer';
 		split: number;
 		photoURL?: string;
 	};
@@ -122,7 +123,8 @@
 			userId: firekitUser.uid ?? '',
 			email: firekitUser.email ?? '',
 			name: firekitUser.displayName ?? 'You',
-			split: 100,
+			ownerRole: 'caller',
+			split: 70,
 			photoURL: firekitUser.photoURL ?? undefined
 		}
 	]);
@@ -134,6 +136,7 @@
 				email: owner.email,
 				name: owner.name,
 				photoURL: owner.photoURL || '',
+				ownerRole: owner.ownerRole,
 				split: Number(owner.split) || 0
 			}))
 		);
@@ -146,6 +149,12 @@
 		dealOwners.reduce((total, owner) => total + (Number(owner.split) || 0), 0)
 	);
 	const splitRemaining = $derived(100 - splitTotal);
+	const canEditSplit = $derived(
+		userRole === 'compliance' ||
+			userRole === 'finance' ||
+			userRole === 'admin' ||
+			userRole === 'super-admin'
+	);
 
 	// Track uploaded files
 	let uploadedFiles = $state<Record<string, File | null>>({
@@ -294,8 +303,22 @@
 		syncDealOwners();
 	};
 
+	const handleRoleChange = (ownerKey: number, role: 'caller' | 'closer') => {
+		dealOwners = dealOwners.map((owner) =>
+			owner.key === ownerKey
+				? {
+						...owner,
+						ownerRole: role,
+						split: canEditSplit ? owner.split : role === 'caller' ? 70 : 30
+					}
+				: owner
+		);
+		syncDealOwners();
+	};
+
 	const addDealOwner = () => {
-		const defaultSplit = Math.max(0, splitRemaining);
+		const defaultRole: 'caller' | 'closer' = 'closer';
+		const defaultSplit = canEditSplit ? Math.max(0, splitRemaining) : 30;
 		dealOwners = [
 			...dealOwners,
 			{
@@ -303,6 +326,7 @@
 				userId: '',
 				email: '',
 				name: '',
+				ownerRole: defaultRole,
 				split: defaultSplit
 			}
 		];
@@ -1721,16 +1745,29 @@
 
 					<div class="space-y-3 rounded-xl border border-border/60 bg-background/60">
 						<div
-							class="grid grid-cols-[minmax(0,1.6fr)_140px_40px] items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
+							class={[
+								'grid items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground',
+								canEditSplit
+									? 'grid-cols-[minmax(0,1.6fr)_160px_110px_40px]'
+									: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
+							]}
 						>
 							<span>Owners</span>
-							<span class="text-right">Split %</span>
+							<span class="text-center">Role</span>
+							{#if canEditSplit}
+								<span class="text-right">Split %</span>
+							{/if}
 							<span></span>
 						</div>
 
 						{#each dealOwners as owner, index (owner.key)}
 							<div
-								class="grid grid-cols-[minmax(0,1.6fr)_140px_40px] items-center gap-4 border-t border-border/40 px-4 py-3"
+								class={[
+									'grid items-center gap-4 border-t border-border/40 px-4 py-3',
+									canEditSplit
+										? 'grid-cols-[minmax(0,1.6fr)_160px_110px_40px]'
+										: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
+								]}
 							>
 								<div class="flex min-w-0 items-center gap-3 md:gap-4">
 									<Avatar.Root
@@ -1797,24 +1834,64 @@
 									</div>
 								</div>
 
-								<div class="flex items-center justify-end gap-2">
-									<Input
-										{...createSale.fields.dealOwners[index]?.split.as('number')}
-										class="h-10   w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-										type="number"
-										min="0"
-										max="100"
-										step="1"
-										value={owner.split}
-										oninput={(event) =>
-											handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
+								<div class="flex items-center justify-center">
+									<Select.Root
+										type="single"
+										value={owner.ownerRole}
+										onValueChange={(value) =>
+											handleRoleChange(owner.key, value as 'caller' | 'closer')}
+									>
+										<Select.Trigger class="w-full">
+											<span class="capitalize">{owner.ownerRole}</span>
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="caller">
+												<div class="flex flex-col text-left">
+													<span class="text-sm font-medium">Caller</span>
+													<span class="text-xs text-muted-foreground">70% split</span>
+												</div>
+											</Select.Item>
+											<Select.Item value="closer">
+												<div class="flex flex-col text-left">
+													<span class="text-sm font-medium">Closer</span>
+													<span class="text-xs text-muted-foreground">30% split</span>
+												</div>
+											</Select.Item>
+										</Select.Content>
+									</Select.Root>
+									<input
+										class="sr-only"
+										name={createSale.fields.dealOwners[index]?.ownerRole?.as('text').name ?? `dealOwners[${index}].ownerRole`}
+										value={owner.ownerRole}
 									/>
-									{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
-										<Field.Error class="col-span-2 text-xs text-destructive"
-											>{issue.message}</Field.Error
-										>
-									{/each}
 								</div>
+
+								{#if canEditSplit}
+									<div class="flex items-center justify-end gap-2">
+										<Input
+											{...createSale.fields.dealOwners[index]?.split.as('number')}
+											class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											type="number"
+											min="0"
+											max="100"
+											step="1"
+											value={owner.split}
+											oninput={(event) =>
+												handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
+										/>
+										{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
+											<Field.Error class="col-span-2 text-xs text-destructive"
+												>{issue.message}</Field.Error
+											>
+										{/each}
+									</div>
+								{:else}
+									<input
+										class="sr-only"
+										{...createSale.fields.dealOwners[index]?.split.as('number')}
+										value={owner.split}
+									/>
+								{/if}
 
 								<div class="flex items-center justify-end">
 									{#if dealOwners.length > 1}

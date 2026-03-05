@@ -1,4 +1,9 @@
-import { env } from '$env/dynamic/private';
+import {
+	DOCUSIGN_BASE_PATH,
+	DOCUSIGN_INTEGRATION_KEY,
+	DOCUSIGN_PRIVATE_KEY,
+	DOCUSIGN_USER_ID
+} from '$env/static/private';
 // Don't rely on TypeScript types - they're outdated
 // Access all classes as properties on the docusign module
 // @ts-expect-error - docusign-esign is a CommonJS module without complete type definitions
@@ -6,12 +11,6 @@ import docusign from 'docusign-esign';
 
 const SCOPES = ['signature', 'impersonation'];
 const TOKEN_EXPIRATION_SECONDS = 3600; // 1 hour
-
-// Get environment variables with fallbacks
-const DOCUSIGN_INTEGRATION_KEY = env.DOCUSIGN_INTEGRATION_KEY || '';
-const DOCUSIGN_USER_ID = env.DOCUSIGN_USER_ID || '';
-const DOCUSIGN_PRIVATE_KEY = env.DOCUSIGN_PRIVATE_KEY || '';
-const DOCUSIGN_BASE_PATH = env.DOCUSIGN_BASE_PATH || '';
 
 let cachedAccessToken: string | null = null;
 let tokenExpirationTime: number | null = null;

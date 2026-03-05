@@ -21,6 +21,7 @@ const buyerSchema = z.object({
 const dealOwnerSchema = z.object({
 	userId: z.string().min(1, 'Owner is required'),
 	email: z.email('Owner email is required'),
+	ownerRole: z.enum(['caller', 'closer']),
 	split: z.number().min(0, 'Split must be at least 0').max(100, 'Split cannot exceed 100')
 });
 
