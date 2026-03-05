@@ -1,4 +1,6 @@
 import { form } from '$app/server';
+import { createEnvelopeFromPDF } from '$lib/server/docusign';
+import { generateReferralAgreementPDF } from '$lib/server/template-renderer';
 import { z } from 'zod';
 
 const referralAgreementSchema = z.object({
@@ -9,6 +11,7 @@ const referralAgreementSchema = z.object({
 
 	// Referrer Information
 	referrerName: z.string().min(1, 'Referrer name is required'),
+	referrerEmail: z.email('Valid email is required'),
 	eidNo: z.string().min(1, 'EID number is required'),
 	referrerNationality: z.string().min(1, 'Nationality is required'),
 	agreementDate: z.string().min(1, 'Agreement date is required'),
@@ -29,12 +32,31 @@ const referralAgreementSchema = z.object({
 });
 
 export const submitReferralAgreement = form(referralAgreementSchema, async (data) => {
-	// The form data will be available in the `data` parameter
-	// For now, we'll just return success - actual PDF generation and DocuSign sending
-	// will be handled after the form is submitted
+	const pdfBuffer = await generateReferralAgreementPDF({
+		srNo: data.srNo,
+		referrerName: data.referrerName,
+		referrerNationality: data.referrerNationality,
+		referrerEidNo: data.eidNo,
+		agreementDate: data.agreementDate,
+		propertyName: data.propertyName,
+		referralFeePercentage: data.referralFeePct,
+		firstPartyDate: data.firstPartyDate,
+		secondPartyDate: data.secondPartyDate
+	});
+
+	const envelope = await createEnvelopeFromPDF({
+		pdfBuffer,
+		documentName: `Referral Agreement - ${data.propertyName}`,
+		recipientEmail: data.referrerEmail,
+		recipientName: data.referrerName,
+		emailSubject: 'Referral Agreement - Please Review and Sign',
+		emailBlurb: `Dear ${data.referrerName}, please review and sign this referral agreement for ${data.propertyName}.`
+	});
+
 	return {
 		success: true,
-		message: 'Referral agreement submitted successfully',
-		data
+		envelopeId: envelope.envelopeId,
+		status: envelope.status,
+		message: 'Referral agreement sent successfully via DocuSign'
 	};
 });

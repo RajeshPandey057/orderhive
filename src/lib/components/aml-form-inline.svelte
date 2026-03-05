@@ -50,7 +50,7 @@
 					return;
 				}
 
-				toast.success('AML form submitted successfully!');
+				toast.success('AML form sent successfully via email.');
 				open = false;
 			})}
 		>
@@ -295,21 +295,23 @@
 					<Field.Field>
 						<Field.Label>Is this your first property transaction?</Field.Label>
 						<RadioGroup.Root
-							value={submitAMLForm.fields.firstPropertyTransaction.value()}
-							onValueChange={(v) =>
-								submitAMLForm.fields.firstPropertyTransaction.set(v as 'Yes' | 'No')}
+							bind:value={
+								() => submitAMLForm.fields.firstPropertyTransaction.value() ?? '',
+								(v) => submitAMLForm.fields.firstPropertyTransaction.set((v ?? '') as 'Yes' | 'No')
+							}
 						>
 							<div class="flex items-center gap-6">
 								<div class="flex items-center gap-2">
-									<RadioGroup.Item value="yes" id="first-yes" />
+									<RadioGroup.Item value="Yes" id="first-yes" />
 									<Label for="first-yes">Yes</Label>
 								</div>
 								<div class="flex items-center gap-2">
-									<RadioGroup.Item value="no" id="first-no" />
+									<RadioGroup.Item value="No" id="first-no" />
 									<Label for="first-no">No</Label>
 								</div>
 							</div>
 						</RadioGroup.Root>
+						<input class="sr-only" {...submitAMLForm.fields.firstPropertyTransaction.as('text')} />
 						{#each submitAMLForm.fields.firstPropertyTransaction.issues() as issue, i (i)}
 							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 						{/each}
@@ -347,20 +349,23 @@
 					<Field.Field>
 						<Field.Label>Politically Exposed Person or related individual?</Field.Label>
 						<RadioGroup.Root
-							value={submitAMLForm.fields.pepRelated.value()}
-							onValueChange={(v) => submitAMLForm.fields.pepRelated.set(v as 'Yes' | 'No')}
+							bind:value={
+								() => submitAMLForm.fields.pepRelated.value() ?? '',
+								(v) => submitAMLForm.fields.pepRelated.set((v ?? '') as 'Yes' | 'No')
+							}
 						>
 							<div class="flex items-center gap-6">
 								<div class="flex items-center gap-2">
-									<RadioGroup.Item value="yes" id="pep-yes" />
+									<RadioGroup.Item value="Yes" id="pep-yes" />
 									<Label for="pep-yes">Yes</Label>
 								</div>
 								<div class="flex items-center gap-2">
-									<RadioGroup.Item value="no" id="pep-no" />
+									<RadioGroup.Item value="No" id="pep-no" />
 									<Label for="pep-no">No</Label>
 								</div>
 							</div>
 						</RadioGroup.Root>
+						<input class="sr-only" {...submitAMLForm.fields.pepRelated.as('text')} />
 						{#each submitAMLForm.fields.pepRelated.issues() as issue, i (i)}
 							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 						{/each}
@@ -424,7 +429,7 @@
 				<Button type="submit" class="flex-1" disabled={!!submitAMLForm.pending}>
 					{#if submitAMLForm.pending}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-						Generating...
+						Sending AML form via email...
 					{:else}
 						Generate & Send AML Form
 					{/if}

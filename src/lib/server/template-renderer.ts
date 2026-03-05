@@ -18,9 +18,23 @@ export interface BuyerData {
 	companyName?: string;
 	businessAddress?: string;
 	natureOfBusiness?: string;
+	giveDetails?: string;
 	annualGrossIncome?: string;
 	purposeOfTransaction?: string;
+	financialCustomerName?: string;
 	sourceOfFunds?: string;
+	// AML-specific fields
+	date?: string;
+	referenceNo?: string;
+	firstPropertyTransaction?: string;
+	previousTransactionsDetails?: string;
+	transactionFor?: string;
+	thirdPartyDetails?: string;
+	pepRelated?: string;
+	customerName?: string;
+	customerSignature?: string;
+	salesAgentName?: string;
+	salesAgentSignature?: string;
 }
 
 export interface ReferralAgreementData {
@@ -41,6 +55,24 @@ export interface ReferralAgreementData {
 async function readTemplate(filename: string): Promise<string> {
 	const templatePath = join(process.cwd(), filename);
 	return await readFile(templatePath, 'utf-8');
+}
+
+/**
+ * Set the checked attribute on a radio button matching the given value
+ */
+function setRadioChecked(html: string, name: string, value: string): string {
+	// Remove any existing checked attributes for this radio group
+	const removeChecked = new RegExp(
+		`(<input[^>]*type="radio"[^>]*name="${name}"[^>]*?) checked([^>]*>)`,
+		'gi'
+	);
+	html = html.replace(removeChecked, '$1$2');
+	// Add checked to the matching value radio
+	const addChecked = new RegExp(
+		`(<input[^>]*type="radio"[^>]*name="${name}"[^>]*?value="${value}"[^>]*?)(/?>)`,
+		'gi'
+	);
+	return html.replace(addChecked, '$1 checked$2');
 }
 
 /**
@@ -103,8 +135,8 @@ export async function fillAMLTemplate(buyerData: BuyerData): Promise<string> {
 	const referenceNo = generateReferenceNumber();
 
 	// Fill in all the fields
-	html = setInputValue(html, 'date', todayDate);
-	html = setInputValue(html, 'reference_no', referenceNo);
+	html = setInputValue(html, 'date', buyerData.date || todayDate);
+	html = setInputValue(html, 'reference_no', buyerData.referenceNo || referenceNo);
 	html = setInputValue(html, 'full_name', fullName);
 	html = setInputValue(html, 'passport_id_no', buyerData.passportNumber || '');
 	html = setInputValue(html, 'nationality', buyerData.nationality || '');
@@ -119,15 +151,40 @@ export async function fillAMLTemplate(buyerData: BuyerData): Promise<string> {
 	html = setInputValue(html, 'company_name', buyerData.companyName || '');
 	html = setInputValue(html, 'business_address', buyerData.businessAddress || '');
 	html = setInputValue(html, 'nature_of_business', buyerData.natureOfBusiness || '');
-	html = setInputValue(html, 'give_details', '');
+	html = setInputValue(html, 'give_details', buyerData.giveDetails || '');
 	html = setInputValue(html, 'annual_gross_income', buyerData.annualGrossIncome || '');
 	html = setInputValue(
 		html,
 		'purpose_of_transaction',
 		buyerData.purposeOfTransaction || 'Property Investment'
 	);
-	html = setInputValue(html, 'financial_customer_name', fullName);
+	html = setInputValue(
+		html,
+		'financial_customer_name',
+		buyerData.financialCustomerName || fullName
+	);
 	html = setInputValue(html, 'source_of_funds', buyerData.sourceOfFunds || '');
+
+	// Additional Questions
+	if (buyerData.firstPropertyTransaction) {
+		html = setRadioChecked(html, 'first_property_transaction', buyerData.firstPropertyTransaction);
+	}
+	html = setInputValue(
+		html,
+		'previous_transactions_details',
+		buyerData.previousTransactionsDetails || ''
+	);
+	html = setInputValue(html, 'transaction_for', buyerData.transactionFor || '');
+	html = setInputValue(html, 'third_party_details', buyerData.thirdPartyDetails || '');
+	if (buyerData.pepRelated) {
+		html = setRadioChecked(html, 'pep_related', buyerData.pepRelated);
+	}
+
+	// Declaration
+	html = setInputValue(html, 'customer_name', buyerData.customerName || fullName);
+	html = setInputValue(html, 'customer_signature', buyerData.customerSignature || '');
+	html = setInputValue(html, 'sales_agent_name', buyerData.salesAgentName || '');
+	html = setInputValue(html, 'sales_agent_signature', buyerData.salesAgentSignature || '');
 
 	return html;
 }

@@ -1,4 +1,6 @@
 import { form } from '$app/server';
+import { createEnvelopeFromPDF } from '$lib/server/docusign';
+import { generateAMLFormPDF } from '$lib/server/template-renderer';
 import { z } from 'zod';
 
 const amlFormSchema = z.object({
@@ -52,12 +54,61 @@ const amlFormSchema = z.object({
 });
 
 export const submitAMLForm = form(amlFormSchema, async (data) => {
-	// The form data will be available in the `data` parameter
-	// For now, we'll just return success - actual PDF generation and DocuSign sending
-	// will be handled after the form is submitted
+	const nameParts = data.fullName.trim().split(/\s+/).filter(Boolean);
+	const firstName = nameParts[0];
+	const lastName = nameParts.slice(1).join(' ') || '-';
+
+	console.log('📄 Generating AML form PDF for:', data.fullName);
+
+	const pdfBuffer = await generateAMLFormPDF({
+		firstName,
+		lastName,
+		email: data.emailAddress,
+		phone: data.contactNo,
+		passportNumber: data.passportIdNo,
+		nationality: data.nationality,
+		dateOfBirth: data.dateOfBirth,
+		maritalStatus: data.maritalStatus,
+		gender: data.gender,
+		residentAddress: data.residentAddress,
+		permanentAddress: data.permanentAddress,
+		occupation: data.occupation,
+		companyName: data.companyName,
+		businessAddress: data.businessAddress,
+		natureOfBusiness: data.natureOfBusiness,
+		giveDetails: data.giveDetails,
+		annualGrossIncome: data.annualGrossIncome,
+		purposeOfTransaction: data.purposeOfTransaction,
+		financialCustomerName: data.financialCustomerName,
+		sourceOfFunds: data.sourceOfFunds,
+		date: data.date,
+		referenceNo: data.referenceNo,
+		firstPropertyTransaction: data.firstPropertyTransaction,
+		previousTransactionsDetails: data.previousTransactionsDetails,
+		transactionFor: data.transactionFor,
+		thirdPartyDetails: data.thirdPartyDetails,
+		pepRelated: data.pepRelated,
+		customerName: data.customerName,
+		customerSignature: data.customerSignature,
+		salesAgentName: data.salesAgentName,
+		salesAgentSignature: data.salesAgentSignature
+	});
+
+	console.log('✅ PDF generated:', `${Math.round(pdfBuffer.length / 1024)}KB`);
+
+	const envelope = await createEnvelopeFromPDF({
+		pdfBuffer,
+		documentName: `AML Form - ${data.fullName}`,
+		recipientEmail: data.emailAddress,
+		recipientName: data.fullName,
+		emailSubject: 'AML/KYC Form - Please Review and Sign',
+		emailBlurb: `Dear ${firstName}, please review and sign this AML (Anti-Money Laundering) and KYC (Know Your Customer) form as part of your property purchase process.`
+	});
+
 	return {
 		success: true,
-		message: 'AML form submitted successfully',
-		data
+		envelopeId: envelope.envelopeId,
+		status: envelope.status,
+		message: 'AML form sent successfully via DocuSign'
 	};
 });

@@ -25,12 +25,10 @@
 
 			// Pre-fill buyer data if available
 			if (buyerData) {
-				submitReferralAgreement.fields.referrerName.set(
-					`${buyerData.firstName || ''} ${buyerData.lastName || ''}`.trim()
-				);
-				submitReferralAgreement.fields.secondPartyName.set(
-					`${buyerData.firstName || ''} ${buyerData.lastName || ''}`.trim()
-				);
+				const fullName = `${buyerData.firstName || ''} ${buyerData.lastName || ''}`.trim();
+				submitReferralAgreement.fields.referrerName.set(fullName);
+				submitReferralAgreement.fields.secondPartyName.set(fullName);
+				submitReferralAgreement.fields.referrerEmail.set(buyerData.email || '');
 			}
 
 			// Set current date
@@ -263,12 +261,15 @@
 				</Field.Group>
 			</Field.Set>
 
+			<!-- Hidden email field for form-kit -->
+			<input class="sr-only" {...submitReferralAgreement.fields.referrerEmail.as('text')} />
+
 			<!-- Submit Button -->
 			<div class="flex gap-3 pt-4">
 				<Button type="submit" class="flex-1" disabled={!!submitReferralAgreement.pending}>
 					{#if submitReferralAgreement.pending}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-						Generating...
+						Sending Referral Agreement via email...
 					{:else}
 						Generate & Send Referral Agreement
 					{/if}
