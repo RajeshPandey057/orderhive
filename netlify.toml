@@ -1,0 +1,19 @@
+[build]
+  command = "bun run build"
+  publish = "build"
+
+[[headers]]
+  for = "/_app/immutable/*"
+  [headers.values]
+    cache-control = "public, immutable, max-age=31536000"
+
+[[redirects]]
+  from = "*"
+  to = "/.netlify/functions/sveltekit-render"
+  status = 200
+
+# Tell Netlify's secrets scanner to skip server-side bundle output.
+# These files intentionally contain secrets embedded at build time via
+# $env/static/private — they are server-only and never sent to clients.
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = ".svelte-kit/output/server,.netlify/server"
