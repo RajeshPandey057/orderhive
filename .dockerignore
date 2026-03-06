@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+.svelte-kit
+.wrangler
+node_modules
+coverage
+dist
+build
+.DS_Store
+*.log
+.env.local
+.env.keys
+.env.*.local
+Dockerfile*
+README.md
+DOCUSIGN_SETUP.md
