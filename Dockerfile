@@ -12,7 +12,7 @@ COPY . /app
 FROM base AS prod-deps
 ENV CI=true
 ENV NODE_BUILD=true
-RUN bun install --production --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 FROM base AS build
 ENV CI=true
