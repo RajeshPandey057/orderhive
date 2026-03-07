@@ -63,14 +63,12 @@
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
 		"dayjs": "^1.11.19",
-		"docusign-esign": "^8.6.0",
 		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",
 		"eslint-plugin-unicorn": "^62.0.0",
 		"firebase": "^12.7.0",
-		"firebase-admin": "^13.6.0",
 		"formsnap": "^2.0.1",
 		"globals": "^16.5.0",
 		"layerchart": "2.0.0-next.43",
@@ -101,9 +99,16 @@
 		"zod": "^4.2.1"
 	},
 	"dependencies": {
+		"docusign-esign": "^8.6.0",
+		"firebase-admin": "^13.6.0",
 		"puppeteer": "^24.37.5"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["@firebase/util", "esbuild", "protobufjs", "sharp"]
+		"onlyBuiltDependencies": [
+			"@firebase/util",
+			"esbuild",
+			"protobufjs",
+			"sharp"
+		]
 	}
 }
