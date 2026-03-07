@@ -15,7 +15,7 @@
 	"description": "OrderHive is an order management system for Indglobal Realty, streamlining sales tracking, compliance, and team management.",
 	"engines": {
 		"bun": ">=1.0.0",
-		"pnpm": "Please use bun instead of npm.",
+		"pnpm": ">=10.0.0",
 		"npm": "Please use bun instead of npm.",
 		"yarn": "Please use bun instead of yarn."
 	},
