@@ -26,9 +26,10 @@ export async function generatePDFFromHTML(options: PDFGenerationOptions): Promis
 
 	let browser;
 	try {
-		// Launch headless browser
+		// Launch headless browser — use system Chromium when available (set via PUPPETEER_EXECUTABLE_PATH)
 		browser = await puppeteer.launch({
 			headless: true,
+			executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
 			args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
 		});
 

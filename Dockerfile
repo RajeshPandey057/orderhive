@@ -3,7 +3,11 @@ FROM node:20-alpine AS base
 ARG DOTENV_PRIVATE_KEY_CI=privatekey
 ENV DOTENV_PRIVATE_KEY_CI=${DOTENV_PRIVATE_KEY_CI}
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+# chromium + deps are installed for puppeteer PDF generation (avoids downloading bundled Chromium)
+RUN apk add --no-cache libc6-compat chromium nss freetype harfbuzz ca-certificates ttf-freefont
+# Use the system Chromium instead of puppeteer's auto-downloaded binary
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 # enable corepack for pnpm
 RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@latest --activate
 

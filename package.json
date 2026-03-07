@@ -102,5 +102,8 @@
 	},
 	"dependencies": {
 		"puppeteer": "^24.37.5"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["@firebase/util", "esbuild", "protobufjs", "sharp"]
 	}
 }
