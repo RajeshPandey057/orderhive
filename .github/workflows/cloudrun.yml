@@ -53,7 +53,7 @@ env:
     PROJECT_ID: ind-global-project # TODO: update Google Cloud project id
     GAR_NAME: ind-app-repo # TODO: update Google Cloud project id
     GAR_LOCATION: me-central1 # TODO: update Artifact Registry location
-    REGION: me-central1 # TODO: update Cloud Run service region
+    REGION: europe-north1 # TODO: update Cloud Run service region
     SERVICE: ${{ fromJSON('["orderhive", "orderhive-dev"]')[contains( github.ref_name,'dev')] }} # TODO: update Cloud Run service name
 
 jobs:
