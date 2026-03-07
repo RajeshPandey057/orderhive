@@ -21,6 +21,7 @@ RUN pnpm install --prod --frozen-lockfile
 FROM base AS build
 ENV CI=true
 ENV NODE_BUILD=true
+ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN pnpm install --frozen-lockfile
 RUN pnpm dlx @dotenvx/dotenvx run -- pnpm run build
 
