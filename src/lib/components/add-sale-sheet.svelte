@@ -149,12 +149,26 @@
 		dealOwners.reduce((total, owner) => total + (Number(owner.split) || 0), 0)
 	);
 	const splitRemaining = $derived(100 - splitTotal);
-	const canEditSplit = $derived(
-		userRole === 'compliance' ||
-			userRole === 'finance' ||
-			userRole === 'admin' ||
-			userRole === 'super-admin'
-	);
+	const canEditSplit = $derived(userRole === 'compliance' || userRole === 'finance');
+
+	let splitPreset = $state<'70/30' | '55/45'>('70/30');
+
+	const callerSplit = (preset: '70/30' | '55/45') => (preset === '70/30' ? 70 : 55);
+	const closerSplit = (preset: '70/30' | '55/45') => (preset === '70/30' ? 30 : 45);
+
+	const handlePresetChange = (preset: '70/30' | '55/45') => {
+		splitPreset = preset;
+		dealOwners = dealOwners.map((owner, idx) => ({
+			...owner,
+			split:
+				idx < 2
+					? owner.ownerRole === 'caller'
+						? callerSplit(preset)
+						: closerSplit(preset)
+					: owner.split
+		}));
+		syncDealOwners();
+	};
 
 	// Track uploaded files
 	let uploadedFiles = $state<Record<string, File | null>>({
@@ -309,7 +323,11 @@
 				? {
 						...owner,
 						ownerRole: role,
-						split: canEditSplit ? owner.split : role === 'caller' ? 70 : 30
+						split: canEditSplit
+							? owner.split
+							: role === 'caller'
+								? callerSplit(splitPreset)
+								: closerSplit(splitPreset)
 					}
 				: owner
 		);
@@ -317,8 +335,13 @@
 	};
 
 	const addDealOwner = () => {
+		const isFirstTwo = dealOwners.length < 2;
 		const defaultRole: 'caller' | 'closer' = 'closer';
-		const defaultSplit = canEditSplit ? Math.max(0, splitRemaining) : 30;
+		const defaultSplit = isFirstTwo
+			? canEditSplit
+				? Math.max(0, splitRemaining)
+				: closerSplit(splitPreset)
+			: 0;
 		dealOwners = [
 			...dealOwners,
 			{
@@ -1240,7 +1263,7 @@
 						<RadioGroup.Root
 							bind:value={
 								() => createSale.fields.dealStage.value() ?? '',
-								(v) => createSale.fields.dealStage.set(v ?? '')
+								(v) => createSale.fields.dealStage.set(v || undefined)
 							}
 							class="flex w-full flex-row gap-4"
 						>
@@ -1446,10 +1469,10 @@
 									{/each}
 									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.unitValue.value()}
 										{@const unitValue = parseFloat(
-											createSale.fields.unitValue.value().replace(/,/g, '')
+											createSale.fields?.unitValue?.value()?.replace(/,/g, '') ?? '0'
 										)}
 										{@const percentage = createSale.fields.referralAmount.value()}
-										{@const calculatedAmount = (unitValue * percentage) / 100}
+										{@const calculatedAmount = (unitValue * (percentage ?? 0)) / 100}
 										{#if !isNaN(calculatedAmount) && calculatedAmount > 0}
 											<div class="mt-2 rounded-md bg-muted/50 p-3 text-sm">
 												<div class="flex items-center justify-between">
@@ -1745,29 +1768,17 @@
 
 					<div class="space-y-3 rounded-xl border border-border/60 bg-background/60">
 						<div
-							class={[
-								'grid items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground',
-								canEditSplit
-									? 'grid-cols-[minmax(0,1.6fr)_160px_110px_40px]'
-									: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
-							]}
+							class="grid grid-cols-[minmax(0,1.6fr)_160px_160px_40px] items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
 						>
 							<span>Owners</span>
-							<span class="text-center">Role</span>
-							{#if canEditSplit}
-								<span class="text-right">Split %</span>
-							{/if}
+							<span class="text-center">Select Role</span>
+							<span class="text-center">Select Split %</span>
 							<span></span>
 						</div>
 
 						{#each dealOwners as owner, index (owner.key)}
 							<div
-								class={[
-									'grid items-center gap-4 border-t border-border/40 px-4 py-3',
-									canEditSplit
-										? 'grid-cols-[minmax(0,1.6fr)_160px_110px_40px]'
-										: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
-								]}
+								class="grid grid-cols-[minmax(0,1.6fr)_160px_160px_40px] items-center gap-4 border-t border-border/40 px-4 py-3"
 							>
 								<div class="flex min-w-0 items-center gap-3 md:gap-4">
 									<Avatar.Root
@@ -1835,62 +1846,131 @@
 								</div>
 
 								<div class="flex items-center justify-center">
-									<Select.Root
-										type="single"
-										value={owner.ownerRole}
-										onValueChange={(value) =>
-											handleRoleChange(owner.key, value as 'caller' | 'closer')}
-									>
-										<Select.Trigger class="w-full">
-											<span class="capitalize">{owner.ownerRole}</span>
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="caller">
-												<div class="flex flex-col text-left">
-													<span class="text-sm font-medium">Caller</span>
-													<span class="text-xs text-muted-foreground">70% split</span>
-												</div>
-											</Select.Item>
-											<Select.Item value="closer">
-												<div class="flex flex-col text-left">
-													<span class="text-sm font-medium">Closer</span>
-													<span class="text-xs text-muted-foreground">30% split</span>
-												</div>
-											</Select.Item>
-										</Select.Content>
-									</Select.Root>
-									<input
-										class="sr-only"
-										name={createSale.fields.dealOwners[index]?.ownerRole?.as('text').name ?? `dealOwners[${index}].ownerRole`}
-										value={owner.ownerRole}
-									/>
+									{#if index < 2}
+										<Select.Root
+											type="single"
+											value={owner.ownerRole}
+											onValueChange={(value) =>
+												handleRoleChange(owner.key, value as 'caller' | 'closer')}
+										>
+											<Select.Trigger class="w-full">
+												<span class="capitalize">{owner.ownerRole}</span>
+											</Select.Trigger>
+											<Select.Content>
+												<Select.Item value="caller">
+													<div class="flex flex-col text-left">
+														<span class="text-sm font-medium">Caller</span>
+														<span class="text-xs text-muted-foreground"
+															>{callerSplit(splitPreset)}% split</span
+														>
+													</div>
+												</Select.Item>
+												<Select.Item value="closer">
+													<div class="flex flex-col text-left">
+														<span class="text-sm font-medium">Closer</span>
+														<span class="text-xs text-muted-foreground"
+															>{closerSplit(splitPreset)}% split</span
+														>
+													</div>
+												</Select.Item>
+											</Select.Content>
+										</Select.Root>
+										<input
+											class="sr-only"
+											name={createSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
+												`dealOwners[${index}].ownerRole`}
+											value={owner.ownerRole}
+										/>
+									{:else}
+										<input
+											class="sr-only"
+											name={createSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
+												`dealOwners[${index}].ownerRole`}
+											value={owner.ownerRole}
+										/>
+									{/if}
 								</div>
 
-								{#if canEditSplit}
-									<div class="flex items-center justify-end gap-2">
-										<Input
-											{...createSale.fields.dealOwners[index]?.split.as('number')}
-											class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-											type="number"
-											min="0"
-											max="100"
-											step="1"
-											value={owner.split}
-											oninput={(event) =>
-												handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
-										/>
-										{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
-											<Field.Error class="col-span-2 text-xs text-destructive"
-												>{issue.message}</Field.Error
+								{#if index < 2}
+									{#if canEditSplit}
+										<div class="flex items-center justify-end gap-2">
+											<Input
+												{...createSale.fields.dealOwners[index]?.split.as('number')}
+												class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+												type="number"
+												min="0"
+												max="100"
+												step="1"
+												value={owner.split}
+												oninput={(event) =>
+													handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
+											/>
+											{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
+												<Field.Error class="col-span-2 text-xs text-destructive"
+													>{issue.message}</Field.Error
+												>
+											{/each}
+										</div>
+									{:else if index === 0}
+										<!-- Preset selector: only shown on first row for agents -->
+										<div class="flex items-center justify-center">
+											<Select.Root
+												type="single"
+												value={splitPreset}
+												onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
 											>
-										{/each}
-									</div>
+												<Select.Trigger class="w-full">
+													<span>{splitPreset}</span>
+												</Select.Trigger>
+												<Select.Content>
+													<Select.Item value="70/30">
+														<div class="flex flex-col text-left">
+															<span class="text-sm font-medium">70/30</span>
+															<span class="text-xs text-muted-foreground"
+																>Caller 70% / Closer 30%</span
+															>
+														</div>
+													</Select.Item>
+													<Select.Item value="55/45">
+														<div class="flex flex-col text-left">
+															<span class="text-sm font-medium">55/45</span>
+															<span class="text-xs text-muted-foreground"
+																>Caller 55% / Closer 45%</span
+															>
+														</div>
+													</Select.Item>
+												</Select.Content>
+											</Select.Root>
+											<input
+												class="sr-only"
+												{...createSale.fields.dealOwners[index]?.split.as('number')}
+												value={owner.split}
+											/>
+										</div>
+									{:else}
+										<!-- Second row (closer): show derived split as badge -->
+										<div class="flex items-center justify-center">
+											<span
+												class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
+											>
+												{owner.split}%
+											</span>
+											<input
+												class="sr-only"
+												{...createSale.fields.dealOwners[index]?.split.as('number')}
+												value={owner.split}
+											/>
+										</div>
+									{/if}
 								{:else}
-									<input
-										class="sr-only"
-										{...createSale.fields.dealOwners[index]?.split.as('number')}
-										value={owner.split}
-									/>
+									<!-- 3rd+ agents: no split selector, just persist the value -->
+									<div>
+										<input
+											class="sr-only"
+											{...createSale.fields.dealOwners[index]?.split.as('number')}
+											value={owner.split}
+										/>
+									</div>
 								{/if}
 
 								<div class="flex items-center justify-end">
