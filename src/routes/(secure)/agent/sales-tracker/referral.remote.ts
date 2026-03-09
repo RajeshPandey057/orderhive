@@ -22,12 +22,10 @@ const referralAgreementSchema = z.object({
 
 	// First Party (IND Global)
 	firstPartyName: z.string().min(1, 'First party name is required'),
-	firstPartySignature: z.string().min(1, 'First party signature is required'),
 	firstPartyDate: z.string().min(1, 'First party date is required'),
 
 	// Second Party (Referrer)
 	secondPartyName: z.string().min(1, 'Second party name is required'),
-	secondPartySignature: z.string().min(1, 'Second party signature is required'),
 	secondPartyDate: z.string().min(1, 'Second party date is required')
 });
 

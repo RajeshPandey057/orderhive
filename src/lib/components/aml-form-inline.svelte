@@ -389,34 +389,12 @@
 							{/each}
 						</Field.Field>
 						<Field.Field>
-							<Field.Label>Customer Signature</Field.Label>
-							<Input
-								{...submitAMLForm.fields.customerSignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitAMLForm.fields.customerSignature.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<Field.Field>
 							<Field.Label>Sales Agent Name</Field.Label>
 							<Input
 								{...submitAMLForm.fields.salesAgentName.as('text')}
 								placeholder="Sales agent name"
 							/>
 							{#each submitAMLForm.fields.salesAgentName.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>Sales Agent Signature</Field.Label>
-							<Input
-								{...submitAMLForm.fields.salesAgentSignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitAMLForm.fields.salesAgentSignature.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
 						</Field.Field>

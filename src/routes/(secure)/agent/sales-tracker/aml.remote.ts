@@ -48,9 +48,7 @@ const amlFormSchema = z.object({
 
 	// Declaration
 	customerName: z.string().min(1, 'Customer name is required'),
-	customerSignature: z.string().min(1, 'Customer signature is required'),
-	salesAgentName: z.string().min(1, 'Sales agent name is required'),
-	salesAgentSignature: z.string().min(1, 'Sales agent signature is required')
+	salesAgentName: z.string().min(1, 'Sales agent name is required')
 });
 
 export const submitAMLForm = form(amlFormSchema, async (data) => {
@@ -89,9 +87,7 @@ export const submitAMLForm = form(amlFormSchema, async (data) => {
 		thirdPartyDetails: data.thirdPartyDetails,
 		pepRelated: data.pepRelated,
 		customerName: data.customerName,
-		customerSignature: data.customerSignature,
-		salesAgentName: data.salesAgentName,
-		salesAgentSignature: data.salesAgentSignature
+		salesAgentName: data.salesAgentName
 	});
 
 	console.log('✅ PDF generated:', `${Math.round(pdfBuffer.length / 1024)}KB`);
