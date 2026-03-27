@@ -1,12 +1,18 @@
 {
 	"servers": {
-		"svelte": {
-			"url": "https://mcp.svelte.dev/mcp",
-			"type": "http"
-		},
+		 
 		"Docusign-MCP": {
 			"url": "https://mcp-d.docusign.com/mcp",
 			"type": "http"
+		},
+		"dev.svelte/mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"@sveltejs/mcp@0.1.22"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.1.22"
 		}
 	},
 	"inputs": []
