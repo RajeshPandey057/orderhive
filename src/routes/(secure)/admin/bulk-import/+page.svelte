@@ -46,7 +46,11 @@
 		},
 		{ column: 'split_preset', required: 'No', notes: '"70/30" or "55/45". Defaults to 70/30.' },
 		{ column: 'deal_stage', required: 'Yes (primary)', notes: '"eoi" or "booking".' },
-		{ column: 'payment_value', required: 'Yes (primary)', notes: 'Number between 0 and 100.' },
+		{
+			column: 'payment_value',
+			required: 'Yes (primary)',
+			notes: 'Actual payment amount (e.g. 500000 for AED 500k).'
+		},
 		{ column: 'booking_form_url', required: 'Yes (primary)', notes: 'Google Drive link.' },
 		{ column: 'payment_receipt_url', required: 'Yes (primary)', notes: 'Google Drive link.' },
 		{ column: 'referral_agreement_url', required: 'No', notes: 'Google Drive link — optional.' },

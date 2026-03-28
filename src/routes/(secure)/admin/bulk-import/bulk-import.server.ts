@@ -38,10 +38,7 @@ const primaryRowSchema = z
 		closer_email: z.email().optional().or(z.literal('')),
 		split_preset: z.enum(['70/30', '55/45']).optional().or(z.literal('')),
 		deal_stage: z.enum(['eoi', 'booking'], 'deal_stage must be eoi or booking'),
-		payment_value: z.coerce
-			.number()
-			.min(0, 'payment_value must be ≥ 0')
-			.max(100, 'payment_value must be ≤ 100'),
+		payment_value: z.coerce.number().min(0, 'payment_value must be ≥ 0'),
 		booking_form_url: z.string().url('booking_form_url must be a valid URL'),
 		payment_receipt_url: z.string().url('payment_receipt_url must be a valid URL'),
 		referral_agreement_url: z.string().url().optional().or(z.literal('')),
@@ -211,21 +208,54 @@ async function generateSaleId(): Promise<string> {
 
 type UserRecord = { uid: string; displayName?: string; email: string; photoURL?: string };
 
-async function resolveUserByEmail(email: string): Promise<UserRecord | null> {
-	if (!email || email.trim() === '') return null;
-	const snap = await firestore
+async function resolveUserByEmail(email: string): Promise<UserRecord> {
+	const normalised = email.trim().toLowerCase();
+
+	// 1. Check users collection (Firebase Auth synced records)
+	const usersSnap = await firestore
 		.collection('users')
-		.where('email', '==', email.trim().toLowerCase())
+		.where('email', '==', normalised)
 		.limit(1)
 		.get();
-	if (snap.empty) return null;
-	const doc = snap.docs[0];
-	return {
-		uid: doc.id,
-		email: doc.data().email,
-		displayName: doc.data().displayName,
-		photoURL: doc.data().photoURL
-	};
+
+	if (!usersSnap.empty) {
+		const doc = usersSnap.docs[0];
+		return {
+			uid: doc.id,
+			email: doc.data().email,
+			displayName: doc.data().displayName,
+			photoURL: doc.data().photoURL
+		};
+	}
+
+	// 2. Fall back to roles collection (invited but not yet signed in)
+	const rolesSnap = await firestore
+		.collection('roles')
+		.where('email', '==', normalised)
+		.limit(1)
+		.get();
+
+	if (!rolesSnap.empty) {
+		const doc = rolesSnap.docs[0];
+		return {
+			uid: doc.id, // roles use email as doc ID
+			email: doc.data().email,
+			displayName: doc.data().displayName,
+			photoURL: doc.data().photoURL
+		};
+	}
+
+	// 3. Not found anywhere — auto-create as agent in roles collection
+	const now = FieldValue.serverTimestamp();
+	const roleRef = firestore.collection('roles').doc(normalised);
+	await roleRef.set({
+		email: normalised,
+		accessType: 'agent',
+		createdAt: now,
+		updatedAt: now
+	});
+
+	return { uid: normalised, email: normalised };
 }
 
 // ─── POST handler ───────────────────────────────────────────────────────────
@@ -356,14 +386,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 
 		// Resolve deal owners
 		const callerUser = await resolveUserByEmail(primary.caller_email);
-		if (!callerUser) {
-			importErrors.push({
-				row_group: groupNum,
-				row: group.primaryIdx,
-				message: `caller_email '${primary.caller_email}' not found in users collection`
-			});
-			continue;
-		}
 
 		const splitPreset = (primary.split_preset as '70/30' | '55/45' | '' | undefined) || '70/30';
 		const callerSplit = splitPreset === '55/45' ? 55 : 70;
@@ -382,14 +404,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 
 		if (primary.closer_email && primary.closer_email.trim() !== '') {
 			const closerUser = await resolveUserByEmail(primary.closer_email);
-			if (!closerUser) {
-				importErrors.push({
-					row_group: groupNum,
-					row: group.primaryIdx,
-					message: `closer_email '${primary.closer_email}' not found in users collection`
-				});
-				continue;
-			}
 			dealOwners.push({
 				userId: closerUser.uid,
 				email: closerUser.email,
