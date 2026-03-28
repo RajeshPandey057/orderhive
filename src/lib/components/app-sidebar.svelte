@@ -3,6 +3,7 @@
 	import LucideBookMarked from '~icons/lucide/book-marked';
 	import LucideCalendarClock from '~icons/lucide/calendar-clock';
 	import LucideClipboardCheck from '~icons/lucide/clipboard-check';
+	import LucideUploadCloud from '~icons/lucide/cloud-upload';
 	import LucideFileText from '~icons/lucide/file-text';
 	import LucideLayoutPanelTop from '~icons/lucide/layout-panel-top';
 	import LucideReceipt from '~icons/lucide/receipt';
@@ -25,7 +26,8 @@
 		'Agent Dashboard': LucideLayoutPanelTop,
 		'Compliance Dashboard': LucideLayoutPanelTop,
 		'Finance Dashboard': LucideLayoutPanelTop,
-		'User Management': LucideUserCog
+		'User Management': LucideUserCog,
+		'Bulk Import': LucideUploadCloud
 	};
 
 	function getIconForMenuItem(title: string): typeof LucideLayoutPanelTop {

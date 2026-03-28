@@ -28,7 +28,8 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
-		{ title: 'Team Management', url: '/admin/team-management' }
+		{ title: 'Team Management', url: '/admin/team-management' },
+		{ title: 'Bulk Import', url: '/admin/bulk-import' }
 	],
 	agent: [
 		{ title: 'Dashboard', url: '/agent/dashboard' },
@@ -54,6 +55,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		{ title: 'Team Management', url: '/admin/team-management' },
+		{ title: 'Bulk Import', url: '/admin/bulk-import' },
 		{ title: 'Agent Dashboard', url: '/agent/dashboard' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
 		{ title: 'Compliance Dashboard', url: '/compliance/dashboard' },

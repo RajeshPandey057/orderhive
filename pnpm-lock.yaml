@@ -14,6 +14,9 @@ importers:
       firebase-admin:
         specifier: ^13.6.0
         version: 13.7.0
+      papaparse:
+        specifier: ^5.5.3
+        version: 5.5.3
       puppeteer:
         specifier: ^24.37.5
         version: 24.38.0(typescript@5.9.3)
@@ -93,6 +96,9 @@ importers:
       '@types/node':
         specifier: ^24
         version: 24.12.0
+      '@types/papaparse':
+        specifier: ^5.5.2
+        version: 5.5.2
       '@vite-pwa/assets-generator':
         specifier: ^1.0.2
         version: 1.0.2
@@ -1721,6 +1727,9 @@ packages:
   '@types/node@24.12.0':
     resolution: {integrity: sha512-GYDxsZi3ChgmckRT9HPU0WEhKLP08ev/Yfcq2AstjrDASOYCSXeyjDsHg4v5t4jOj7cyDX3vmprafKlWIG9MXQ==}
 
+  '@types/papaparse@5.5.2':
+    resolution: {integrity: sha512-gFnFp/JMzLHCwRf7tQHrNnfhN4eYBVYYI897CGX4MY1tzY9l2aLkVyx2IlKZ/SAqDbB3I1AOZW5gTMGGsqWliA==}
+
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
@@ -3245,6 +3254,9 @@ packages:
     resolution: {integrity: sha512-KzmIXQH1wCfwZ4RsMohD/IUtEjVhteR+c+ulb/CHYJHX8SuDXoJmChtsc/Xs5Wl8NHS4L5Q7cxL8MG40gSU1bA==}
     peerDependencies:
       svelte: ^5.29.0
+
+  papaparse@5.5.3:
+    resolution: {integrity: sha512-5QvjGxYVjxO59MGU2lHVYpRWBBtKHnlIAcSe1uNFCkkptUh63NFRj0FJQm7nR67puEruUci/ZkjmEFrjCAyP4A==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -5511,6 +5523,10 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/papaparse@5.5.2':
+    dependencies:
+      '@types/node': 24.12.0
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react@18.3.28':
@@ -7222,6 +7238,8 @@ snapshots:
       runed: 0.23.4(svelte@5.53.7)
       svelte: 5.53.7
       svelte-toolbelt: 0.9.3(svelte@5.53.7)
+
+  papaparse@5.5.3: {}
 
   parent-module@1.0.1:
     dependencies:
