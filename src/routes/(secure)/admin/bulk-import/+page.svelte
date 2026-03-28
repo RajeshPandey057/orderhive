@@ -13,7 +13,7 @@
 	import FileText from '~icons/lucide/file-text';
 	import Loader2 from '~icons/lucide/loader-2';
 	import X from '~icons/lucide/x';
-	import type { BulkImportResult } from './bulk-import.remote';
+	import type { BulkImportResult } from './bulk-import.server';
 
 	const columnReference = [
 		{

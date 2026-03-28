@@ -1,1 +1,1 @@
-export { POST } from './bulk-import.remote';
+export { POST } from './bulk-import.server';
