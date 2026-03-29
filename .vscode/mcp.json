@@ -1,6 +1,5 @@
 {
 	"servers": {
-		 
 		"Docusign-MCP": {
 			"url": "https://mcp-d.docusign.com/mcp",
 			"type": "http"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { asset } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -13,7 +14,7 @@
 	import FileText from '~icons/lucide/file-text';
 	import Loader2 from '~icons/lucide/loader-2';
 	import X from '~icons/lucide/x';
-	import type { BulkImportResult } from './bulk-import.server';
+	import { importBulkSales, type BulkImportResult } from './bulk-import.remote';
 
 	const columnReference = [
 		{
@@ -116,40 +117,17 @@
 	let result = $state<BulkImportResult | null>(null);
 
 	const canImport = $derived(csvFile !== null && !isImporting);
-
-	function handleFileChange(event: Event) {
-		const input = event.target as HTMLInputElement;
-		csvFile = input.files?.[0] ?? null;
-		result = null;
-	}
-
-	function removeFile() {
-		csvFile = null;
-		result = null;
-		const input = document.getElementById('csv-input') as HTMLInputElement;
-		if (input) input.value = '';
-	}
-
-	async function handleImport() {
+	const importBulkSalesForm = importBulkSales.enhance(async ({ submit }) => {
 		if (!csvFile) return;
+
 		isImporting = true;
 		result = null;
 		try {
-			const formData = new FormData();
-			formData.append('csv', csvFile);
-
-			const response = await fetch('/admin/bulk-import', {
-				method: 'POST',
-				body: formData
-			});
-
-			if (!response.ok) {
-				const text = await response.text();
-				toast.error(`Import failed: ${text}`);
-				return;
-			}
-
-			result = (await response.json()) as BulkImportResult;
+			await submit();
+			result = (importBulkSales.result as BulkImportResult | null) ?? {
+				imported: [],
+				errors: []
+			};
 
 			if (result.imported.length > 0) {
 				toast.success(
@@ -169,6 +147,25 @@
 		} finally {
 			isImporting = false;
 		}
+	});
+
+	function handleFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		csvFile = input.files?.[0] ?? null;
+		if (csvFile) {
+			importBulkSales.fields.csv.set(csvFile);
+		} else {
+			importBulkSales.fields.csv.set(undefined);
+		}
+		result = null;
+	}
+
+	function removeFile() {
+		csvFile = null;
+		importBulkSales.fields.csv.set(undefined);
+		result = null;
+		const input = document.getElementById('csv-input') as HTMLInputElement;
+		if (input) input.value = '';
 	}
 </script>
 
@@ -185,89 +182,86 @@
 <div class="flex flex-1 flex-col gap-6 p-6 pt-0">
 	<!-- Upload card -->
 	<Card.Root>
-		<Card.Header>
-			<Card.Title>Import Sales from CSV</Card.Title>
-			<Card.Description>
-				Upload a CSV file to bulk-create sales. Google Drive links in the CSV are stored as-is — no
-				re-upload required.
-			</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
-			<!-- Sample download -->
-			<div class="flex items-center justify-between rounded-lg border border-dashed p-4">
-				<div class="flex items-center gap-3">
-					<FileText class="h-8 w-8 text-muted-foreground" />
-					<div>
-						<p class="text-sm font-medium">Need a template?</p>
-						<p class="text-xs text-muted-foreground">
-							Download the sample CSV to see the required column format.
-						</p>
-					</div>
-				</div>
-				<a
-					href="/sample-bulk-upload.csv"
-					download
-					class={buttonVariants({ variant: 'outline', size: 'sm' })}
-				>
-					<Download class="mr-2 h-4 w-4" />
-					Download Sample
-				</a>
-			</div>
-
-			<!-- File input -->
-			{#if csvFile}
-				<div class="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+		<form {...importBulkSalesForm}>
+			<Card.Header>
+				<Card.Title>Import Sales from CSV</Card.Title>
+				<Card.Description>
+					Upload a CSV file to bulk-create sales. Google Drive links in the CSV are stored as-is —
+					no re-upload required.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				<!-- Sample download -->
+				<div class="flex items-center justify-between rounded-lg border border-dashed p-4">
 					<div class="flex items-center gap-3">
-						<FileText class="h-5 w-5 text-muted-foreground" />
+						<FileText class="h-8 w-8 text-muted-foreground" />
 						<div>
-							<p class="text-sm font-medium">{csvFile.name}</p>
-							<p class="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(1)} KB</p>
+							<p class="text-sm font-medium">Need a template?</p>
+							<p class="text-xs text-muted-foreground">
+								Download the sample CSV to see the required column format.
+							</p>
 						</div>
 					</div>
-					<button
-						type="button"
-						onclick={removeFile}
-						class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+					<a
+						href={asset('/sample-bulk-upload.csv')}
+						download
+						class={buttonVariants({ variant: 'outline', size: 'sm' })}
 					>
-						<X class="h-4 w-4" />
-					</button>
+						<Download class="mr-2 h-4 w-4" />
+						Download Sample
+					</a>
 				</div>
-			{:else}
-				<label
-					for="csv-input"
-					class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-muted/50"
-				>
-					<Upload class="h-8 w-8 text-muted-foreground" />
-					<div>
-						<p class="text-sm font-medium">Click to upload CSV file</p>
-						<p class="text-xs text-muted-foreground">Only .csv files are supported</p>
+
+				<!-- File input -->
+				{#if csvFile}
+					<div class="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+						<div class="flex items-center gap-3">
+							<FileText class="h-5 w-5 text-muted-foreground" />
+							<div>
+								<p class="text-sm font-medium">{csvFile.name}</p>
+								<p class="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(1)} KB</p>
+							</div>
+						</div>
+						<button
+							type="button"
+							onclick={removeFile}
+							class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+						>
+							<X class="h-4 w-4" />
+						</button>
 					</div>
-				</label>
-				<input
-					id="csv-input"
-					type="file"
-					accept=".csv"
-					class="hidden"
-					onchange={handleFileChange}
-				/>
-			{/if}
-		</Card.Content>
-		<Card.Footer class="justify-end">
-			<button
-				type="button"
-				onclick={handleImport}
-				disabled={!canImport}
-				class={buttonVariants({ variant: 'default' })}
-			>
-				{#if isImporting}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-					Importing...
 				{:else}
-					<Upload class="mr-2 h-4 w-4" />
-					Import Sales
+					<label
+						for="csv-input"
+						class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-muted/50"
+					>
+						<Upload class="h-8 w-8 text-muted-foreground" />
+						<div>
+							<p class="text-sm font-medium">Click to upload CSV file</p>
+							<p class="text-xs text-muted-foreground">Only .csv files are supported</p>
+						</div>
+					</label>
+					<input
+						id="csv-input"
+						{...importBulkSales.fields.csv.as('file')}
+						accept=".csv"
+						class="hidden"
+						onchange={handleFileChange}
+					/>
 				{/if}
-			</button>
-		</Card.Footer>
+			</Card.Content>
+			<Card.Footer class="justify-end">
+				<button type="submit" disabled={!canImport} class={buttonVariants({ variant: 'default' })}>
+					{#if isImporting}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						Importing...
+					{:else}
+						<Upload class="mr-2 h-4 w-4" />
+						Import Sales
+					{/if}
+				</button>
+			</Card.Footer>
+		</form>
 	</Card.Root>
 
 	<!-- Results -->

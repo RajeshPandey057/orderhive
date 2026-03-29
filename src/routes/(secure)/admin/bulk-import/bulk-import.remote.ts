@@ -1,10 +1,9 @@
+import { form, getRequestEvent } from '$app/server';
 import { firestore } from '$lib/server/firebase';
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 import Papa from 'papaparse';
 import { z } from 'zod';
-
-// ─── Zod schemas ────────────────────────────────────────────────────────────
 
 const invoiceStageValues = ['first-half', 'second-half', 'full', 'not-yet-eligible'] as const;
 const propertyTypeValues = ['apartment', 'townhouse', 'villa', 'commercial', 'plot'] as const;
@@ -148,13 +147,15 @@ const jointBuyerRowSchema = z.object({
 	aml_form_url: z.string().url().optional().or(z.literal(''))
 });
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+const bulkImportSchema = z.object({
+	csv: z.instanceof(File).refine((file) => file.size > 0, {
+		message: 'No CSV file provided'
+	})
+});
 
 export type ImportedSale = { id: string; row_group: number; client: string };
 export type ImportError = { row_group: number; row: number; message: string };
 export type BulkImportResult = { imported: ImportedSale[]; errors: ImportError[] };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeFileRecord(url: string | undefined | '') {
 	if (!url || url.trim() === '') return null;
@@ -211,7 +212,6 @@ type UserRecord = { uid: string; displayName?: string; email: string; photoURL?:
 async function resolveUserByEmail(email: string): Promise<UserRecord> {
 	const normalised = email.trim().toLowerCase();
 
-	// 1. Check users collection (Firebase Auth synced records)
 	const usersSnap = await firestore
 		.collection('users')
 		.where('email', '==', normalised)
@@ -228,7 +228,6 @@ async function resolveUserByEmail(email: string): Promise<UserRecord> {
 		};
 	}
 
-	// 2. Fall back to roles collection (invited but not yet signed in)
 	const rolesSnap = await firestore
 		.collection('roles')
 		.where('email', '==', normalised)
@@ -238,14 +237,13 @@ async function resolveUserByEmail(email: string): Promise<UserRecord> {
 	if (!rolesSnap.empty) {
 		const doc = rolesSnap.docs[0];
 		return {
-			uid: doc.id, // roles use email as doc ID
+			uid: doc.id,
 			email: doc.data().email,
 			displayName: doc.data().displayName,
 			photoURL: doc.data().photoURL
 		};
 	}
 
-	// 3. Not found anywhere — auto-create as agent in roles collection
 	const now = FieldValue.serverTimestamp();
 	const roleRef = firestore.collection('roles').doc(normalised);
 	await roleRef.set({
@@ -258,23 +256,15 @@ async function resolveUserByEmail(email: string): Promise<UserRecord> {
 	return { uid: normalised, email: normalised };
 }
 
-// ─── POST handler ───────────────────────────────────────────────────────────
+export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
+	const { locals } = getRequestEvent();
 
-export async function POST({ request, locals }: { request: Request; locals: App.Locals }) {
 	if (!locals.user || (locals.user.role !== 'admin' && locals.user.role !== 'super-admin')) {
 		throw error(403, 'Forbidden');
 	}
 
-	const formData = await request.formData();
-	const csvFile = formData.get('csv') as File | null;
+	const csvText = await csv.text();
 
-	if (!csvFile || csvFile.size === 0) {
-		throw error(400, 'No CSV file provided');
-	}
-
-	const csvText = await csvFile.text();
-
-	// Parse CSV
 	const parsed = Papa.parse<Record<string, string>>(csvText.trim(), {
 		header: true,
 		skipEmptyLines: true,
@@ -289,7 +279,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 	const importErrors: ImportError[] = [];
 	const importedSales: ImportedSale[] = [];
 
-	// Group rows by row_group
 	const groups = new Map<
 		number,
 		{
@@ -345,7 +334,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 		}
 	}
 
-	// Process each group
 	for (const [groupNum, group] of groups) {
 		if (group.primaryIdx === -1) {
 			importErrors.push({
@@ -356,7 +344,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 			continue;
 		}
 
-		// Validate primary row
 		const primaryResult = primaryRowSchema.safeParse(group.primaryRow);
 		if (!primaryResult.success) {
 			const messages = primaryResult.error.issues
@@ -367,7 +354,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 		}
 		const primary = primaryResult.data;
 
-		// Validate joint buyer rows
 		const jointBuyers: z.infer<typeof jointBuyerRowSchema>[] = [];
 		let jointValid = true;
 		for (const { row, idx } of group.jointRows) {
@@ -384,7 +370,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 		}
 		if (!jointValid) continue;
 
-		// Resolve deal owners
 		const callerUser = await resolveUserByEmail(primary.caller_email);
 
 		const splitPreset = (primary.split_preset as '70/30' | '55/45' | '' | undefined) || '70/30';
@@ -414,7 +399,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 			});
 		}
 
-		// Calculate referral amount
 		let finalReferralAmount: number | undefined;
 		if (
 			primary.referral_amount_type &&
@@ -431,7 +415,6 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 			}
 		}
 
-		// Build sale record
 		const now = FieldValue.serverTimestamp();
 		const createdByUid = callerUser.uid;
 
@@ -533,5 +516,5 @@ export async function POST({ request, locals }: { request: Request; locals: App.
 	}
 
 	const result: BulkImportResult = { imported: importedSales, errors: importErrors };
-	return json(result);
-}
+	return result;
+});
