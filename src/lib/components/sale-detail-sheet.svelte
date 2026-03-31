@@ -548,6 +548,30 @@
 									{/if}
 								</Table.Cell>
 							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Sale Date
+								</Table.Cell>
+								<Table.Cell class="font-medium">{sale?.saleDate ?? '-'}</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Nationality
+								</Table.Cell>
+								<Table.Cell class="font-medium">{sale?.nationality ?? '-'}</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Resident Status
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.residentStatus
+										? sale.residentStatus === 'resident'
+											? 'Resident'
+											: 'Non-Resident'
+										: '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground"></Table.Cell>
+								<Table.Cell class="font-medium"></Table.Cell>
+							</Table.Row>
 						</Table.Body>
 					</Table.Root>
 				</div>
@@ -922,16 +946,16 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									RM Name
+									Caller Manager
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.relationshipManagerName ?? '-'}
+									{sale?.callerManagerEmail ?? '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									RM Email
+									Closer Manager
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.relationshipManagerEmail ?? '-'}
+									{sale?.closerManagerEmail ?? '-'}
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>

@@ -50,6 +50,8 @@
 	let nextJointKey = 0;
 	let nextOwnerKey = 0;
 	let tentativeEligibilityDate = $state<DateValue | undefined>(undefined);
+	let saleDateValue = $state<DateValue | undefined>(undefined);
+	let saleDatePickerOpen = $state(false);
 	let popoverOpen = $state(false);
 	let developerPopoverOpen = $state(false);
 	let developerSearchValue = $state('');
@@ -600,6 +602,101 @@
 								name="phone"
 								value={getE164number(clientPhoneValue, clientPhoneCountry) || ''}
 							/>
+							<!-- Sale Date + Nationality + Resident Status -->
+							<div class="grid grid-cols-3 gap-4">
+								<Field.Field>
+									<Field.Label for="sale-date">Sale Date</Field.Label>
+									<Popover.Root bind:open={saleDatePickerOpen}>
+										<Popover.Trigger class="w-full">
+											<Button
+												variant="outline"
+												class="w-full justify-start text-left font-normal"
+												id="sale-date"
+												type="button"
+											>
+												{#if saleDateValue}
+													{new Date(
+														saleDateValue.year,
+														saleDateValue.month - 1,
+														saleDateValue.day
+													).toLocaleDateString('en-GB', {
+														day: '2-digit',
+														month: 'short',
+														year: 'numeric'
+													})}
+												{:else}
+													<span class="text-muted-foreground">Pick sale date</span>
+												{/if}
+											</Button>
+										</Popover.Trigger>
+										<Popover.Content class="w-auto p-0" align="start">
+											<CalendarComponent
+												type="single"
+												bind:value={saleDateValue}
+												onValueChange={(value) => {
+													saleDateValue = value;
+													if (value) {
+														const d = new Date(value.year, value.month - 1, value.day);
+														createSale.fields.saleDate?.set(d.toISOString().split('T')[0]);
+													}
+													saleDatePickerOpen = false;
+												}}
+											/>
+										</Popover.Content>
+									</Popover.Root>
+									<input
+										type="hidden"
+										{...createSale.fields.saleDate?.as('text')}
+										value={saleDateValue
+											? new Date(saleDateValue.year, saleDateValue.month - 1, saleDateValue.day)
+													.toISOString()
+													.split('T')[0]
+											: ''}
+									/>
+									{#each createSale.fields.saleDate?.issues() ?? [] as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="nationality"
+										>Nationality <span class="text-muted-foreground">(Optional)</span></Field.Label
+									>
+									<Input
+										id="nationality"
+										{...createSale.fields.nationality?.as('text')}
+										placeholder="e.g. Indian"
+									/>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label
+										>Resident Status <span class="text-muted-foreground">(Optional)</span
+										></Field.Label
+									>
+									<Select.Root
+										type="single"
+										value={createSale.fields.residentStatus?.value() ?? ''}
+										onValueChange={(v) =>
+											createSale.fields.residentStatus?.set(
+												(v || undefined) as 'resident' | 'non-resident' | undefined
+											)}
+									>
+										<Select.Trigger>
+											{#if createSale.fields.residentStatus?.value() === 'resident'}
+												Resident
+											{:else if createSale.fields.residentStatus?.value() === 'non-resident'}
+												Non-Resident
+											{:else}
+												<span class="text-muted-foreground">Select status</span>
+											{/if}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="resident">Resident</Select.Item>
+											<Select.Item value="non-resident">Non-Resident</Select.Item>
+										</Select.Content>
+									</Select.Root>
+									<input type="hidden" {...createSale.fields.residentStatus?.as('text')} />
+								</Field.Field>
+							</div>
 						</Field.Group>
 					</Field.Set>
 					<Field.Set>
@@ -1229,39 +1326,40 @@
 				</Field.Set>
 				<Field.Separator />
 
-				<!-- Relationship Manager Section -->
+				<!-- Manager Details Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Relationship Manager Details
+						Manager Details
 					</Field.Legend>
 					<Field.Group>
 						<div class="grid grid-cols-2 gap-4">
 							<Field.Field>
-								<Field.Label for="relationshipManagerName"
-									>Relationship Manager Name <span class="text-muted-foreground">(Optional)</span
+								<Field.Label for="callerManagerEmail"
+									>Caller Manager Email <span class="text-muted-foreground">(Optional)</span
 									></Field.Label
 								>
 								<Input
-									id="relationshipManagerName"
-									{...createSale.fields.relationshipManagerName?.as('text')}
-									placeholder="Enter manager name"
+									id="callerManagerEmail"
+									type="email"
+									{...createSale.fields.callerManagerEmail?.as('text')}
+									placeholder="caller-manager@example.com"
 								/>
-								{#each createSale.fields.relationshipManagerName?.issues() ?? [] as issue, i (i)}
+								{#each createSale.fields.callerManagerEmail?.issues() ?? [] as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Field.Label for="relationshipManagerEmail"
-									>Relationship Manager Email <span class="text-muted-foreground">(Optional)</span
+								<Field.Label for="closerManagerEmail"
+									>Closer Manager Email <span class="text-muted-foreground">(Optional)</span
 									></Field.Label
 								>
 								<Input
-									id="relationshipManagerEmail"
+									id="closerManagerEmail"
 									type="email"
-									{...createSale.fields.relationshipManagerEmail?.as('text')}
-									placeholder="manager@example.com"
+									{...createSale.fields.closerManagerEmail?.as('text')}
+									placeholder="closer-manager@example.com"
 								/>
-								{#each createSale.fields.relationshipManagerEmail?.issues() ?? [] as issue, i (i)}
+								{#each createSale.fields.closerManagerEmail?.issues() ?? [] as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>

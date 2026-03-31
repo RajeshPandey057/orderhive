@@ -121,12 +121,15 @@ const saleSchema = z
 		grossFloorArea: z.number().optional(),
 		unitNo: z.string().min(1, 'Unit number is required'),
 		unitValue: z.string().min(1, 'Unit value is required'),
+		saleDate: z.string().min(1, 'Sale date is required'),
+		nationality: z.string().optional(),
+		residentStatus: z.enum(['resident', 'non-resident']).optional(),
 		referralAmountType: z.enum(['percentage', 'amount']).optional(),
 		referralAmount: z.number().optional(),
-		relationshipManagerName: z.string().optional(),
-		relationshipManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
-		seniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
-		reportingManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
+		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
+		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
+		seniorManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
+		reportingManagerEmail: z.string().email('Valid email is required').optional().or(z.literal(''))
 	})
 	.superRefine((data, ctx) => {
 		// Apartment validation
@@ -356,11 +359,12 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
 		unitNo: data.unitNo,
 		unitValue: data.unitValue,
+		saleDate: data.saleDate,
+		...(data.nationality && { nationality: data.nationality }),
+		...(data.residentStatus && { residentStatus: data.residentStatus }),
 		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
-		...(data.relationshipManagerName && { relationshipManagerName: data.relationshipManagerName }),
-		...(data.relationshipManagerEmail && {
-			relationshipManagerEmail: data.relationshipManagerEmail
-		}),
+		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
+		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
 		...(data.seniorManagerEmail && { seniorManagerEmail: data.seniorManagerEmail }),
 		...(data.reportingManagerEmail && { reportingManagerEmail: data.reportingManagerEmail }),
 		createdByUid,

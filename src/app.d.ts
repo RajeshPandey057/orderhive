@@ -263,9 +263,12 @@ declare global {
 		grossFloorArea?: number;
 		unitNo: string;
 		unitValue: string;
+		saleDate?: string;
+		nationality?: string;
+		residentStatus?: 'resident' | 'non-resident';
 		referralAmount?: number;
-		relationshipManagerName?: string;
-		relationshipManagerEmail?: string;
+		callerManagerEmail?: string;
+		closerManagerEmail?: string;
 		seniorManagerEmail?: string;
 		reportingManagerEmail?: string;
 		createdByUid: string;

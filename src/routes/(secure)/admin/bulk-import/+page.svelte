@@ -5,6 +5,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import * as Switch from '$lib/components/ui/switch/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { toast } from 'svelte-sonner';
 	import AlertCircle from '~icons/lucide/alert-circle';
@@ -18,10 +19,10 @@
 
 	const columnReference = [
 		{
-			column: 'row_group',
+			column: 'order_id',
 			required: 'Yes',
 			notes:
-				'Positive integer — groups rows into one sale. All rows for the same sale share the same value.'
+				'String ID — groups rows into one sale. All rows for the same sale share the same value. E.g. "ORD-001".'
 		},
 		{
 			column: 'is_joint_buyer',
@@ -36,6 +37,17 @@
 		{ column: 'national_id_url', required: 'Yes', notes: 'Google Drive link — stored as-is.' },
 		{ column: 'aml_form_url', required: 'No', notes: 'Google Drive link — optional.' },
 		{
+			column: 'sale_date',
+			required: 'Yes (primary)',
+			notes: 'Format: 26-Apr-2026 (DD-Mmm-YYYY).'
+		},
+		{ column: 'nationality', required: 'No', notes: 'e.g. "Indian", "Emirati".' },
+		{
+			column: 'resident_status',
+			required: 'No',
+			notes: '"resident" or "non-resident".'
+		},
+		{
 			column: 'caller_email',
 			required: 'Yes (primary)',
 			notes: 'Must match a user in the system.'
@@ -45,7 +57,33 @@
 			required: 'No',
 			notes: 'Must match a user in the system if provided.'
 		},
-		{ column: 'split_preset', required: 'No', notes: '"70/30" or "55/45". Defaults to 70/30.' },
+		{
+			column: 'third_agent_email',
+			required: 'No',
+			notes:
+				'If provided, enables 3-agent split mode — requires caller_split, closer_split, third_agent_split.'
+		},
+		{
+			column: 'split_preset',
+			required: 'No',
+			notes: '"70/30" or "55/45". Used in 2-agent mode. Defaults to 70/30.'
+		},
+		{
+			column: 'caller_split',
+			required: 'No',
+			notes:
+				'Number 0-100. Required when third_agent_email is set. caller_split + closer_split + third_agent_split must equal 100.'
+		},
+		{
+			column: 'closer_split',
+			required: 'No',
+			notes: 'Number 0-100. Required when third_agent_email is set.'
+		},
+		{
+			column: 'third_agent_split',
+			required: 'No',
+			notes: 'Number 0-100. Required when third_agent_email is set.'
+		},
 		{ column: 'deal_stage', required: 'Yes (primary)', notes: '"eoi" or "booking".' },
 		{
 			column: 'payment_value',
@@ -62,7 +100,7 @@
 			notes: 'Developer slug, e.g. "emaar", "damac".'
 		},
 		{ column: 'project', required: 'Yes (primary)', notes: 'Project name.' },
-		{ column: 'community', required: 'No', notes: 'Community slug, e.g. "dubai-marina".' },
+		{ column: 'community', required: 'No', notes: 'Community name, e.g. "Dubai Marina".' },
 		{
 			column: 'property_type',
 			required: 'Yes (primary)',
@@ -108,8 +146,8 @@
 		{ column: 'tentative_eligibility_date', required: 'No', notes: 'DD/MM/YYYY format.' },
 		{ column: 'referral_amount_type', required: 'No', notes: '"percentage" or "amount".' },
 		{ column: 'referral_amount', required: 'No', notes: 'Number. Used with referral_amount_type.' },
-		{ column: 'relationship_manager_name', required: 'No', notes: '' },
-		{ column: 'relationship_manager_email', required: 'No', notes: 'Valid email if provided.' },
+		{ column: 'caller_manager_email', required: 'No', notes: 'Valid email if provided.' },
+		{ column: 'closer_manager_email', required: 'No', notes: 'Valid email if provided.' },
 		{
 			column: 'senior_manager_email',
 			required: 'No',
@@ -121,6 +159,11 @@
 			notes: 'Email of the reporting manager (must be a valid email).'
 		}
 	];
+
+	let lenientMode = $state(false);
+	$effect(() => {
+		importBulkSales.fields.lenient?.set(lenientMode ? 'true' : 'false');
+	});
 
 	let csvFile = $state<File | null>(null);
 	let isImporting = $state(false);
@@ -260,6 +303,24 @@
 					/>
 				{/if}
 			</Card.Content>
+			<!-- Lenient mode toggle -->
+			<Card.Content class="border-t pt-4">
+				<div class="flex items-center justify-between rounded-lg border p-4">
+					<div>
+						<p class="text-sm font-medium">Non-Mandatory Mode</p>
+						<p class="text-xs text-muted-foreground">
+							When enabled, all field validations are relaxed — only order_id is required. Useful
+							for importing partial data.
+						</p>
+					</div>
+					<Switch.Root bind:checked={lenientMode} class="data-[state=checked]:bg-orange-500" />
+				</div>
+				<input
+					type="hidden"
+					{...importBulkSales.fields.lenient?.as('text')}
+					value={lenientMode ? 'true' : 'false'}
+				/>
+			</Card.Content>
 			<Card.Footer class="justify-end">
 				<button type="submit" disabled={!canImport} class={buttonVariants({ variant: 'default' })}>
 					{#if isImporting}
@@ -289,7 +350,7 @@
 						<Table.Header>
 							<Table.Row>
 								<Table.Head>Sale ID</Table.Head>
-								<Table.Head>Row Group</Table.Head>
+								<Table.Head>Order ID</Table.Head>
 								<Table.Head>Client</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -297,7 +358,7 @@
 							{#each result.imported as sale (sale.id)}
 								<Table.Row>
 									<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
-									<Table.Cell>{sale.row_group}</Table.Cell>
+									<Table.Cell>{sale.order_id}</Table.Cell>
 									<Table.Cell>{sale.client}</Table.Cell>
 								</Table.Row>
 							{/each}
@@ -322,7 +383,7 @@
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
-								<Table.Head>Row Group</Table.Head>
+								<Table.Head>Order ID</Table.Head>
 								<Table.Head>CSV Row #</Table.Head>
 								<Table.Head>Error</Table.Head>
 							</Table.Row>
@@ -330,7 +391,7 @@
 						<Table.Body>
 							{#each result.errors as err, i (i)}
 								<Table.Row>
-									<Table.Cell>{err.row_group || '—'}</Table.Cell>
+									<Table.Cell>{err.order_id || '—'}</Table.Cell>
 									<Table.Cell>{err.row || '—'}</Table.Cell>
 									<Table.Cell class="text-sm text-destructive">{err.message}</Table.Cell>
 								</Table.Row>

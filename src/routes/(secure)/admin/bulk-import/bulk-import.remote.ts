@@ -22,123 +22,181 @@ const bedroomTypeValues = [
 	'podium-townhouse'
 ] as const;
 
-const primaryRowSchema = z
-	.object({
-		row_group: z.coerce.number().int().positive('row_group must be a positive integer'),
+function buildPrimaryRowSchema(lenient: boolean) {
+	const base = z.object({
+		order_id: z.string().min(1, 'order_id is required'),
 		is_joint_buyer: z.literal('false'),
-		first_name: z.string().min(1, 'first_name is required'),
-		last_name: z.string().min(1, 'last_name is required'),
-		email: z.email('email must be valid'),
-		phone: z.string().min(7, 'phone is required'),
-		passport_url: z.string().url('passport_url must be a valid URL'),
-		national_id_url: z.string().url('national_id_url must be a valid URL'),
-		aml_form_url: z.string().url().optional().or(z.literal('')),
-		caller_email: z.email('caller_email must be a valid email'),
-		closer_email: z.email().optional().or(z.literal('')),
-		split_preset: z.enum(['70/30', '55/45']).optional().or(z.literal('')),
-		deal_stage: z.enum(['eoi', 'booking'], 'deal_stage must be eoi or booking'),
-		payment_value: z.coerce.number().min(0, 'payment_value must be ≥ 0'),
-		booking_form_url: z.string().url('booking_form_url must be a valid URL'),
-		payment_receipt_url: z.string().url('payment_receipt_url must be a valid URL'),
-		referral_agreement_url: z.string().url().optional().or(z.literal('')),
-		sale_type: z.enum(['off-plan', 'secondary'], 'sale_type must be off-plan or secondary'),
-		developer: z.string().min(1, 'developer is required'),
-		project: z.string().min(1, 'project is required'),
+		first_name: z.string().optional().or(z.literal('')),
+		last_name: z.string().optional().or(z.literal('')),
+		email: z.string().optional().or(z.literal('')),
+		phone: z.string().optional().or(z.literal('')),
+		passport_url: z.string().optional().or(z.literal('')),
+		national_id_url: z.string().optional().or(z.literal('')),
+		aml_form_url: z.string().optional().or(z.literal('')),
+		caller_email: z.string().optional().or(z.literal('')),
+		closer_email: z.string().optional().or(z.literal('')),
+		split_preset: z.string().optional().or(z.literal('')),
+		caller_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		closer_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		third_agent_email: z.string().optional().or(z.literal('')),
+		third_agent_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		deal_stage: z.string().optional().or(z.literal('')),
+		payment_value: z.coerce.number().optional().or(z.literal('')),
+		booking_form_url: z.string().optional().or(z.literal('')),
+		payment_receipt_url: z.string().optional().or(z.literal('')),
+		referral_agreement_url: z.string().optional().or(z.literal('')),
+		sale_type: z.string().optional().or(z.literal('')),
+		developer: z.string().optional().or(z.literal('')),
+		project: z.string().optional().or(z.literal('')),
 		community: z.string().optional().or(z.literal('')),
-		property_type: z.enum(propertyTypeValues, 'property_type is invalid'),
-		bedroom_type: z.enum(bedroomTypeValues).optional().or(z.literal('')),
-		commercial_sub_type: z.enum(['office', 'warehouse']).optional().or(z.literal('')),
+		property_type: z.string().optional().or(z.literal('')),
+		bedroom_type: z.string().optional().or(z.literal('')),
+		commercial_sub_type: z.string().optional().or(z.literal('')),
 		property_size: z.coerce.number().positive().optional().or(z.literal('')),
 		plot_area: z.coerce.number().positive().optional().or(z.literal('')),
 		built_up_area: z.coerce.number().positive().optional().or(z.literal('')),
 		gross_floor_area: z.coerce.number().positive().optional().or(z.literal('')),
-		unit_no: z.string().min(1, 'unit_no is required'),
-		unit_value: z.string().min(1, 'unit_value is required'),
-		invoice_stage: z.enum(invoiceStageValues, 'invoice_stage is invalid'),
+		unit_no: z.string().optional().or(z.literal('')),
+		unit_value: z.string().optional().or(z.literal('')),
+		invoice_stage: z.string().optional().or(z.literal('')),
 		tentative_eligibility_date: z.string().optional().or(z.literal('')),
-		referral_amount_type: z.enum(['percentage', 'amount']).optional().or(z.literal('')),
+		referral_amount_type: z.string().optional().or(z.literal('')),
 		referral_amount: z.coerce.number().positive().optional().or(z.literal('')),
-		relationship_manager_name: z.string().optional().or(z.literal('')),
-		relationship_manager_email: z.email().optional().or(z.literal('')),
-		senior_manager_email: z.email().optional().or(z.literal('')),
-		reporting_manager_email: z.email().optional().or(z.literal(''))
-	})
-	.superRefine((data, ctx) => {
+		sale_date: z.string().optional().or(z.literal('')),
+		nationality: z.string().optional().or(z.literal('')),
+		resident_status: z.string().optional().or(z.literal('')),
+		caller_manager_email: z.string().optional().or(z.literal('')),
+		closer_manager_email: z.string().optional().or(z.literal('')),
+		senior_manager_email: z.string().optional().or(z.literal('')),
+		reporting_manager_email: z.string().optional().or(z.literal(''))
+	});
+
+	if (lenient) return base;
+
+	return base.superRefine((data, ctx) => {
+		const req = (val: string | undefined, path: string, msg: string) => {
+			if (!val || val.trim() === '') ctx.addIssue({ code: 'custom', path: [path], message: msg });
+		};
+		req(data.first_name, 'first_name', 'first_name is required');
+		req(data.last_name, 'last_name', 'last_name is required');
+		req(data.phone, 'phone', 'phone is required');
+		req(data.passport_url, 'passport_url', 'passport_url is required');
+		req(data.national_id_url, 'national_id_url', 'national_id_url is required');
+		req(data.caller_email, 'caller_email', 'caller_email is required');
+		req(data.unit_no, 'unit_no', 'unit_no is required');
+		req(data.unit_value, 'unit_value', 'unit_value is required');
+		req(data.developer, 'developer', 'developer is required');
+		req(data.project, 'project', 'project is required');
+		req(data.sale_date, 'sale_date', 'sale_date is required');
+
+		if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
+			ctx.addIssue({ code: 'custom', path: ['email'], message: 'email must be valid' });
+		if (data.caller_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.caller_email))
+			ctx.addIssue({
+				code: 'custom',
+				path: ['caller_email'],
+				message: 'caller_email must be a valid email'
+			});
+		if (!data.deal_stage || !['eoi', 'booking'].includes(data.deal_stage))
+			ctx.addIssue({
+				code: 'custom',
+				path: ['deal_stage'],
+				message: 'deal_stage must be eoi or booking'
+			});
+		if (typeof data.payment_value !== 'number')
+			ctx.addIssue({
+				code: 'custom',
+				path: ['payment_value'],
+				message: 'payment_value must be a number ≥ 0'
+			});
+		req(data.booking_form_url, 'booking_form_url', 'booking_form_url is required');
+		req(data.payment_receipt_url, 'payment_receipt_url', 'payment_receipt_url is required');
+		if (!data.sale_type || !['off-plan', 'secondary'].includes(data.sale_type))
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sale_type'],
+				message: 'sale_type must be off-plan or secondary'
+			});
+		if (!data.property_type || !propertyTypeValues.includes(data.property_type as never))
+			ctx.addIssue({
+				code: 'custom',
+				path: ['property_type'],
+				message: 'property_type is invalid'
+			});
+		if (!data.invoice_stage || !invoiceStageValues.includes(data.invoice_stage as never))
+			ctx.addIssue({
+				code: 'custom',
+				path: ['invoice_stage'],
+				message: 'invoice_stage is invalid'
+			});
+
 		if (data.property_type === 'apartment') {
-			if (!data.bedroom_type) {
+			if (!data.bedroom_type)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['bedroom_type'],
 					message: 'bedroom_type is required for apartments'
 				});
-			}
-			if (!data.property_size) {
+			if (!data.property_size)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['property_size'],
 					message: 'property_size is required for apartments'
 				});
-			}
 		}
 		if (data.property_type === 'townhouse' || data.property_type === 'villa') {
-			if (!data.bedroom_type) {
+			if (!data.bedroom_type)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['bedroom_type'],
 					message: 'bedroom_type is required for townhouse/villa'
 				});
-			}
-			if (!data.plot_area) {
+			if (!data.plot_area)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['plot_area'],
 					message: 'plot_area is required for townhouse/villa'
 				});
-			}
-			if (!data.built_up_area) {
+			if (!data.built_up_area)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['built_up_area'],
 					message: 'built_up_area is required for townhouse/villa'
 				});
-			}
 		}
 		if (data.property_type === 'commercial') {
-			if (!data.commercial_sub_type) {
+			if (!data.commercial_sub_type)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['commercial_sub_type'],
 					message: 'commercial_sub_type is required for commercial properties'
 				});
-			}
-			if (!data.property_size) {
+			if (!data.property_size)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['property_size'],
 					message: 'property_size is required for commercial properties'
 				});
-			}
-			if (data.commercial_sub_type === 'warehouse' && !data.gross_floor_area) {
+			if (data.commercial_sub_type === 'warehouse' && !data.gross_floor_area)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['gross_floor_area'],
 					message: 'gross_floor_area is required for warehouses'
 				});
-			}
 		}
 		if (data.property_type === 'plot') {
-			if (!data.property_size) {
+			if (!data.property_size)
 				ctx.addIssue({
 					code: 'custom',
 					path: ['property_size'],
 					message: 'property_size is required for plots'
 				});
-			}
 		}
 	});
+}
 
 const jointBuyerRowSchema = z.object({
-	row_group: z.coerce.number().int().positive('row_group must be a positive integer'),
+	order_id: z.string().min(1, 'order_id is required'),
 	is_joint_buyer: z.literal('true'),
 	first_name: z.string().min(1, 'first_name is required'),
 	last_name: z.string().min(1, 'last_name is required'),
@@ -152,11 +210,12 @@ const jointBuyerRowSchema = z.object({
 const bulkImportSchema = z.object({
 	csv: z.instanceof(File).refine((file) => file.size > 0, {
 		message: 'No CSV file provided'
-	})
+	}),
+	lenient: z.string().optional().default('false')
 });
 
-export type ImportedSale = { id: string; row_group: number; client: string };
-export type ImportError = { row_group: number; row: number; message: string };
+export type ImportedSale = { id: string; order_id: string; client: string };
+export type ImportError = { order_id: string; row: number; message: string };
 export type BulkImportResult = { imported: ImportedSale[]; errors: ImportError[] };
 
 function makeFileRecord(url: string | undefined | '') {
@@ -186,6 +245,33 @@ function parseDDMMYYYY(dateStr: string | undefined | ''): string | null {
 	if (parts.length !== 3) return null;
 	const [dd, mm, yyyy] = parts;
 	const iso = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+	if (isNaN(new Date(iso).getTime())) return null;
+	return iso;
+}
+
+const MONTH_MAP: Record<string, string> = {
+	jan: '01',
+	feb: '02',
+	mar: '03',
+	apr: '04',
+	may: '05',
+	jun: '06',
+	jul: '07',
+	aug: '08',
+	sep: '09',
+	oct: '10',
+	nov: '11',
+	dec: '12'
+};
+
+function parseDDMmmYYYY(dateStr: string | undefined | ''): string | null {
+	if (!dateStr || dateStr.trim() === '') return null;
+	const parts = dateStr.trim().split('-');
+	if (parts.length !== 3) return null;
+	const [dd, mmm, yyyy] = parts;
+	const mm = MONTH_MAP[mmm.toLowerCase()];
+	if (!mm) return null;
+	const iso = `${yyyy}-${mm}-${dd.padStart(2, '0')}`;
 	if (isNaN(new Date(iso).getTime())) return null;
 	return iso;
 }
@@ -258,8 +344,9 @@ async function resolveUserByEmail(email: string): Promise<UserRecord> {
 	return { uid: normalised, email: normalised };
 }
 
-export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
+export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: lenientStr }) => {
 	const { locals } = getRequestEvent();
+	const lenient = lenientStr === 'true';
 
 	if (!locals.user || (locals.user.role !== 'admin' && locals.user.role !== 'super-admin')) {
 		throw error(403, 'Forbidden');
@@ -280,9 +367,10 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 	const rows = parsed.data;
 	const importErrors: ImportError[] = [];
 	const importedSales: ImportedSale[] = [];
+	const primaryRowSchema = buildPrimaryRowSchema(lenient);
 
 	const groups = new Map<
-		number,
+		string,
 		{
 			primaryRow: Record<string, string>;
 			primaryIdx: number;
@@ -292,34 +380,33 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
-		const rawGroup = row['row_group'];
-		const groupNum = parseInt(rawGroup, 10);
+		const orderId = row['order_id']?.trim();
 
-		if (isNaN(groupNum) || groupNum <= 0) {
+		if (!orderId) {
 			importErrors.push({
-				row_group: groupNum || 0,
+				order_id: '',
 				row: i + 2,
-				message: 'row_group must be a positive integer'
+				message: 'order_id is missing or empty'
 			});
 			continue;
 		}
 
-		if (!groups.has(groupNum)) {
-			groups.set(groupNum, {
+		if (!groups.has(orderId)) {
+			groups.set(orderId, {
 				primaryRow: {} as Record<string, string>,
 				primaryIdx: -1,
 				jointRows: []
 			});
 		}
-		const group = groups.get(groupNum)!;
+		const group = groups.get(orderId)!;
 
 		const isJoint = row['is_joint_buyer']?.trim().toLowerCase();
 		if (isJoint === 'false') {
 			if (group.primaryIdx !== -1) {
 				importErrors.push({
-					row_group: groupNum,
+					order_id: orderId,
 					row: i + 2,
-					message: `Duplicate primary row for row_group ${groupNum}`
+					message: `Duplicate primary row for order_id ${orderId}`
 				});
 				continue;
 			}
@@ -329,19 +416,19 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			group.jointRows.push({ row, idx: i + 2 });
 		} else {
 			importErrors.push({
-				row_group: groupNum,
+				order_id: orderId,
 				row: i + 2,
 				message: `is_joint_buyer must be 'true' or 'false'`
 			});
 		}
 	}
 
-	for (const [groupNum, group] of groups) {
+	for (const [orderId, group] of groups) {
 		if (group.primaryIdx === -1) {
 			importErrors.push({
-				row_group: groupNum,
+				order_id: orderId,
 				row: 0,
-				message: `No primary row found for row_group ${groupNum}`
+				message: `No primary row found for order_id ${orderId}`
 			});
 			continue;
 		}
@@ -351,7 +438,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			const messages = primaryResult.error.issues
 				.map((i) => `${i.path.join('.')}: ${i.message}`)
 				.join('; ');
-			importErrors.push({ row_group: groupNum, row: group.primaryIdx, message: messages });
+			importErrors.push({ order_id: orderId, row: group.primaryIdx, message: messages });
 			continue;
 		}
 		const primary = primaryResult.data;
@@ -364,7 +451,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 				const messages = jointResult.error.issues
 					.map((i) => `${i.path.join('.')}: ${i.message}`)
 					.join('; ');
-				importErrors.push({ row_group: groupNum, row: idx, message: `Joint buyer: ${messages}` });
+				importErrors.push({ order_id: orderId, row: idx, message: `Joint buyer: ${messages}` });
 				jointValid = false;
 			} else {
 				jointBuyers.push(jointResult.data);
@@ -372,33 +459,86 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 		}
 		if (!jointValid) continue;
 
-		const callerUser = await resolveUserByEmail(primary.caller_email);
+		const callerEmail = primary.caller_email ?? '';
+		const callerUser = callerEmail ? await resolveUserByEmail(callerEmail) : null;
 
-		const splitPreset = (primary.split_preset as '70/30' | '55/45' | '' | undefined) || '70/30';
-		const callerSplit = splitPreset === '55/45' ? 55 : 70;
-		const closerSplit = splitPreset === '55/45' ? 45 : 30;
+		// Build deal owners — support 3-agent splits
+		const dealOwners: Sale['dealOwners'] = [];
 
-		const dealOwners: Sale['dealOwners'] = [
-			{
-				userId: callerUser.uid,
-				email: callerUser.email,
-				name: callerUser.displayName ?? callerUser.email,
-				photoURL: callerUser.photoURL ?? '',
-				ownerRole: 'caller',
-				split: callerSplit
+		const hasThirdAgent = primary.third_agent_email && primary.third_agent_email.trim() !== '';
+
+		if (hasThirdAgent) {
+			// Explicit 3-agent splits
+			const cs = typeof primary.caller_split === 'number' ? primary.caller_split : 0;
+			const clos = typeof primary.closer_split === 'number' ? primary.closer_split : 0;
+			const ts = typeof primary.third_agent_split === 'number' ? primary.third_agent_split : 0;
+
+			if (!lenient && Math.round(cs + clos + ts) !== 100) {
+				importErrors.push({
+					order_id: orderId,
+					row: group.primaryIdx,
+					message: `caller_split + closer_split + third_agent_split must sum to 100 (got ${cs + clos + ts})`
+				});
+				continue;
 			}
-		];
 
-		if (primary.closer_email && primary.closer_email.trim() !== '') {
-			const closerUser = await resolveUserByEmail(primary.closer_email);
+			if (callerUser) {
+				dealOwners.push({
+					userId: callerUser.uid,
+					email: callerUser.email,
+					name: callerUser.displayName ?? callerUser.email,
+					photoURL: callerUser.photoURL ?? '',
+					ownerRole: 'caller',
+					split: cs
+				});
+			}
+			if (primary.closer_email && primary.closer_email.trim() !== '') {
+				const closerUser = await resolveUserByEmail(primary.closer_email);
+				dealOwners.push({
+					userId: closerUser.uid,
+					email: closerUser.email,
+					name: closerUser.displayName ?? closerUser.email,
+					photoURL: closerUser.photoURL ?? '',
+					ownerRole: 'closer',
+					split: clos
+				});
+			}
+			const thirdUser = await resolveUserByEmail(primary.third_agent_email!);
 			dealOwners.push({
-				userId: closerUser.uid,
-				email: closerUser.email,
-				name: closerUser.displayName ?? closerUser.email,
-				photoURL: closerUser.photoURL ?? '',
+				userId: thirdUser.uid,
+				email: thirdUser.email,
+				name: thirdUser.displayName ?? thirdUser.email,
+				photoURL: thirdUser.photoURL ?? '',
 				ownerRole: 'closer',
-				split: closerSplit
+				split: ts
 			});
+		} else {
+			// 2-agent mode — use split_preset
+			const splitPreset = (primary.split_preset || '70/30') as '70/30' | '55/45';
+			const callerSplit = splitPreset === '55/45' ? 55 : 70;
+			const closerSplit = splitPreset === '55/45' ? 45 : 30;
+
+			if (callerUser) {
+				dealOwners.push({
+					userId: callerUser.uid,
+					email: callerUser.email,
+					name: callerUser.displayName ?? callerUser.email,
+					photoURL: callerUser.photoURL ?? '',
+					ownerRole: 'caller',
+					split: callerSplit
+				});
+			}
+			if (primary.closer_email && primary.closer_email.trim() !== '') {
+				const closerUser = await resolveUserByEmail(primary.closer_email);
+				dealOwners.push({
+					userId: closerUser.uid,
+					email: closerUser.email,
+					name: closerUser.displayName ?? closerUser.email,
+					photoURL: closerUser.photoURL ?? '',
+					ownerRole: 'closer',
+					split: closerSplit
+				});
+			}
 		}
 
 		let finalReferralAmount: number | undefined;
@@ -408,7 +548,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			typeof primary.referral_amount === 'number'
 		) {
 			if (primary.referral_amount_type === 'percentage') {
-				const unitValue = parseFloat(String(primary.unit_value).replace(/,/g, ''));
+				const unitValue = parseFloat(String(primary.unit_value ?? '').replace(/,/g, ''));
 				if (!isNaN(unitValue)) {
 					finalReferralAmount = (unitValue * primary.referral_amount) / 100;
 				}
@@ -418,19 +558,21 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 		}
 
 		const now = FieldValue.serverTimestamp();
-		const createdByUid = callerUser.uid;
+		const createdByUid = callerUser?.uid ?? orderId;
 
 		let saleId: string;
 		try {
 			saleId = await generateSaleId();
 		} catch {
 			importErrors.push({
-				row_group: groupNum,
+				order_id: orderId,
 				row: group.primaryIdx,
 				message: 'Failed to generate sale ID, please retry'
 			});
 			continue;
 		}
+
+		const parsedSaleDate = parseDDMmmYYYY(primary.sale_date) ?? primary.sale_date ?? null;
 
 		const saleRecord = {
 			status: 'pending',
@@ -438,13 +580,14 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			complianceStatus: 'pending',
 			commissionStatus: 'pending',
 			invoiceFile: { status: 'pending' },
-			invoiceStage: [primary.invoice_stage],
+			invoiceStage: primary.invoice_stage ? [primary.invoice_stage] : [],
 			tentativeEligibilityDate: parseDDMMYYYY(primary.tentative_eligibility_date),
+			...(parsedSaleDate && { saleDate: parsedSaleDate }),
 			clientDetails: {
-				firstName: primary.first_name,
-				lastName: primary.last_name,
-				email: primary.email,
-				phone: primary.phone,
+				firstName: primary.first_name ?? '',
+				lastName: primary.last_name ?? '',
+				email: primary.email ?? '',
+				phone: primary.phone ?? '',
 				passportFile: makeFileRecord(primary.passport_url),
 				nationalIdFile: makeFileRecord(primary.national_id_url),
 				amlFormFile: makeFileRecord(primary.aml_form_url)
@@ -460,16 +603,16 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			})),
 			dealOwners,
 			dealOwnerIds: dealOwners.map((o) => o.userId),
-			dealStage: primary.deal_stage,
-			paymentValue: primary.payment_value,
+			dealStage: primary.deal_stage ?? '',
+			paymentValue: primary.payment_value ?? 0,
 			bookingFormFile: makeFileRecord(primary.booking_form_url),
 			paymentReceiptFile: makeFileRecord(primary.payment_receipt_url),
 			refferalAgreementFile: makeFileRecord(primary.referral_agreement_url),
-			saleType: primary.sale_type,
-			developer: primary.developer,
-			project: primary.project,
+			saleType: primary.sale_type ?? '',
+			developer: primary.developer ?? '',
+			project: primary.project ?? '',
 			...(primary.community && primary.community !== '' && { community: primary.community }),
-			propertyType: primary.property_type,
+			propertyType: primary.property_type ?? '',
 			...(primary.bedroom_type && { bedroomType: primary.bedroom_type }),
 			...(primary.commercial_sub_type && { commercialSubType: primary.commercial_sub_type }),
 			...(primary.property_size &&
@@ -482,28 +625,23 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 				typeof primary.gross_floor_area === 'number' && {
 					grossFloorArea: primary.gross_floor_area
 				}),
-			unitNo: primary.unit_no,
-			unitValue: primary.unit_value,
+			unitNo: primary.unit_no ?? '',
+			unitValue: primary.unit_value ?? '',
 			...(finalReferralAmount !== undefined && { referralAmount: finalReferralAmount }),
-			...(primary.relationship_manager_name &&
-				primary.relationship_manager_name !== '' && {
-					relationshipManagerName: primary.relationship_manager_name
+			...(primary.nationality && { nationality: primary.nationality }),
+			...(primary.resident_status &&
+				['resident', 'non-resident'].includes(primary.resident_status) && {
+					residentStatus: primary.resident_status as 'resident' | 'non-resident'
 				}),
-			...(primary.relationship_manager_email &&
-				primary.relationship_manager_email !== '' && {
-					relationshipManagerEmail: primary.relationship_manager_email
-				}),
-			...(primary.senior_manager_email &&
-				primary.senior_manager_email !== '' && {
-					seniorManagerEmail: primary.senior_manager_email
-				}),
-			...(primary.reporting_manager_email &&
-				primary.reporting_manager_email !== '' && {
-					reportingManagerEmail: primary.reporting_manager_email
-				}),
+			...(primary.caller_manager_email && { callerManagerEmail: primary.caller_manager_email }),
+			...(primary.closer_manager_email && { closerManagerEmail: primary.closer_manager_email }),
+			...(primary.senior_manager_email && { seniorManagerEmail: primary.senior_manager_email }),
+			...(primary.reporting_manager_email && {
+				reportingManagerEmail: primary.reporting_manager_email
+			}),
 			commnets: [],
 			createdByUid,
-			createdByEmail: callerUser.email,
+			createdByEmail: callerUser?.email ?? '',
 			createdAt: now,
 			updatedAt: now
 		};
@@ -512,13 +650,13 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			await firestore.collection('sales').doc(saleId).set(saleRecord);
 			importedSales.push({
 				id: saleId,
-				row_group: groupNum,
-				client: `${primary.first_name} ${primary.last_name}`
+				order_id: orderId,
+				client: `${primary.first_name ?? ''} ${primary.last_name ?? ''}`.trim()
 			});
 		} catch (writeErr) {
-			console.error(`Failed to write sale for row_group ${groupNum}:`, writeErr);
+			console.error(`Failed to write sale for order_id ${orderId}:`, writeErr);
 			importErrors.push({
-				row_group: groupNum,
+				order_id: orderId,
 				row: group.primaryIdx,
 				message: 'Failed to save sale to Firestore'
 			});
