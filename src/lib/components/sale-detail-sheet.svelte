@@ -936,6 +936,20 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Senior Manager
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.seniorManagerEmail ?? '-'}
+								</Table.Cell>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
+									Reporting Manager
+								</Table.Cell>
+								<Table.Cell class="font-medium">
+									{sale?.reportingManagerEmail ?? '-'}
+								</Table.Cell>
+							</Table.Row>
+							<Table.Row>
+								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Commission %
 								</Table.Cell>
 								<Table.Cell class="font-medium">4</Table.Cell>

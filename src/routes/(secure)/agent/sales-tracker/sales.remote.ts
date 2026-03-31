@@ -124,11 +124,9 @@ const saleSchema = z
 		referralAmountType: z.enum(['percentage', 'amount']).optional(),
 		referralAmount: z.number().optional(),
 		relationshipManagerName: z.string().optional(),
-		relationshipManagerEmail: z
-			.string()
-			.email('Valid email is required')
-			.optional()
-			.or(z.literal(''))
+		relationshipManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
+		seniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
+		reportingManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
 	})
 	.superRefine((data, ctx) => {
 		// Apartment validation
@@ -363,6 +361,8 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.relationshipManagerEmail && {
 			relationshipManagerEmail: data.relationshipManagerEmail
 		}),
+		...(data.seniorManagerEmail && { seniorManagerEmail: data.seniorManagerEmail }),
+		...(data.reportingManagerEmail && { reportingManagerEmail: data.reportingManagerEmail }),
 		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,
 		createdAt: timestamp,

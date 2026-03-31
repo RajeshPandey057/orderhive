@@ -109,7 +109,17 @@
 		{ column: 'referral_amount_type', required: 'No', notes: '"percentage" or "amount".' },
 		{ column: 'referral_amount', required: 'No', notes: 'Number. Used with referral_amount_type.' },
 		{ column: 'relationship_manager_name', required: 'No', notes: '' },
-		{ column: 'relationship_manager_email', required: 'No', notes: 'Valid email if provided.' }
+		{ column: 'relationship_manager_email', required: 'No', notes: 'Valid email if provided.' },
+		{
+			column: 'senior_manager_email',
+			required: 'No',
+			notes: 'Email of the senior manager (must be a valid email).'
+		},
+		{
+			column: 'reporting_manager_email',
+			required: 'No',
+			notes: 'Email of the reporting manager (must be a valid email).'
+		}
 	];
 
 	let csvFile = $state<File | null>(null);

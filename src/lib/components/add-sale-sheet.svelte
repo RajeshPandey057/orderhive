@@ -116,6 +116,27 @@
 	};
 
 	const users = firekitCollection<FirestoreUser>('users');
+	const rolesCollection = firekitCollection<Role>('roles');
+
+	// Derived options for manager dropdowns (filtered by agentRole)
+	const seniorManagerOptions = $derived(
+		rolesCollection.data?.filter((r) => r.agentRole === 'senior-manager') ?? []
+	);
+	const reportingManagerOptions = $derived(
+		rolesCollection.data?.filter((r) => r.agentRole === 'reporting-manager') ?? []
+	);
+
+	// Selected manager emails
+	let selectedSeniorManagerEmail = $state('');
+	let selectedReportingManagerEmail = $state('');
+
+	// Sync manager emails to form fields
+	$effect(() => {
+		createSale.fields.seniorManagerEmail?.set(selectedSeniorManagerEmail || undefined);
+	});
+	$effect(() => {
+		createSale.fields.reportingManagerEmail?.set(selectedReportingManagerEmail || undefined);
+	});
 
 	let dealOwners = $state<DealOwnerRow[]>([
 		{
@@ -1243,6 +1264,89 @@
 								{#each createSale.fields.relationshipManagerEmail?.issues() ?? [] as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
+							</Field.Field>
+						</div>
+					</Field.Group>
+				</Field.Set>
+				<Field.Separator />
+
+				<!-- Deal Managers Section -->
+				<Field.Set>
+					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+						Deal Managers <span class="text-sm font-normal text-muted-foreground">(Optional)</span>
+					</Field.Legend>
+					<Field.Group>
+						<div class="grid grid-cols-2 gap-4">
+							<Field.Field>
+								<Field.Label>Senior Manager</Field.Label>
+								<Select.Root
+									type="single"
+									value={selectedSeniorManagerEmail}
+									onValueChange={(v) => (selectedSeniorManagerEmail = v ?? '')}
+								>
+									<Select.Trigger>
+										{selectedSeniorManagerEmail
+											? seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)
+													?.firstName
+												? `${seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)?.lastName ?? ''}`.trim()
+												: selectedSeniorManagerEmail
+											: 'Select Senior Manager'}
+									</Select.Trigger>
+									<Select.Content>
+										{#if seniorManagerOptions.length === 0}
+											<div class="px-3 py-2 text-sm text-muted-foreground">
+												No senior managers found
+											</div>
+										{:else}
+											{#each seniorManagerOptions as mgr (mgr.email)}
+												<Select.Item value={mgr.email}>
+													{#if mgr.firstName || mgr.lastName}
+														{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
+													{:else}
+														{mgr.email}
+													{/if}
+												</Select.Item>
+											{/each}
+										{/if}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...createSale.fields.seniorManagerEmail?.as('text')} />
+							</Field.Field>
+							<Field.Field>
+								<Field.Label>Reporting Manager</Field.Label>
+								<Select.Root
+									type="single"
+									value={selectedReportingManagerEmail}
+									onValueChange={(v) => (selectedReportingManagerEmail = v ?? '')}
+								>
+									<Select.Trigger>
+										{selectedReportingManagerEmail
+											? reportingManagerOptions.find(
+													(r) => r.email === selectedReportingManagerEmail
+												)?.firstName
+												? `${reportingManagerOptions.find((r) => r.email === selectedReportingManagerEmail)?.firstName} ${reportingManagerOptions.find((r) => r.email === selectedReportingManagerEmail)?.lastName ?? ''}`.trim()
+												: selectedReportingManagerEmail
+											: 'Select Reporting Manager'}
+									</Select.Trigger>
+									<Select.Content>
+										{#if reportingManagerOptions.length === 0}
+											<div class="px-3 py-2 text-sm text-muted-foreground">
+												No reporting managers found
+											</div>
+										{:else}
+											{#each reportingManagerOptions as mgr (mgr.email)}
+												<Select.Item value={mgr.email}>
+													{#if mgr.firstName || mgr.lastName}
+														{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
+													{:else}
+														{mgr.email}
+													{/if}
+												</Select.Item>
+											{/each}
+										{/if}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" {...createSale.fields.reportingManagerEmail?.as('text')} />
 							</Field.Field>
 						</div>
 					</Field.Group>

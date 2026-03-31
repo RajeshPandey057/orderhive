@@ -20,7 +20,7 @@ const amlFormSchema = z.object({
 	residentAddress: z.string().min(1, 'Resident address is required'),
 	permanentAddress: z.string().min(1, 'Permanent address is required'),
 	contactNo: z.string().min(1, 'Contact number is required'),
-	emailAddress: z.string().email('Valid email is required'),
+	emailAddress: z.email('Valid email is required'),
 
 	// Business and Occupational Details
 	occupation: z.string().min(1, 'Occupation is required'),

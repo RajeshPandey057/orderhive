@@ -266,6 +266,8 @@ declare global {
 		referralAmount?: number;
 		relationshipManagerName?: string;
 		relationshipManagerEmail?: string;
+		seniorManagerEmail?: string;
+		reportingManagerEmail?: string;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

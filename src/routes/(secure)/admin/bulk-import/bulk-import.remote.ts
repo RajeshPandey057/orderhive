@@ -59,7 +59,9 @@ const primaryRowSchema = z
 		referral_amount_type: z.enum(['percentage', 'amount']).optional().or(z.literal('')),
 		referral_amount: z.coerce.number().positive().optional().or(z.literal('')),
 		relationship_manager_name: z.string().optional().or(z.literal('')),
-		relationship_manager_email: z.email().optional().or(z.literal(''))
+		relationship_manager_email: z.email().optional().or(z.literal('')),
+		senior_manager_email: z.email().optional().or(z.literal('')),
+		reporting_manager_email: z.email().optional().or(z.literal(''))
 	})
 	.superRefine((data, ctx) => {
 		if (data.property_type === 'apartment') {
@@ -490,6 +492,14 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv }) => {
 			...(primary.relationship_manager_email &&
 				primary.relationship_manager_email !== '' && {
 					relationshipManagerEmail: primary.relationship_manager_email
+				}),
+			...(primary.senior_manager_email &&
+				primary.senior_manager_email !== '' && {
+					seniorManagerEmail: primary.senior_manager_email
+				}),
+			...(primary.reporting_manager_email &&
+				primary.reporting_manager_email !== '' && {
+					reportingManagerEmail: primary.reporting_manager_email
 				}),
 			commnets: [],
 			createdByUid,
