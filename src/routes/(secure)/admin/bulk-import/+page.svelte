@@ -22,7 +22,7 @@
 			column: 'order_id',
 			required: 'Yes',
 			notes:
-				'Becomes the Sale ID in the system. Must follow the INDN001 format — "IND" prefix followed by a letter and digits (e.g. INDN001, INDM042). All rows for the same sale share the same value.'
+				'Becomes the Sale ID in the system. Must follow the INDN001 format — "IND" prefix followed by a letter and digits (e.g. INDN001, INDM042).'
 		},
 		{
 			column: 'is_joint_buyer',
