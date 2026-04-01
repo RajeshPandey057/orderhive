@@ -235,7 +235,7 @@
 <div class="flex flex-1 flex-col gap-6 p-6 pt-0">
 	<!-- Upload card -->
 	<Card.Root>
-		<form {...importBulkSalesForm}>
+		<form {...importBulkSalesForm} enctype="multipart/form-data">
 			<Card.Header>
 				<Card.Title>Import Sales from CSV</Card.Title>
 				<Card.Description>
@@ -265,7 +265,14 @@
 					</a>
 				</div>
 
-				<!-- File input -->
+				<!-- File input — always kept in DOM so FormData picks it up on submit -->
+				<input
+					id="csv-input"
+					{...importBulkSales.fields.csv.as('file')}
+					accept=".csv"
+					class="hidden"
+					onchange={handleFileChange}
+				/>
 				{#if csvFile}
 					<div class="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
 						<div class="flex items-center gap-3">
@@ -294,13 +301,6 @@
 							<p class="text-xs text-muted-foreground">Only .csv files are supported</p>
 						</div>
 					</label>
-					<input
-						id="csv-input"
-						{...importBulkSales.fields.csv.as('file')}
-						accept=".csv"
-						class="hidden"
-						onchange={handleFileChange}
-					/>
 				{/if}
 			</Card.Content>
 			<!-- Lenient mode toggle -->

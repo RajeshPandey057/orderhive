@@ -15,6 +15,12 @@ export const handle: Handle = ({ event, resolve }) => {
 	const { cookies, locals } = event;
 	locals.user = null;
 
+	// In local dev, inject a super-admin user so auth is not required
+	if (import.meta.env.DEV) {
+		locals.user = { uid: 'dev-user', email: 'dev@localhost', role: 'super-admin' };
+		return resolve(event);
+	}
+
 	// Read user data from cookie
 	const session = cookies.get(SESSION_TOKEN);
 
