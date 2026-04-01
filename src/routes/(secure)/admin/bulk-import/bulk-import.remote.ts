@@ -22,9 +22,14 @@ const bedroomTypeValues = [
 	'podium-townhouse'
 ] as const;
 
+const ORDER_ID_RE = /^IND[A-Za-z0-9]+$/;
+
 function buildPrimaryRowSchema(lenient: boolean) {
 	const base = z.object({
-		order_id: z.string().min(1, 'order_id is required'),
+		order_id: z
+			.string()
+			.min(1, 'order_id is required')
+			.regex(ORDER_ID_RE, 'order_id must follow the INDN001 format (e.g. INDN001, INDM042)'),
 		is_joint_buyer: z.literal('false'),
 		first_name: z.string().optional().or(z.literal('')),
 		last_name: z.string().optional().or(z.literal('')),
@@ -214,7 +219,7 @@ const bulkImportSchema = z.object({
 	lenient: z.string().optional().default('false')
 });
 
-export type ImportedSale = { id: string; order_id: string; client: string };
+export type ImportedSale = { id: string; client: string };
 export type ImportError = { order_id: string; row: number; message: string };
 export type BulkImportResult = { imported: ImportedSale[]; errors: ImportError[] };
 
@@ -560,14 +565,16 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		const now = FieldValue.serverTimestamp();
 		const createdByUid = callerUser?.uid ?? orderId;
 
-		let saleId: string;
-		try {
-			saleId = await generateSaleId();
-		} catch {
+		// Use the order_id from the CSV directly as the Firestore document ID
+		const saleId = orderId;
+
+		// Prevent overwriting an existing sale
+		const existing = await firestore.collection('sales').doc(saleId).get();
+		if (existing.exists) {
 			importErrors.push({
 				order_id: orderId,
 				row: group.primaryIdx,
-				message: 'Failed to generate sale ID, please retry'
+				message: `Sale ${saleId} already exists — skipped to avoid overwrite`
 			});
 			continue;
 		}
@@ -650,7 +657,6 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			await firestore.collection('sales').doc(saleId).set(saleRecord);
 			importedSales.push({
 				id: saleId,
-				order_id: orderId,
 				client: `${primary.first_name ?? ''} ${primary.last_name ?? ''}`.trim()
 			});
 		} catch (writeErr) {

@@ -22,7 +22,7 @@
 			column: 'order_id',
 			required: 'Yes',
 			notes:
-				'String ID — groups rows into one sale. All rows for the same sale share the same value. E.g. "ORD-001".'
+				'Becomes the Sale ID in the system. Must follow the INDN001 format — "IND" prefix followed by a letter and digits (e.g. INDN001, INDM042). All rows for the same sale share the same value.'
 		},
 		{
 			column: 'is_joint_buyer',
@@ -350,7 +350,6 @@
 						<Table.Header>
 							<Table.Row>
 								<Table.Head>Sale ID</Table.Head>
-								<Table.Head>Order ID</Table.Head>
 								<Table.Head>Client</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -358,7 +357,6 @@
 							{#each result.imported as sale (sale.id)}
 								<Table.Row>
 									<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
-									<Table.Cell>{sale.order_id}</Table.Cell>
 									<Table.Cell>{sale.client}</Table.Cell>
 								</Table.Row>
 							{/each}
