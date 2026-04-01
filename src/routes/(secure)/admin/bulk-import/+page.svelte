@@ -321,7 +321,7 @@
 					value={lenientMode ? 'true' : 'false'}
 				/>
 			</Card.Content>
-			<Card.Footer class="justify-end">
+			<Card.Footer class="mt-4 justify-end">
 				<button type="submit" disabled={!canImport} class={buttonVariants({ variant: 'default' })}>
 					{#if isImporting}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
