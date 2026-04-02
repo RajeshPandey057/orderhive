@@ -39,8 +39,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { getDefaultRoute, getMenuItems, isMenuItemActive, type AccessType } from '$lib/constants';
 	import FullLogo from '@/svg/full-logo.svelte';
+	import Logo from '@/svg/logo.svelte';
 	import type { ComponentProps } from 'svelte';
 	import { firekitUser } from 'svelte-firekit';
 	import NavMain from './nav-main.svelte';
@@ -69,13 +71,18 @@
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
+	{@const sidebar = useSidebar()}
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
 				class="px-2 py-6"
 				onclick={() => data?.user?.role && goto(getDefaultRoute(data.user.role))}
 			>
-				<FullLogo />
+				{#if sidebar.open}
+					<FullLogo />
+				{:else}
+					<Logo />
+				{/if}
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Header>
