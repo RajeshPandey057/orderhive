@@ -7,20 +7,6 @@ import { z } from 'zod';
 
 const invoiceStageValues = ['first-half', 'second-half', 'full', 'not-yet-eligible'] as const;
 const propertyTypeValues = ['apartment', 'townhouse', 'villa', 'commercial', 'plot'] as const;
-const bedroomTypeValues = [
-	'studio',
-	'1bed',
-	'2bed',
-	'2bed+maid',
-	'3bed',
-	'3bed+maid',
-	'4bed',
-	'5bed',
-	'6-7bed',
-	'duplex',
-	'penthouse',
-	'podium-townhouse'
-] as const;
 
 const ORDER_ID_RE = /^IND[A-Za-z0-9]+$/;
 
@@ -30,7 +16,10 @@ function buildPrimaryRowSchema(lenient: boolean) {
 			.string()
 			.min(1, 'order_id is required')
 			.regex(ORDER_ID_RE, 'order_id must follow the INDN001 format (e.g. INDN001, INDM042)'),
-		is_joint_buyer: z.literal('false'),
+		is_joint_buyer: z.preprocess(
+			(val) => (typeof val === 'string' ? val.trim().toLowerCase() || 'false' : val),
+			z.literal('false')
+		),
 		first_name: z.string().optional().or(z.literal('')),
 		last_name: z.string().optional().or(z.literal('')),
 		email: z.string().optional().or(z.literal('')),
@@ -202,7 +191,10 @@ function buildPrimaryRowSchema(lenient: boolean) {
 
 const jointBuyerRowSchema = z.object({
 	order_id: z.string().min(1, 'order_id is required'),
-	is_joint_buyer: z.literal('true'),
+	is_joint_buyer: z.preprocess(
+		(val) => (typeof val === 'string' ? val.trim().toLowerCase() : val),
+		z.literal('true')
+	),
 	first_name: z.string().min(1, 'first_name is required'),
 	last_name: z.string().min(1, 'last_name is required'),
 	email: z.email('email must be valid'),
@@ -279,25 +271,6 @@ function parseDDMmmYYYY(dateStr: string | undefined | ''): string | null {
 	const iso = `${yyyy}-${mm}-${dd.padStart(2, '0')}`;
 	if (isNaN(new Date(iso).getTime())) return null;
 	return iso;
-}
-
-async function generateSaleId(): Promise<string> {
-	const today = new Date();
-	const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-	const counterDocRef = firestore.collection('counters').doc(`sale-${dateStr}`);
-
-	return firestore.runTransaction(async (transaction) => {
-		const counterDoc = await transaction.get(counterDocRef);
-		const nextNumber = counterDoc.exists ? (counterDoc.data()?.count ?? 0) + 1 : 1;
-
-		transaction.set(
-			counterDocRef,
-			{ count: nextNumber, lastUpdated: FieldValue.serverTimestamp() },
-			{ merge: true }
-		);
-
-		return `IND-${dateStr}-${String(nextNumber).padStart(4, '0')}`;
-	});
 }
 
 type UserRecord = { uid: string; displayName?: string; email: string; photoURL?: string };
@@ -406,7 +379,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		const group = groups.get(orderId)!;
 
 		const isJoint = row['is_joint_buyer']?.trim().toLowerCase();
-		if (isJoint === 'false') {
+		if (isJoint === 'false' || isJoint === '' || isJoint === undefined) {
 			if (group.primaryIdx !== -1) {
 				importErrors.push({
 					order_id: orderId,
