@@ -124,20 +124,17 @@
 	const seniorManagerOptions = $derived(
 		rolesCollection.data?.filter((r) => r.agentRole === 'senior-manager') ?? []
 	);
-	const reportingManagerOptions = $derived(
-		rolesCollection.data?.filter((r) => r.agentRole === 'reporting-manager') ?? []
-	);
 
 	// Selected manager emails
-	let selectedSeniorManagerEmail = $state('');
-	let selectedReportingManagerEmail = $state('');
+	let selectedCallerSeniorManagerEmail = $state('');
+	let selectedCloserSeniorManagerEmail = $state('');
 
 	// Sync manager emails to form fields
 	$effect(() => {
-		createSale.fields.seniorManagerEmail?.set(selectedSeniorManagerEmail || undefined);
+		createSale.fields.callerSeniorManagerEmail?.set(selectedCallerSeniorManagerEmail || undefined);
 	});
 	$effect(() => {
-		createSale.fields.reportingManagerEmail?.set(selectedReportingManagerEmail || undefined);
+		createSale.fields.closerSeniorManagerEmail?.set(selectedCloserSeniorManagerEmail || undefined);
 	});
 
 	let dealOwners = $state<DealOwnerRow[]>([
@@ -1329,14 +1326,13 @@
 				<!-- Manager Details Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Manager Details
+						Manager Details <span class="text-sm font-normal text-muted-foreground">(Optional)</span>
 					</Field.Legend>
 					<Field.Group>
 						<div class="grid grid-cols-2 gap-4">
 							<Field.Field>
 								<Field.Label for="callerManagerEmail"
-									>Caller Manager Email <span class="text-muted-foreground">(Optional)</span
-									></Field.Label
+									>Caller Manager Email</Field.Label
 								>
 								<Input
 									id="callerManagerEmail"
@@ -1350,8 +1346,7 @@
 							</Field.Field>
 							<Field.Field>
 								<Field.Label for="closerManagerEmail"
-									>Closer Manager Email <span class="text-muted-foreground">(Optional)</span
-									></Field.Label
+									>Closer Manager Email</Field.Label
 								>
 								<Input
 									id="closerManagerEmail"
@@ -1363,32 +1358,20 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
-						</div>
-					</Field.Group>
-				</Field.Set>
-				<Field.Separator />
-
-				<!-- Deal Managers Section -->
-				<Field.Set>
-					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Deal Managers <span class="text-sm font-normal text-muted-foreground">(Optional)</span>
-					</Field.Legend>
-					<Field.Group>
-						<div class="grid grid-cols-2 gap-4">
 							<Field.Field>
-								<Field.Label>Senior Manager</Field.Label>
+								<Field.Label>Caller Senior Manager</Field.Label>
 								<Select.Root
 									type="single"
-									value={selectedSeniorManagerEmail}
-									onValueChange={(v) => (selectedSeniorManagerEmail = v ?? '')}
+									value={selectedCallerSeniorManagerEmail}
+									onValueChange={(v) => (selectedCallerSeniorManagerEmail = v ?? '')}
 								>
 									<Select.Trigger>
-										{selectedSeniorManagerEmail
-											? seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)
+										{selectedCallerSeniorManagerEmail
+											? seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)
 													?.firstName
-												? `${seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedSeniorManagerEmail)?.lastName ?? ''}`.trim()
-												: selectedSeniorManagerEmail
-											: 'Select Senior Manager'}
+												? `${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.lastName ?? ''}`.trim()
+												: selectedCallerSeniorManagerEmail
+											: 'Select Caller Senior Manager'}
 									</Select.Trigger>
 									<Select.Content>
 										{#if seniorManagerOptions.length === 0}
@@ -1408,31 +1391,30 @@
 										{/if}
 									</Select.Content>
 								</Select.Root>
-								<input type="hidden" {...createSale.fields.seniorManagerEmail?.as('text')} />
+								<input type="hidden" {...createSale.fields.callerSeniorManagerEmail?.as('text')} />
 							</Field.Field>
 							<Field.Field>
-								<Field.Label>Reporting Manager</Field.Label>
+								<Field.Label>Closer Senior Manager</Field.Label>
 								<Select.Root
 									type="single"
-									value={selectedReportingManagerEmail}
-									onValueChange={(v) => (selectedReportingManagerEmail = v ?? '')}
+									value={selectedCloserSeniorManagerEmail}
+									onValueChange={(v) => (selectedCloserSeniorManagerEmail = v ?? '')}
 								>
 									<Select.Trigger>
-										{selectedReportingManagerEmail
-											? reportingManagerOptions.find(
-													(r) => r.email === selectedReportingManagerEmail
-												)?.firstName
-												? `${reportingManagerOptions.find((r) => r.email === selectedReportingManagerEmail)?.firstName} ${reportingManagerOptions.find((r) => r.email === selectedReportingManagerEmail)?.lastName ?? ''}`.trim()
-												: selectedReportingManagerEmail
-											: 'Select Reporting Manager'}
+										{selectedCloserSeniorManagerEmail
+											? seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)
+													?.firstName
+												? `${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.lastName ?? ''}`.trim()
+												: selectedCloserSeniorManagerEmail
+											: 'Select Closer Senior Manager'}
 									</Select.Trigger>
 									<Select.Content>
-										{#if reportingManagerOptions.length === 0}
+										{#if seniorManagerOptions.length === 0}
 											<div class="px-3 py-2 text-sm text-muted-foreground">
-												No reporting managers found
+												No senior managers found
 											</div>
 										{:else}
-											{#each reportingManagerOptions as mgr (mgr.email)}
+											{#each seniorManagerOptions as mgr (mgr.email)}
 												<Select.Item value={mgr.email}>
 													{#if mgr.firstName || mgr.lastName}
 														{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
@@ -1444,7 +1426,7 @@
 										{/if}
 									</Select.Content>
 								</Select.Root>
-								<input type="hidden" {...createSale.fields.reportingManagerEmail?.as('text')} />
+								<input type="hidden" {...createSale.fields.closerSeniorManagerEmail?.as('text')} />
 							</Field.Field>
 						</div>
 					</Field.Group>

@@ -128,8 +128,8 @@ const saleSchema = z
 		referralAmount: z.number().optional(),
 		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
 		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		seniorManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		reportingManagerEmail: z.string().email('Valid email is required').optional().or(z.literal(''))
+		callerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
+		closerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
 	})
 	.superRefine((data, ctx) => {
 		// Apartment validation
@@ -365,8 +365,12 @@ export const createSale = form(saleSchema, async (data) => {
 		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
 		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
 		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
-		...(data.seniorManagerEmail && { seniorManagerEmail: data.seniorManagerEmail }),
-		...(data.reportingManagerEmail && { reportingManagerEmail: data.reportingManagerEmail }),
+		...(data.callerSeniorManagerEmail && {
+			callerSeniorManagerEmail: data.callerSeniorManagerEmail
+		}),
+		...(data.closerSeniorManagerEmail && {
+			closerSeniorManagerEmail: data.closerSeniorManagerEmail
+		}),
 		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,
 		createdAt: timestamp,

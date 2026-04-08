@@ -960,16 +960,16 @@
 							</Table.Row>
 							<Table.Row>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Senior Manager
+									Caller Senior Manager
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.seniorManagerEmail ?? '-'}
+									{sale?.callerSeniorManagerEmail ?? '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Reporting Manager
+									Closer Senior Manager
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.reportingManagerEmail ?? '-'}
+									{sale?.closerSeniorManagerEmail ?? '-'}
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>

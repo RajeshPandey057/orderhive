@@ -15,7 +15,6 @@ declare global {
 		createdAt?: FieldValue;
 		updatedAt?: FieldValue;
 		seniorManagerEmail?: string;
-		reportingManagerEmail?: string;
 		accessType: 'admin' | 'agent' | 'finance' | 'compliance' | 'super-admin';
 	};
 	type Sale = {
@@ -269,8 +268,8 @@ declare global {
 		referralAmount?: number;
 		callerManagerEmail?: string;
 		closerManagerEmail?: string;
-		seniorManagerEmail?: string;
-		reportingManagerEmail?: string;
+		callerSeniorManagerEmail?: string;
+		closerSeniorManagerEmail?: string;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

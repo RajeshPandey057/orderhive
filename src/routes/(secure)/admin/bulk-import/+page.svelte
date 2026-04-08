@@ -149,14 +149,14 @@
 		{ column: 'caller_manager_email', required: 'No', notes: 'Valid email if provided.' },
 		{ column: 'closer_manager_email', required: 'No', notes: 'Valid email if provided.' },
 		{
-			column: 'senior_manager_email',
+			column: 'caller_senior_manager_email',
 			required: 'No',
-			notes: 'Email of the senior manager (must be a valid email).'
+			notes: 'Email of the caller\'s senior manager (must be a valid email).'
 		},
 		{
-			column: 'reporting_manager_email',
+			column: 'closer_senior_manager_email',
 			required: 'No',
-			notes: 'Email of the reporting manager (must be a valid email).'
+			notes: 'Email of the closer\'s senior manager (must be a valid email).'
 		}
 	];
 

@@ -61,8 +61,8 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		resident_status: z.string().optional().or(z.literal('')),
 		caller_manager_email: z.string().optional().or(z.literal('')),
 		closer_manager_email: z.string().optional().or(z.literal('')),
-		senior_manager_email: z.string().optional().or(z.literal('')),
-		reporting_manager_email: z.string().optional().or(z.literal(''))
+		caller_senior_manager_email: z.string().optional().or(z.literal('')),
+		closer_senior_manager_email: z.string().optional().or(z.literal(''))
 	});
 
 	if (lenient) return base;
@@ -615,9 +615,11 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 				}),
 			...(primary.caller_manager_email && { callerManagerEmail: primary.caller_manager_email }),
 			...(primary.closer_manager_email && { closerManagerEmail: primary.closer_manager_email }),
-			...(primary.senior_manager_email && { seniorManagerEmail: primary.senior_manager_email }),
-			...(primary.reporting_manager_email && {
-				reportingManagerEmail: primary.reporting_manager_email
+			...(primary.caller_senior_manager_email && {
+				callerSeniorManagerEmail: primary.caller_senior_manager_email
+			}),
+			...(primary.closer_senior_manager_email && {
+				closerSeniorManagerEmail: primary.closer_senior_manager_email
 			}),
 			commnets: [],
 			createdByUid,
