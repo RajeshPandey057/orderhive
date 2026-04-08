@@ -22,7 +22,7 @@
 			column: 'order_id',
 			required: 'Yes',
 			notes:
-				'Becomes the Sale ID in the system. Must follow the INDN001 format — "IND" prefix followed by a letter and digits (e.g. INDN001, INDM042).'
+				'Becomes the Sale ID in the system. Must follow the INDN001 format — "IND" prefix followed by a letter and digits.'
 		},
 		{
 			column: 'is_joint_buyer',
@@ -151,12 +151,12 @@
 		{
 			column: 'caller_senior_manager_email',
 			required: 'No',
-			notes: 'Email of the caller\'s senior manager (must be a valid email).'
+			notes: "Email of the caller's senior manager (must be a valid email)."
 		},
 		{
 			column: 'closer_senior_manager_email',
 			required: 'No',
-			notes: 'Email of the closer\'s senior manager (must be a valid email).'
+			notes: "Email of the closer's senior manager (must be a valid email)."
 		}
 	];
 
