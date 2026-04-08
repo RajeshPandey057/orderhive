@@ -4,6 +4,29 @@ import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
+// Ensure a role document exists for the given email; creates a minimal one if absent.
+async function ensureRoleExists(email: string): Promise<void> {
+	const normalised = email.trim().toLowerCase();
+	if (!normalised) return;
+
+	const rolesSnap = await firestore
+		.collection('roles')
+		.where('email', '==', normalised)
+		.limit(1)
+		.get();
+
+	if (!rolesSnap.empty) return;
+
+	const now = FieldValue.serverTimestamp();
+	await firestore
+		.collection('roles')
+		.doc(normalised)
+		.set(
+			{ email: normalised, accessType: 'agent', createdAt: now, updatedAt: now },
+			{ merge: true }
+		);
+}
+
 // Define the schema for the sale form using Zod
 const buyerSchema = z.object({
 	firstName: z.string().min(1, 'First name is required'),
@@ -321,6 +344,18 @@ export const createSale = form(saleSchema, async (data) => {
 		}
 	}
 
+	// Ensure role documents exist for any manager emails entered
+	await Promise.all(
+		[
+			data.callerManagerEmail,
+			data.closerManagerEmail,
+			data.callerSeniorManagerEmail,
+			data.closerSeniorManagerEmail
+		]
+			.filter(Boolean)
+			.map((email) => ensureRoleExists(email!))
+	);
+
 	const saleRecord = {
 		status: 'pending',
 		financeStatus: 'pending',
@@ -371,7 +406,6 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.closerSeniorManagerEmail && {
 			closerSeniorManagerEmail: data.closerSeniorManagerEmail
 		}),
-		createdByUid,
 		createdByEmail: data.dealOwners[0]?.email ?? null,
 		createdAt: timestamp,
 		updatedAt: timestamp

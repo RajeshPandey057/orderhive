@@ -554,6 +554,18 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 
 		const parsedSaleDate = parseDDMmmYYYY(primary.sale_date) ?? primary.sale_date ?? null;
 
+		// Ensure role documents exist for any manager emails provided
+		await Promise.all(
+			[
+				primary.caller_manager_email,
+				primary.closer_manager_email,
+				primary.caller_senior_manager_email,
+				primary.closer_senior_manager_email
+			]
+				.filter((e): e is string => !!e && typeof e === 'string' && e.trim() !== '')
+				.map((email) => resolveUserByEmail(email))
+		);
+
 		const saleRecord = {
 			status: 'pending',
 			financeStatus: 'pending',
