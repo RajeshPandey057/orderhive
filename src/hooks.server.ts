@@ -9,15 +9,22 @@ interface UserData {
 
 export const handle: Handle = ({ event, resolve }) => {
 	const isSecureRoute = event.route.id?.startsWith('/(secure)');
-	if (!isSecureRoute) {
-		return resolve(event);
-	}
+	const path = event.url.pathname;
 	const { cookies, locals } = event;
 	locals.user = null;
 
-	// In local dev, inject a super-admin user so auth is not required
+	// In local dev, auto-login as admin and bypass login wall
 	if (import.meta.env.DEV) {
-		locals.user = { uid: 'dev-user', email: 'dev@localhost', role: 'super-admin' };
+		locals.user = { uid: 'dev-admin-user', email: 'admin@localhost', role: 'admin' };
+
+		if (path === '/') {
+			redirect(303, '/admin/dashboard');
+		}
+
+		return resolve(event);
+	}
+
+	if (!isSecureRoute) {
 		return resolve(event);
 	}
 
@@ -35,8 +42,6 @@ export const handle: Handle = ({ event, resolve }) => {
 			cookies.delete(SESSION_TOKEN, { path: '/' });
 		}
 	}
-
-	const path = event.url.pathname;
 
 	// Redirect to login if not authenticated and trying to access secure route
 	if (!locals.user && isSecureRoute) {

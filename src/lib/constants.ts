@@ -11,15 +11,16 @@ export type AccessType = 'admin' | 'agent' | 'compliance' | 'finance' | 'super-a
 interface MenuItem {
 	title: string;
 	url: string;
+	external?: boolean;
 }
 
 // Route prefixes allowed for each role
 export const ROLE_ROUTES: Record<AccessType, string[]> = {
-	admin: ['/admin', '/dashboard', '/profile'],
-	agent: ['/agent', '/dashboard', '/profile'],
+	admin: ['/admin', '/listing', '/dashboard', '/profile'],
+	agent: ['/agent', '/listing', '/dashboard', '/profile'],
 	compliance: ['/compliance', '/dashboard', '/profile'],
 	finance: ['/finance', '/dashboard', '/profile'],
-	'super-admin': ['/admin', '/agent', '/compliance', '/finance', '/dashboard', '/profile']
+	'super-admin': ['/admin', '/agent', '/listing', '/compliance', '/finance', '/dashboard', '/profile']
 };
 
 // Menu items for each role
@@ -27,12 +28,16 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	admin: [
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Access Management', url: '/admin/access-management' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listings', external: true },
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		{ title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' }
 	],
 	agent: [
 		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listings', external: true },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
@@ -53,6 +58,8 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	'super-admin': [
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Access Management', url: '/admin/access-management' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listings', external: true },
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		{ title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' },

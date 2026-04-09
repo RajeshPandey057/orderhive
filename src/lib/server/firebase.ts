@@ -4,6 +4,7 @@ import {
 	FIREBASE_PRIVATE_KEY,
 	FIREBASE_PROJECT_ID
 } from '$env/static/private';
+import { dev } from '$app/environment';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type SessionCookieOptions } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -12,19 +13,41 @@ import { randomUUID } from 'node:crypto';
 
 export { FieldValue };
 
+const existingFirebaseApp = getApps().find((it) => it.name === 'firebase-admin-app');
+
 export const firebaseApp =
-	getApps().find((it) => it.name === 'firebase-admin-app') ??
-	initializeApp(
-		{
-			credential: cert({
-				projectId: FIREBASE_PROJECT_ID,
-				clientEmail: FIREBASE_CLIENT_EMAIL,
-				privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-			}),
-			storageBucket: FIREBASE_BUCKET
-		},
-		'firebase-admin-app'
-	);
+	existingFirebaseApp ??
+	(() => {
+		try {
+			return initializeApp(
+				{
+					credential: cert({
+						projectId: FIREBASE_PROJECT_ID,
+						clientEmail: FIREBASE_CLIENT_EMAIL,
+						privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+					}),
+					storageBucket: FIREBASE_BUCKET
+				},
+				'firebase-admin-app'
+			);
+		} catch (error) {
+			// UI-only local mode: allow dev server boot without valid Firebase credentials.
+			if (dev) {
+				console.warn(
+					'Falling back to Firebase app without service account credentials in development.',
+					error
+				);
+				return initializeApp(
+					{
+						projectId: FIREBASE_PROJECT_ID || 'dummy-project',
+						storageBucket: FIREBASE_BUCKET
+					},
+					'firebase-admin-app'
+				);
+			}
+			throw error;
+		}
+	})();
 export const auth = getAuth(firebaseApp);
 export const firestore = getFirestore(firebaseApp);
 export const storage = getStorage(firebaseApp);
