@@ -62,7 +62,9 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		caller_manager_email: z.string().optional().or(z.literal('')),
 		closer_manager_email: z.string().optional().or(z.literal('')),
 		caller_senior_manager_email: z.string().optional().or(z.literal('')),
-		closer_senior_manager_email: z.string().optional().or(z.literal(''))
+		closer_senior_manager_email: z.string().optional().or(z.literal('')),
+		commission_percentage: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		passback_amount: z.coerce.number().min(0).optional().or(z.literal(''))
 	});
 
 	if (lenient) return base;
@@ -535,6 +537,18 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			}
 		}
 
+		// Calculate commission and passback derived values
+		let revenueAchieved: number | undefined;
+		let revenueAfterPassback: number | undefined;
+		if (primary.commission_percentage && typeof primary.commission_percentage === 'number') {
+			const unitValueNum = parseFloat(String(primary.unit_value ?? '').replace(/,/g, ''));
+			if (!isNaN(unitValueNum)) {
+				revenueAchieved = Math.round((unitValueNum * primary.commission_percentage) / 100);
+				const passback = typeof primary.passback_amount === 'number' ? primary.passback_amount : 0;
+				revenueAfterPassback = Math.round(revenueAchieved - passback);
+			}
+		}
+
 		const now = FieldValue.serverTimestamp();
 		const createdByUid = callerUser?.uid ?? orderId;
 
@@ -620,6 +634,14 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			unitNo: primary.unit_no ?? '',
 			unitValue: primary.unit_value ?? '',
 			...(finalReferralAmount !== undefined && { referralAmount: finalReferralAmount }),
+			...(primary.commission_percentage &&
+				typeof primary.commission_percentage === 'number' && {
+					commissionPercentage: primary.commission_percentage
+				}),
+			...(revenueAchieved !== undefined && { revenueAchieved }),
+			...(primary.passback_amount &&
+				typeof primary.passback_amount === 'number' && { passbackAmount: primary.passback_amount }),
+			...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
 			...(primary.nationality && { nationality: primary.nationality }),
 			...(primary.resident_status &&
 				['resident', 'non-resident'].includes(primary.resident_status) && {

@@ -254,7 +254,7 @@
 				const headerSnippet = createRawSnippet(() => ({
 					render: () => `
 						<button class="flex items-center justify-end gap-1 font-medium hover:text-foreground w-full">
-							<span>Commission Value</span>
+							<span>Revenue</span>
 							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
 						</button>
 					`
@@ -275,7 +275,7 @@
 					};
 				});
 				return renderSnippet(cellSnippet, {
-					value: Math.round((parseInt(row.original.unitValue.replace(/,/g, '')) || 0) * 0.02)
+					value: row.original.revenueAfterPassback ?? row.original.revenueAchieved ?? 0
 				});
 			}
 		}

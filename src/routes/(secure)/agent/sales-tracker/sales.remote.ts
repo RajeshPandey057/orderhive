@@ -149,6 +149,12 @@ const saleSchema = z
 		residentStatus: z.enum(['resident', 'non-resident']).optional(),
 		referralAmountType: z.enum(['percentage', 'amount']).optional(),
 		referralAmount: z.number().optional(),
+		commissionPercentage: z
+			.number()
+			.min(0, 'Commission % must be at least 0')
+			.max(100, 'Commission % cannot exceed 100')
+			.optional(),
+		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional(),
 		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
 		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
 		callerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
@@ -231,6 +237,25 @@ const saleSchema = z
 					path: ['propertySize'],
 					message: 'Property size is required for plots'
 				});
+			}
+		}
+
+		// Passback cannot exceed revenue achieved
+		if (
+			data.passbackAmount !== undefined &&
+			data.passbackAmount > 0 &&
+			data.commissionPercentage !== undefined
+		) {
+			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
+			if (!isNaN(unitValue)) {
+				const revenueAchieved = (unitValue * data.commissionPercentage) / 100;
+				if (data.passbackAmount > revenueAchieved) {
+					ctx.addIssue({
+						code: 'custom',
+						path: ['passbackAmount'],
+						message: 'Passback amount cannot exceed revenue achieved'
+					});
+				}
 			}
 		}
 	});
@@ -344,6 +369,17 @@ export const createSale = form(saleSchema, async (data) => {
 		}
 	}
 
+	// Calculate commission and passback derived values
+	let revenueAchieved: number | undefined;
+	let revenueAfterPassback: number | undefined;
+	if (data.commissionPercentage !== undefined) {
+		const unitValueNum = parseFloat(data.unitValue.replace(/,/g, ''));
+		if (!isNaN(unitValueNum)) {
+			revenueAchieved = Math.round((unitValueNum * data.commissionPercentage) / 100);
+			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
+		}
+	}
+
 	// Ensure role documents exist for any manager emails entered
 	await Promise.all(
 		[
@@ -398,6 +434,12 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.nationality && { nationality: data.nationality }),
 		...(data.residentStatus && { residentStatus: data.residentStatus }),
 		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
+		...(data.commissionPercentage !== undefined && {
+			commissionPercentage: data.commissionPercentage
+		}),
+		...(revenueAchieved !== undefined && { revenueAchieved }),
+		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
+		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
 		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
 		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
 		...(data.callerSeniorManagerEmail && {

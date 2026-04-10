@@ -262,6 +262,10 @@ declare global {
 		grossFloorArea?: number;
 		unitNo: string;
 		unitValue: string;
+		commissionPercentage?: number;
+		revenueAchieved?: number;
+		passbackAmount?: number;
+		revenueAfterPassback?: number;
 		saleDate?: string;
 		nationality?: string;
 		residentStatus?: 'resident' | 'non-resident';

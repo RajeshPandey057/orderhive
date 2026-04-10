@@ -1318,6 +1318,78 @@
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
+							<Field.Field>
+								<Field.Label for="commissionPercentage">Commission %</Field.Label>
+								<InputGroup.Root id="commissionPercentage">
+									<InputGroup.Input
+										{...createSale.fields.commissionPercentage?.as('number')}
+										type="number"
+										min="0"
+										max="100"
+										step="0.01"
+										placeholder="e.g. 5"
+									/>
+									<InputGroup.Addon>%</InputGroup.Addon>
+								</InputGroup.Root>
+								{#each createSale.fields.commissionPercentage?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
+						</div>
+
+						{@const commissionPct = createSale.fields.commissionPercentage?.value()}
+						{@const rawUnitValue = parseFloat(
+							(createSale.fields.unitValue.value() ?? '').replace(/,/g, '')
+						)}
+						{@const revenueAchieved =
+							commissionPct && !isNaN(rawUnitValue)
+								? Math.round((rawUnitValue * commissionPct) / 100)
+								: null}
+						{@const passback = createSale.fields.passbackAmount?.value()}
+						{@const revenueAfterPassback =
+							revenueAchieved !== null ? Math.round(revenueAchieved - (passback ?? 0)) : null}
+
+						{#if revenueAchieved !== null}
+							<div class="grid grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4">
+								<div class="space-y-1">
+									<p class="text-xs text-muted-foreground">Revenue Achieved</p>
+									<p class="font-semibold">
+										AED {new Intl.NumberFormat('en-US').format(revenueAchieved)}
+									</p>
+								</div>
+								<div class="space-y-1">
+									<p class="text-xs text-muted-foreground">Revenue After Passback</p>
+									<p class="font-semibold">
+										{#if revenueAfterPassback !== null}
+											AED {new Intl.NumberFormat('en-US').format(revenueAfterPassback)}
+										{:else}
+											—
+										{/if}
+									</p>
+								</div>
+							</div>
+						{/if}
+
+						<div class="grid grid-cols-2 gap-4">
+							<Field.Field>
+								<Field.Label for="passbackAmount"
+									>Passback Amount <span class="text-muted-foreground">(Optional)</span
+									></Field.Label
+								>
+								<InputGroup.Root id="passbackAmount">
+									<InputGroup.Addon>AED</InputGroup.Addon>
+									<InputGroup.Input
+										{...createSale.fields.passbackAmount?.as('number')}
+										type="number"
+										min="0"
+										step="0.01"
+										placeholder="e.g. 55500"
+									/>
+								</InputGroup.Root>
+								{#each createSale.fields.passbackAmount?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+							</Field.Field>
 						</div>
 					</Field.Group>
 				</Field.Set>
@@ -1326,14 +1398,13 @@
 				<!-- Manager Details Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Manager Details <span class="text-sm font-normal text-muted-foreground">(Optional)</span>
+						Manager Details <span class="text-sm font-normal text-muted-foreground">(Optional)</span
+						>
 					</Field.Legend>
 					<Field.Group>
 						<div class="grid grid-cols-2 gap-4">
 							<Field.Field>
-								<Field.Label for="callerManagerEmail"
-									>Caller Manager Email</Field.Label
-								>
+								<Field.Label for="callerManagerEmail">Caller Manager Email</Field.Label>
 								<Input
 									id="callerManagerEmail"
 									type="email"
@@ -1345,9 +1416,7 @@
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Field.Label for="closerManagerEmail"
-									>Closer Manager Email</Field.Label
-								>
+								<Field.Label for="closerManagerEmail">Closer Manager Email</Field.Label>
 								<Input
 									id="closerManagerEmail"
 									type="email"
@@ -1367,8 +1436,9 @@
 								>
 									<Select.Trigger>
 										{selectedCallerSeniorManagerEmail
-											? seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)
-													?.firstName
+											? seniorManagerOptions.find(
+													(r) => r.email === selectedCallerSeniorManagerEmail
+												)?.firstName
 												? `${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.lastName ?? ''}`.trim()
 												: selectedCallerSeniorManagerEmail
 											: 'Select Caller Senior Manager'}
@@ -1402,8 +1472,9 @@
 								>
 									<Select.Trigger>
 										{selectedCloserSeniorManagerEmail
-											? seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)
-													?.firstName
+											? seniorManagerOptions.find(
+													(r) => r.email === selectedCloserSeniorManagerEmail
+												)?.firstName
 												? `${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.lastName ?? ''}`.trim()
 												: selectedCloserSeniorManagerEmail
 											: 'Select Closer Senior Manager'}

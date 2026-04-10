@@ -157,6 +157,18 @@
 			column: 'closer_senior_manager_email',
 			required: 'No',
 			notes: "Email of the closer's senior manager (must be a valid email)."
+		},
+		{
+			column: 'commission_percentage',
+			required: 'No',
+			notes:
+				'Commission % for the deal (0–100). Used to calculate revenueAchieved = unitValue × commission_percentage / 100.'
+		},
+		{
+			column: 'passback_amount',
+			required: 'No',
+			notes:
+				'Lump-sum passback deducted from revenueAchieved. revenueAfterPassback = revenueAchieved − passback_amount.'
 		}
 	];
 
