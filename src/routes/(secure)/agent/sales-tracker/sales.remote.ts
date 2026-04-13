@@ -147,8 +147,6 @@ const saleSchema = z
 		saleDate: z.string().min(1, 'Sale date is required'),
 		nationality: z.string().optional(),
 		residentStatus: z.enum(['resident', 'non-resident']).optional(),
-		referralAmountType: z.enum(['percentage', 'amount']).optional(),
-		referralAmount: z.number().optional(),
 		commissionPercentage: z
 			.number()
 			.min(0, 'Commission % must be at least 0')
@@ -354,21 +352,6 @@ export const createSale = form(saleSchema, async (data) => {
 		toUploadedFile(data.refferalAgreementFile, `${basePath}/referral-agreement`)
 	]);
 
-	// Calculate final referral amount
-	let finalReferralAmount: number | undefined;
-	if (data.referralAmountType && data.referralAmount) {
-		if (data.referralAmountType === 'percentage') {
-			// Parse unitValue (remove commas and convert to number)
-			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
-			if (!isNaN(unitValue)) {
-				finalReferralAmount = (unitValue * data.referralAmount) / 100;
-			}
-		} else {
-			// Direct amount
-			finalReferralAmount = data.referralAmount;
-		}
-	}
-
 	// Calculate commission and passback derived values
 	let revenueAchieved: number | undefined;
 	let revenueAfterPassback: number | undefined;
@@ -433,7 +416,6 @@ export const createSale = form(saleSchema, async (data) => {
 		saleDate: data.saleDate,
 		...(data.nationality && { nationality: data.nationality }),
 		...(data.residentStatus && { residentStatus: data.residentStatus }),
-		...(finalReferralAmount && { referralAmount: finalReferralAmount }),
 		...(data.commissionPercentage !== undefined && {
 			commissionPercentage: data.commissionPercentage
 		}),

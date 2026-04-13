@@ -938,10 +938,10 @@
 									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
-									Referral Amount
+									Passback Amount
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.referralAmount ? Number(sale.referralAmount).toLocaleString() : '-'}
+									{sale?.passbackAmount ? Number(sale.passbackAmount).toLocaleString() : '-'}
 								</Table.Cell>
 							</Table.Row>
 							<Table.Row>

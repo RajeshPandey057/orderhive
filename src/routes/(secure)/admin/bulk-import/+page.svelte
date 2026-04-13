@@ -144,8 +144,6 @@
 			notes: '"first-half", "second-half", "full", or "not-yet-eligible".'
 		},
 		{ column: 'tentative_eligibility_date', required: 'No', notes: 'DD/MM/YYYY format.' },
-		{ column: 'referral_amount_type', required: 'No', notes: '"percentage" or "amount".' },
-		{ column: 'referral_amount', required: 'No', notes: 'Number. Used with referral_amount_type.' },
 		{ column: 'caller_manager_email', required: 'No', notes: 'Valid email if provided.' },
 		{ column: 'closer_manager_email', required: 'No', notes: 'Valid email if provided.' },
 		{

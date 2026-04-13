@@ -144,7 +144,7 @@
 			email: firekitUser.email ?? '',
 			name: firekitUser.displayName ?? 'You',
 			ownerRole: 'caller',
-			split: 70,
+			split: 100,
 			photoURL: firekitUser.photoURL ?? undefined
 		}
 	]);
@@ -362,6 +362,15 @@
 				? Math.max(0, splitRemaining)
 				: closerSplit(splitPreset)
 			: 0;
+
+		// When adding the 2nd agent, reset the first (solo caller at 100%) to the preset split
+		if (dealOwners.length === 1 && !canEditSplit) {
+			dealOwners = dealOwners.map((owner) => ({
+				...owner,
+				split: callerSplit(splitPreset)
+			}));
+		}
+
 		dealOwners = [
 			...dealOwners,
 			{
@@ -380,6 +389,11 @@
 	const removeDealOwner = (ownerKey: number) => {
 		if (dealOwners.length === 1) return;
 		dealOwners = dealOwners.filter((owner) => owner.key !== ownerKey);
+
+		// When only one agent remains, give them 100%
+		if (dealOwners.length === 1) {
+			dealOwners = dealOwners.map((owner) => ({ ...owner, split: 100 }));
+		}
 
 		syncDealOwners();
 	};
@@ -1683,68 +1697,6 @@
 						Refferal Agreement
 					</Field.Legend>
 					<Field.Group class="space-y-4">
-						<!-- Referral Amount Section -->
-						<div class="space-y-3 rounded-lg border border-border/60 bg-background/60 p-4">
-							<h3 class="text-sm font-medium">Referral Amount</h3>
-							<RadioGroup.Root
-								class="flex w-full flex-row gap-4"
-								value={createSale.fields.referralAmountType.value() ?? ''}
-								onValueChange={(v) =>
-									createSale.fields.referralAmountType.set(v as 'percentage' | 'amount')}
-							>
-								<Field.Field orientation="horizontal">
-									<RadioGroup.Item value="percentage" id="percentage" />
-									<Field.Label for="percentage">Percentage (%)</Field.Label>
-								</Field.Field>
-								<Field.Field orientation="horizontal">
-									<RadioGroup.Item value="amount" id="amount" />
-									<Field.Label for="amount">Fixed Amount</Field.Label>
-								</Field.Field>
-							</RadioGroup.Root>
-							<input class="sr-only" {...createSale.fields.referralAmountType.as('text')} />
-							{#if createSale.fields.referralAmountType.value()}
-								<Field.Field>
-									<InputGroup.Root id="referralAmount">
-										<InputGroup.Input
-											{...createSale.fields.referralAmount.as('number')}
-											placeholder={createSale.fields.referralAmountType.value() === 'percentage'
-												? 'Enter percentage (e.g., 2.5)'
-												: 'Enter amount (e.g., 50000)'}
-										/>
-										<InputGroup.Addon>
-											{#if createSale.fields.referralAmountType.value() === 'percentage'}
-												<span class="text-xs">%</span>
-											{:else}
-												<span class="text-xs">AED</span>
-											{/if}
-										</InputGroup.Addon>
-									</InputGroup.Root>
-									{#each createSale.fields.referralAmount.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-									{#if createSale.fields.referralAmountType.value() === 'percentage' && createSale.fields.referralAmount.value() && createSale.fields.unitValue.value()}
-										{@const unitValue = parseFloat(
-											createSale.fields?.unitValue?.value()?.replace(/,/g, '') ?? '0'
-										)}
-										{@const percentage = createSale.fields.referralAmount.value()}
-										{@const calculatedAmount = (unitValue * (percentage ?? 0)) / 100}
-										{#if !isNaN(calculatedAmount) && calculatedAmount > 0}
-											<div class="mt-2 rounded-md bg-muted/50 p-3 text-sm">
-												<div class="flex items-center justify-between">
-													<span class="text-muted-foreground">Calculated Amount:</span>
-													<span class="font-semibold text-foreground">
-														AED {calculatedAmount.toLocaleString('en-US', {
-															minimumFractionDigits: 2,
-															maximumFractionDigits: 2
-														})}
-													</span>
-												</div>
-											</div>
-										{/if}
-									{/if}
-								</Field.Field>
-							{/if}
-						</div>
 						{#if uploadedFiles.refferalAgreementFile}
 							<h3 class="text-sm font-medium">Referral Agreement</h3>
 							<div
@@ -2167,35 +2119,43 @@
 											{/each}
 										</div>
 									{:else if index === 0}
-										<!-- Preset selector: only shown on first row for agents -->
+										<!-- Solo agent: show 100% badge; 2+ agents: show preset selector -->
 										<div class="flex items-center justify-center">
-											<Select.Root
-												type="single"
-												value={splitPreset}
-												onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
-											>
-												<Select.Trigger class="w-full">
-													<span>{splitPreset}</span>
-												</Select.Trigger>
-												<Select.Content>
-													<Select.Item value="70/30">
-														<div class="flex flex-col text-left">
-															<span class="text-sm font-medium">70/30</span>
-															<span class="text-xs text-muted-foreground"
-																>Caller 70% / Closer 30%</span
-															>
-														</div>
-													</Select.Item>
-													<Select.Item value="55/45">
-														<div class="flex flex-col text-left">
-															<span class="text-sm font-medium">55/45</span>
-															<span class="text-xs text-muted-foreground"
-																>Caller 55% / Closer 45%</span
-															>
-														</div>
-													</Select.Item>
-												</Select.Content>
-											</Select.Root>
+											{#if dealOwners.length === 1}
+												<span
+													class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
+												>
+													100%
+												</span>
+											{:else}
+												<Select.Root
+													type="single"
+													value={splitPreset}
+													onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
+												>
+													<Select.Trigger class="w-full">
+														<span>{splitPreset}</span>
+													</Select.Trigger>
+													<Select.Content>
+														<Select.Item value="70/30">
+															<div class="flex flex-col text-left">
+																<span class="text-sm font-medium">70/30</span>
+																<span class="text-xs text-muted-foreground"
+																	>Caller 70% / Closer 30%</span
+																>
+															</div>
+														</Select.Item>
+														<Select.Item value="55/45">
+															<div class="flex flex-col text-left">
+																<span class="text-sm font-medium">55/45</span>
+																<span class="text-xs text-muted-foreground"
+																	>Caller 55% / Closer 45%</span
+																>
+															</div>
+														</Select.Item>
+													</Select.Content>
+												</Select.Root>
+											{/if}
 											<input
 												class="sr-only"
 												{...createSale.fields.dealOwners[index]?.split.as('number')}

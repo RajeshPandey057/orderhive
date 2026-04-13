@@ -269,7 +269,6 @@ declare global {
 		saleDate?: string;
 		nationality?: string;
 		residentStatus?: 'resident' | 'non-resident';
-		referralAmount?: number;
 		callerManagerEmail?: string;
 		closerManagerEmail?: string;
 		callerSeniorManagerEmail?: string;

@@ -54,8 +54,6 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		unit_value: z.string().optional().or(z.literal('')),
 		invoice_stage: z.string().optional().or(z.literal('')),
 		tentative_eligibility_date: z.string().optional().or(z.literal('')),
-		referral_amount_type: z.string().optional().or(z.literal('')),
-		referral_amount: z.coerce.number().positive().optional().or(z.literal('')),
 		sale_date: z.string().optional().or(z.literal('')),
 		nationality: z.string().optional().or(z.literal('')),
 		resident_status: z.string().optional().or(z.literal('')),
@@ -521,22 +519,6 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			}
 		}
 
-		let finalReferralAmount: number | undefined;
-		if (
-			primary.referral_amount_type &&
-			primary.referral_amount &&
-			typeof primary.referral_amount === 'number'
-		) {
-			if (primary.referral_amount_type === 'percentage') {
-				const unitValue = parseFloat(String(primary.unit_value ?? '').replace(/,/g, ''));
-				if (!isNaN(unitValue)) {
-					finalReferralAmount = (unitValue * primary.referral_amount) / 100;
-				}
-			} else {
-				finalReferralAmount = primary.referral_amount;
-			}
-		}
-
 		// Calculate commission and passback derived values
 		let revenueAchieved: number | undefined;
 		let revenueAfterPassback: number | undefined;
@@ -633,7 +615,6 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 				}),
 			unitNo: primary.unit_no ?? '',
 			unitValue: primary.unit_value ?? '',
-			...(finalReferralAmount !== undefined && { referralAmount: finalReferralAmount }),
 			...(primary.commission_percentage &&
 				typeof primary.commission_percentage === 'number' && {
 					commissionPercentage: primary.commission_percentage
