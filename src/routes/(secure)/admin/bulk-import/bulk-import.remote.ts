@@ -614,7 +614,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 					grossFloorArea: primary.gross_floor_area
 				}),
 			unitNo: primary.unit_no ?? '',
-			unitValue: primary.unit_value ?? '',
+			unitValue: (primary.unit_value ?? '').replace(/,/g, ''),
 			...(primary.commission_percentage &&
 				typeof primary.commission_percentage === 'number' && {
 					commissionPercentage: primary.commission_percentage

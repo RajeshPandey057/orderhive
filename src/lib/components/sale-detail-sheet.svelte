@@ -935,7 +935,9 @@
 									Unit Value
 								</Table.Cell>
 								<Table.Cell class="font-medium">
-									{sale?.unitValue ? Number(sale.unitValue).toLocaleString() : '-'}
+									{sale?.unitValue
+										? Number(String(sale.unitValue).replace(/,/g, '')).toLocaleString()
+										: '-'}
 								</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Passback Amount

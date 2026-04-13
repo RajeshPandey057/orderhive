@@ -171,7 +171,9 @@
 						render: () => `<div class="font-medium">${formatted}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, { value: Number(row.original.unitValue) });
+				return renderSnippet(cellSnippet, {
+					value: Number(String(row.original.unitValue ?? '').replace(/,/g, ''))
+				});
 			}
 		},
 		{
