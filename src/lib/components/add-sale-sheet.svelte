@@ -37,6 +37,7 @@
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
 	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
+	import { searchUsers as searchUsersRemote } from '../../routes/(secure)/users.remote';
 
 	let { userRole }: { userRole?: 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin' } =
 		$props();
@@ -99,6 +100,8 @@
 	};
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
+	let ownerPopoverOpen = $state<Record<number, boolean>>({ 0: false });
+	let ownerSearchValues = $state<Record<number, string>>({ 0: '' });
 
 	type FirestoreUser = {
 		id: string;
@@ -117,8 +120,32 @@
 		photoURL?: string;
 	};
 
-	const users = firekitCollection<FirestoreUser>('users');
 	const rolesCollection = firekitCollection<Role>('roles');
+
+	// Per-owner search results and loading state
+	let ownerSearchResults = $state<Record<number, FirestoreUser[]>>({ 0: [] });
+	let ownerSearchLoading = $state<Record<number, boolean>>({ 0: false });
+
+	let searchDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+
+	const searchUsers = async (ownerKey: number, term: string) => {
+		ownerSearchLoading[ownerKey] = true;
+		try {
+			ownerSearchResults[ownerKey] = await searchUsersRemote({ q: term.trim() });
+		} catch {
+			ownerSearchResults[ownerKey] = [];
+		} finally {
+			ownerSearchLoading[ownerKey] = false;
+		}
+	};
+
+	$effect(() => {
+		for (const [keyStr, term] of Object.entries(ownerSearchValues)) {
+			const key = Number(keyStr);
+			if (searchDebounceTimers[key]) clearTimeout(searchDebounceTimers[key]);
+			searchDebounceTimers[key] = setTimeout(() => searchUsers(key, term), 300);
+		}
+	});
 
 	// Derived options for manager dropdowns (filtered by agentRole)
 	const seniorManagerOptions = $derived(
@@ -164,12 +191,16 @@
 
 	syncDealOwners();
 
-	const ownerOptions = $derived(users.data ?? []);
 	const splitTotal = $derived(
 		dealOwners.reduce((total, owner) => total + (Number(owner.split) || 0), 0)
 	);
 	const splitRemaining = $derived(100 - splitTotal);
 	const canEditSplit = $derived(userRole === 'compliance' || userRole === 'finance');
+	const ownerGridClass = $derived(
+		dealOwners.length > 1
+			? 'grid-cols-[minmax(0,1.6fr)_160px_160px_40px]'
+			: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
+	);
 
 	let splitPreset = $state<'70/30' | '55/45'>('70/30');
 
@@ -306,7 +337,9 @@
 	};
 
 	const handleOwnerSelect = (ownerKey: number, userId: string) => {
-		const selectedUser = ownerOptions.find((user) => user.id === userId);
+		const selectedUser = (ownerSearchResults[ownerKey] ?? []).find(
+			(user: FirestoreUser) => user.id === userId
+		);
 
 		dealOwners = dealOwners.map((owner) =>
 			owner.key === ownerKey
@@ -371,10 +404,18 @@
 			}));
 		}
 
+		const newOwnerKey = nextOwnerKey++;
+		ownerPopoverOpen[newOwnerKey] = false;
+		ownerSearchValues[newOwnerKey] = '';
+		ownerSearchResults[newOwnerKey] = [];
+		ownerSearchLoading[newOwnerKey] = false;
+		// Trigger an initial full-load for the new owner's dropdown
+		searchUsers(newOwnerKey, '');
+
 		dealOwners = [
 			...dealOwners,
 			{
-				key: nextOwnerKey++,
+				key: newOwnerKey,
 				userId: '',
 				email: '',
 				name: '',
@@ -388,6 +429,12 @@
 
 	const removeDealOwner = (ownerKey: number) => {
 		if (dealOwners.length === 1) return;
+		delete ownerPopoverOpen[ownerKey];
+		delete ownerSearchValues[ownerKey];
+		delete ownerSearchResults[ownerKey];
+		delete ownerSearchLoading[ownerKey];
+		if (searchDebounceTimers[ownerKey]) clearTimeout(searchDebounceTimers[ownerKey]);
+		delete searchDebounceTimers[ownerKey];
 		dealOwners = dealOwners.filter((owner) => owner.key !== ownerKey);
 
 		// When only one agent remains, give them 100%
@@ -1975,17 +2022,45 @@
 
 					<div class="space-y-3 rounded-xl border border-border/60 bg-background/60">
 						<div
-							class="grid grid-cols-[minmax(0,1.6fr)_160px_160px_40px] items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
+							class="grid {ownerGridClass} items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
 						>
 							<span>Owners</span>
 							<span class="text-center">Select Role</span>
-							<span class="text-center">Select Split %</span>
+							{#if dealOwners.length > 1}
+								{#if canEditSplit}
+									<span class="text-center">Split %</span>
+								{:else}
+									<Select.Root
+										type="single"
+										value={splitPreset}
+										onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
+									>
+										<Select.Trigger class="w-full">
+											<span>{splitPreset}</span>
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="70/30">
+												<div class="flex flex-col text-left">
+													<span class="text-sm font-medium">70/30</span>
+													<span class="text-xs text-muted-foreground">Caller 70% / Closer 30%</span>
+												</div>
+											</Select.Item>
+											<Select.Item value="55/45">
+												<div class="flex flex-col text-left">
+													<span class="text-sm font-medium">55/45</span>
+													<span class="text-xs text-muted-foreground">Caller 55% / Closer 45%</span>
+												</div>
+											</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								{/if}
+							{/if}
 							<span></span>
 						</div>
 
 						{#each dealOwners as owner, index (owner.key)}
 							<div
-								class="grid grid-cols-[minmax(0,1.6fr)_160px_160px_40px] items-center gap-4 border-t border-border/40 px-4 py-3"
+								class="grid {ownerGridClass} items-center gap-4 border-t border-border/40 px-4 py-3"
 							>
 								<div class="flex min-w-0 items-center gap-3 md:gap-4">
 									<Avatar.Root
@@ -1997,42 +2072,68 @@
 										<Avatar.Fallback>{owner.name?.[0] || owner.email?.[0] || 'A'}</Avatar.Fallback>
 									</Avatar.Root>
 									<div class="min-w-0 flex-1 space-y-1">
-										<Select.Root
-											type="single"
-											value={owner.userId}
-											onValueChange={(value) => handleOwnerSelect(owner.key, value)}
-										>
-											<Select.Trigger class="w-full justify-between">
-												<div class="flex flex-row items-center gap-2 text-left">
-													<span class="truncate text-sm leading-tight font-medium">
-														{owner.userId === firekitUser.uid ? 'You' : owner.name || 'Add owner'}
-													</span>
-													<span class="truncate text-xs leading-tight text-muted-foreground">
-														{owner.email || 'Select an agent to auto-fill email'}
-													</span>
-												</div>
-											</Select.Trigger>
-											<Select.Content class="max-h-64 overflow-y-auto">
-												{#if users.loading}
-													<Select.Item value="loading" disabled>Loading owners...</Select.Item>
-												{:else if ownerOptions.length === 0}
-													<Select.Item value="empty" disabled>No owners found</Select.Item>
-												{:else}
-													{#each ownerOptions as user (user.id)}
-														<Select.Item value={user.id}>
-															<div class="flex flex-col text-left">
-																<span class="text-sm font-medium">
-																	{user.displayName ?? user.email ?? 'Owner'}
+										<Popover.Root bind:open={ownerPopoverOpen[owner.key]}>
+											<Popover.Trigger class="w-full">
+												<Button
+													role="combobox"
+													variant="outline"
+													type="button"
+													class="h-auto w-full justify-start gap-2 px-3 py-2"
+												>
+													<div class="flex min-w-0 flex-col overflow-hidden text-left">
+														<span class="truncate text-sm leading-tight font-medium">
+															{owner.userId === firekitUser.uid ? 'You' : owner.name || 'Add owner'}
+														</span>
+														<span class="truncate text-xs leading-tight text-muted-foreground">
+															{owner.email || 'Select an agent…'}
+														</span>
+													</div>
+												</Button>
+											</Popover.Trigger>
+											<Popover.Content class="w-72 p-0" align="start">
+												<Command.Root shouldFilter={false}>
+													<Command.Input
+														placeholder="Search agent…"
+														bind:value={ownerSearchValues[owner.key]}
+													/>
+													<Command.List>
+														<Command.Empty>
+															{#if ownerSearchLoading[owner.key]}
+																<span
+																	class="flex items-center gap-2 py-2 text-sm text-muted-foreground"
+																>
+																	<Loader2 class="h-3 w-3 animate-spin" /> Searching…
 																</span>
-																{#if user.email}
-																	<span class="text-xs text-muted-foreground">{user.email}</span>
-																{/if}
-															</div>
-														</Select.Item>
-													{/each}
-												{/if}
-											</Select.Content>
-										</Select.Root>
+															{:else}
+																No agent found.
+															{/if}
+														</Command.Empty>
+														<Command.Group>
+															{#each ownerSearchResults[owner.key] ?? [] as user (user.id)}
+																<Command.Item
+																	value={user.id}
+																	onSelect={() => {
+																		handleOwnerSelect(owner.key, user.id);
+																		ownerPopoverOpen[owner.key] = false;
+																		ownerSearchValues[owner.key] = '';
+																	}}
+																>
+																	<div class="flex flex-col">
+																		<span class="text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'Owner'}
+																		</span>
+																		{#if user.email}
+																			<span class="text-xs text-muted-foreground">{user.email}</span
+																			>
+																		{/if}
+																	</div>
+																</Command.Item>
+															{/each}
+														</Command.Group>
+													</Command.List>
+												</Command.Root>
+											</Popover.Content>
+										</Popover.Root>
 										<input
 											class="sr-only"
 											{...createSale.fields.dealOwners[index]?.userId.as('text')}
@@ -2053,7 +2154,19 @@
 								</div>
 
 								<div class="flex items-center justify-center">
-									{#if index < 2}
+									{#if dealOwners.length === 1}
+										<span
+											class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
+										>
+											100%
+										</span>
+										<input
+											class="sr-only"
+											name={createSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
+												`dealOwners[${index}].ownerRole`}
+											value={owner.ownerRole}
+										/>
+									{:else if index < 2}
 										<Select.Root
 											type="single"
 											value={owner.ownerRole}
@@ -2098,78 +2211,44 @@
 									{/if}
 								</div>
 
-								{#if index < 2}
-									{#if canEditSplit}
-										<div class="flex items-center justify-end gap-2">
-											<Input
-												{...createSale.fields.dealOwners[index]?.split.as('number')}
-												class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-												type="number"
-												min="0"
-												max="100"
-												step="1"
-												value={owner.split}
-												oninput={(event) =>
-													handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
-											/>
-											{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
-												<Field.Error class="col-span-2 text-xs text-destructive"
-													>{issue.message}</Field.Error
-												>
-											{/each}
-										</div>
-									{:else if index === 0}
-										<!-- Solo agent: show 100% badge; 2+ agents: show preset selector -->
-										<div class="flex items-center justify-center">
-											{#if dealOwners.length === 1}
+								{#if dealOwners.length > 1}
+									{#if index < 2}
+										{#if canEditSplit}
+											<div class="flex items-center justify-end gap-2">
+												<Input
+													{...createSale.fields.dealOwners[index]?.split.as('number')}
+													class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+													type="number"
+													min="0"
+													max="100"
+													step="1"
+													value={owner.split}
+													oninput={(event) =>
+														handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
+												/>
+												{#each createSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
+													<Field.Error class="col-span-2 text-xs text-destructive"
+														>{issue.message}</Field.Error
+													>
+												{/each}
+											</div>
+										{:else}
+											<div class="flex items-center justify-center">
 												<span
 													class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
 												>
-													100%
+													{owner.split}%
 												</span>
-											{:else}
-												<Select.Root
-													type="single"
-													value={splitPreset}
-													onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
-												>
-													<Select.Trigger class="w-full">
-														<span>{splitPreset}</span>
-													</Select.Trigger>
-													<Select.Content>
-														<Select.Item value="70/30">
-															<div class="flex flex-col text-left">
-																<span class="text-sm font-medium">70/30</span>
-																<span class="text-xs text-muted-foreground"
-																	>Caller 70% / Closer 30%</span
-																>
-															</div>
-														</Select.Item>
-														<Select.Item value="55/45">
-															<div class="flex flex-col text-left">
-																<span class="text-sm font-medium">55/45</span>
-																<span class="text-xs text-muted-foreground"
-																	>Caller 55% / Closer 45%</span
-																>
-															</div>
-														</Select.Item>
-													</Select.Content>
-												</Select.Root>
-											{/if}
-											<input
-												class="sr-only"
-												{...createSale.fields.dealOwners[index]?.split.as('number')}
-												value={owner.split}
-											/>
-										</div>
+												<input
+													class="sr-only"
+													{...createSale.fields.dealOwners[index]?.split.as('number')}
+													value={owner.split}
+												/>
+											</div>
+										{/if}
 									{:else}
-										<!-- Second row (closer): show derived split as badge -->
-										<div class="flex items-center justify-center">
-											<span
-												class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
-											>
-												{owner.split}%
-											</span>
+										<!-- 3rd+ agents: no split selector, just persist the value -->
+										<div>
 											<input
 												class="sr-only"
 												{...createSale.fields.dealOwners[index]?.split.as('number')}
@@ -2177,15 +2256,6 @@
 											/>
 										</div>
 									{/if}
-								{:else}
-									<!-- 3rd+ agents: no split selector, just persist the value -->
-									<div>
-										<input
-											class="sr-only"
-											{...createSale.fields.dealOwners[index]?.split.as('number')}
-											value={owner.split}
-										/>
-									</div>
 								{/if}
 
 								<div class="flex items-center justify-end">
