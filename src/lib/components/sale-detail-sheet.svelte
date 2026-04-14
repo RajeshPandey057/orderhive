@@ -84,6 +84,55 @@
 	};
 
 	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
+	const canEdit = $derived(role === 'admin' || role === 'super-admin');
+
+	// Edit passback dialog state
+	let editPassbackOpen = $state(false);
+	let editPassbackValue = $state('');
+	let isSavingPassback = $state(false);
+
+	const openEditPassback = () => {
+		editPassbackValue = sale?.passbackAmount != null ? String(sale.passbackAmount) : '';
+		editPassbackOpen = true;
+	};
+
+	const savePassback = async () => {
+		if (!sale?.id) return;
+		const parsed = parseFloat(editPassbackValue);
+		if (isNaN(parsed) || parsed < 0) {
+			toast.error('Please enter a valid passback amount');
+			return;
+		}
+		isSavingPassback = true;
+		try {
+			const unitValueNum = parseFloat(String(sale.unitValue ?? '').replace(/,/g, ''));
+			const commissionPct = sale.commissionPercentage ?? 0;
+			const revenueAchieved =
+				!isNaN(unitValueNum) && commissionPct > 0
+					? Math.round((unitValueNum * commissionPct) / 100)
+					: (sale.revenueAchieved ?? null);
+			const revenueAfterPassback =
+				revenueAchieved != null ? Math.round(revenueAchieved - parsed) : null;
+
+			const updateData: Record<string, unknown> = { passbackAmount: parsed };
+			if (revenueAfterPassback != null) updateData.revenueAfterPassback = revenueAfterPassback;
+
+			const result = await firekitDocMutations.update(`sales/${sale.id}`, updateData);
+			if (result.success) {
+				sale.passbackAmount = parsed;
+				if (revenueAfterPassback != null) sale.revenueAfterPassback = revenueAfterPassback;
+				sale = { ...sale };
+				toast.success('Passback amount updated');
+				editPassbackOpen = false;
+			} else {
+				toast.error(result.error?.message ?? 'Failed to update passback amount');
+			}
+		} catch {
+			toast.error('Failed to update passback amount');
+		} finally {
+			isSavingPassback = false;
+		}
+	};
 
 	// Invoice status state
 	let selectedInvoiceStatus = $state<'pending' | 'generated' | 'raised'>('pending');
@@ -498,9 +547,11 @@
 		<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 			<Sheet.Title class="text-2xl font-medium">Sale</Sheet.Title>
 			<div class="flex flex-row gap-2">
-				<Sheet.Close class={buttonVariants({ variant: 'outline', size: 'sm' })}>
-					<Pencil class="mr-2 h-4 w-4" /> Edit
-				</Sheet.Close>
+				{#if canEdit}
+					<Button variant="outline" size="sm" onclick={openEditPassback}>
+						<Pencil class="mr-2 h-4 w-4" /> Edit
+					</Button>
+				{/if}
 			</div>
 		</div>
 		<!-- Content -->
@@ -1913,5 +1964,35 @@
 				{isSubmittingReject ? 'Submitting...' : 'Submit'}
 			</Button>
 		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Passback Dialog -->
+<Dialog.Root bind:open={editPassbackOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Edit Passback Amount</Dialog.Title>
+			<Dialog.Description>Update the passback amount for this deal.</Dialog.Description>
+		</Dialog.Header>
+		<div class="space-y-4 py-2">
+			<div class="space-y-2">
+				<label for="edit-passback" class="text-sm font-medium">Passback Amount</label>
+				<input
+					id="edit-passback"
+					type="number"
+					min="0"
+					step="any"
+					class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+					placeholder="Enter amount"
+					bind:value={editPassbackValue}
+				/>
+			</div>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (editPassbackOpen = false)}>Cancel</Button>
+			<Button disabled={isSavingPassback} onclick={savePassback}>
+				{isSavingPassback ? 'Saving...' : 'Save'}
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
