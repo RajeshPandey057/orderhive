@@ -5,6 +5,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { formatDateDDMmmYYYY } from '$lib/utils';
 	import { Badge } from '@/components/ui/badge';
 	import { Separator } from '@/components/ui/separator';
 	import { firekitDocMutations, firekitUploadTask, firekitUser } from 'svelte-firekit';
@@ -552,7 +553,7 @@
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Sale Date
 								</Table.Cell>
-								<Table.Cell class="font-medium">{sale?.saleDate ?? '-'}</Table.Cell>
+								<Table.Cell class="font-medium">{formatDateDDMmmYYYY(sale?.saleDate)}</Table.Cell>
 								<Table.Cell class="bg-muted/50 font-medium text-muted-foreground">
 									Nationality
 								</Table.Cell>
@@ -1369,11 +1370,7 @@
 										Tentative Eligibility Date
 									</Table.Cell>
 									<Table.Cell class="font-medium">
-										{new Date(sale.tentativeEligibilityDate).toLocaleDateString('en-US', {
-											day: 'numeric',
-											month: 'short',
-											year: 'numeric'
-										})}
+										{formatDateDDMmmYYYY(sale.tentativeEligibilityDate)}
 									</Table.Cell>
 								{/if}
 							</Table.Row>

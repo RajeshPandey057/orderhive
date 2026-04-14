@@ -492,30 +492,45 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			});
 		} else {
 			// 2-agent mode — use split_preset
-			const splitPreset = (primary.split_preset || '70/30') as '70/30' | '55/45';
-			const callerSplit = splitPreset === '55/45' ? 55 : 70;
-			const closerSplit = splitPreset === '55/45' ? 45 : 30;
+			const rawPreset = (primary.split_preset ?? '').toString().trim();
+			if (rawPreset === '100') {
+				// Single owner — full split
+				if (callerUser) {
+					dealOwners.push({
+						userId: callerUser.uid,
+						email: callerUser.email,
+						name: callerUser.displayName ?? callerUser.email,
+						photoURL: callerUser.photoURL ?? '',
+						ownerRole: 'caller',
+						split: 100
+					});
+				}
+			} else {
+				const splitPreset = rawPreset === '55/45' ? '55/45' : '70/30';
+				const callerSplit = splitPreset === '55/45' ? 55 : 70;
+				const closerSplit = splitPreset === '55/45' ? 45 : 30;
 
-			if (callerUser) {
-				dealOwners.push({
-					userId: callerUser.uid,
-					email: callerUser.email,
-					name: callerUser.displayName ?? callerUser.email,
-					photoURL: callerUser.photoURL ?? '',
-					ownerRole: 'caller',
-					split: callerSplit
-				});
-			}
-			if (primary.closer_email && primary.closer_email.trim() !== '') {
-				const closerUser = await resolveUserByEmail(primary.closer_email);
-				dealOwners.push({
-					userId: closerUser.uid,
-					email: closerUser.email,
-					name: closerUser.displayName ?? closerUser.email,
-					photoURL: closerUser.photoURL ?? '',
-					ownerRole: 'closer',
-					split: closerSplit
-				});
+				if (callerUser) {
+					dealOwners.push({
+						userId: callerUser.uid,
+						email: callerUser.email,
+						name: callerUser.displayName ?? callerUser.email,
+						photoURL: callerUser.photoURL ?? '',
+						ownerRole: 'caller',
+						split: callerSplit
+					});
+				}
+				if (primary.closer_email && primary.closer_email.trim() !== '') {
+					const closerUser = await resolveUserByEmail(primary.closer_email);
+					dealOwners.push({
+						userId: closerUser.uid,
+						email: closerUser.email,
+						name: closerUser.displayName ?? closerUser.email,
+						photoURL: closerUser.photoURL ?? '',
+						ownerRole: 'closer',
+						split: closerSplit
+					});
+				}
 			}
 		}
 
@@ -569,7 +584,9 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			commissionStatus: 'pending',
 			invoiceFile: { status: 'pending' },
 			invoiceStage: primary.invoice_stage ? [primary.invoice_stage] : [],
-			tentativeEligibilityDate: parseDDMMYYYY(primary.tentative_eligibility_date),
+			tentativeEligibilityDate:
+				parseDDMmmYYYY(primary.tentative_eligibility_date) ??
+				parseDDMMYYYY(primary.tentative_eligibility_date),
 			...(parsedSaleDate && { saleDate: parsedSaleDate }),
 			clientDetails: {
 				firstName: primary.first_name ?? '',
