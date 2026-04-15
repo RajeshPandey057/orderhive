@@ -444,3 +444,382 @@ export const createSale = form(saleSchema, async (data) => {
 
 	redirect(303, '/agent/sales-tracker');
 });
+
+const buyerUpdateSchema = z.object({
+	firstName: z.string().min(1, 'First name is required'),
+	lastName: z.string().min(1, 'Last name is required'),
+	email: z.email('Valid email is required'),
+	phone: z.string().min(10, 'Valid phone number is required'),
+	passportFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+	nationalIdFile: z.custom<File>((file) => !file || file instanceof File).optional()
+});
+
+const updateSaleSchema = z
+	.object({
+		id: z.string().min(1, 'Sale ID is required'),
+		firstName: buyerUpdateSchema.shape.firstName,
+		lastName: buyerUpdateSchema.shape.lastName,
+		email: buyerUpdateSchema.shape.email,
+		phone: buyerUpdateSchema.shape.phone,
+		passportFile: buyerUpdateSchema.shape.passportFile,
+		nationalIdFile: buyerUpdateSchema.shape.nationalIdFile,
+		dealOwners: z
+			.array(dealOwnerSchema)
+			.min(1, 'At least one deal owner is required')
+			.superRefine((owners, ctx) => {
+				const total = owners.reduce((sum, owner) => sum + owner.split, 0);
+
+				if (Math.round(total * 100) / 100 !== 100) {
+					ctx.addIssue({
+						code: 'custom',
+						message: 'Deal owner split must total 100%'
+					});
+				}
+			}),
+		jointBuyers: z.array(buyerUpdateSchema).default([]),
+		dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
+		paymentValue: z
+			.number()
+			.min(0, 'Payment value must be at least 0')
+			.max(100, 'Payment value cannot exceed 100'),
+		bookingFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		paymentReceiptFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		invoiceStage: z
+			.array(z.enum(['first-half', 'second-half', 'full', 'not-yet-eligible']))
+			.min(1, 'At least one invoice stage must be selected')
+			.refine(
+				(stages) => {
+					if (stages.includes('full') && stages.length > 1) return false;
+					if (stages.includes('not-yet-eligible') && stages.length > 1) return false;
+					return true;
+				},
+				{
+					message:
+						'Invalid combination: "Full" and "Not Yet Eligible" must be selected alone. "First Half" and "Second Half" can be selected together.'
+				}
+			),
+		tentativeEligibilityDate: z.string().optional(),
+		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
+		developer: z.string().min(1, 'Developer is required'),
+		project: z.string().min(1, 'Project is required'),
+		community: z.string().optional(),
+		propertyType: z.enum(
+			['apartment', 'townhouse', 'villa', 'commercial', 'plot'],
+			'Property type is required'
+		),
+		bedroomType: z
+			.enum([
+				'studio',
+				'1bed',
+				'2bed',
+				'2bed+maid',
+				'3bed',
+				'3bed+maid',
+				'4bed',
+				'5bed',
+				'6-7bed',
+				'duplex',
+				'penthouse',
+				'podium-townhouse'
+			])
+			.optional(),
+		commercialSubType: z.enum(['office', 'warehouse']).optional(),
+		propertySize: z.number().optional(),
+		plotArea: z.number().optional(),
+		builtUpArea: z.number().optional(),
+		grossFloorArea: z.number().optional(),
+		unitNo: z.string().min(1, 'Unit number is required'),
+		unitValue: z.string().min(1, 'Unit value is required'),
+		saleDate: z.string().min(1, 'Sale date is required'),
+		nationality: z.string().optional(),
+		residentStatus: z.enum(['resident', 'non-resident']).optional(),
+		commissionPercentage: z
+			.number()
+			.min(0, 'Commission % must be at least 0')
+			.max(100, 'Commission % cannot exceed 100')
+			.optional(),
+		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional(),
+		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
+		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
+		callerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
+		closerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
+	})
+	.superRefine((data, ctx) => {
+		if (data.propertyType === 'apartment') {
+			if (!data.bedroomType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['bedroomType'],
+					message: 'Number of bedrooms is required for apartments'
+				});
+			}
+			if (!data.propertySize) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['propertySize'],
+					message: 'Property size is required for apartments'
+				});
+			}
+		}
+
+		if (data.propertyType === 'townhouse' || data.propertyType === 'villa') {
+			if (!data.bedroomType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['bedroomType'],
+					message: 'Number of bedrooms is required for townhouse/villa'
+				});
+			}
+			if (!data.plotArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['plotArea'],
+					message: 'Plot area is required for townhouse/villa'
+				});
+			}
+			if (!data.builtUpArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['builtUpArea'],
+					message: 'Built up area is required for townhouse/villa'
+				});
+			}
+		}
+
+		if (data.propertyType === 'commercial') {
+			if (!data.commercialSubType) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['commercialSubType'],
+					message: 'Commercial type is required'
+				});
+			}
+			if (!data.propertySize) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['propertySize'],
+					message: 'Property size is required for commercial properties'
+				});
+			}
+			if (data.commercialSubType === 'warehouse' && !data.grossFloorArea) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['grossFloorArea'],
+					message: 'Gross floor area is required for warehouses'
+				});
+			}
+		}
+
+		if (data.propertyType === 'plot' && !data.propertySize) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['propertySize'],
+				message: 'Property size is required for plots'
+			});
+		}
+
+		if (
+			data.passbackAmount !== undefined &&
+			data.passbackAmount > 0 &&
+			data.commissionPercentage !== undefined
+		) {
+			const unitValue = parseFloat(data.unitValue.replace(/,/g, ''));
+			if (!isNaN(unitValue)) {
+				const revenueAchieved = (unitValue * data.commissionPercentage) / 100;
+				if (data.passbackAmount > revenueAchieved) {
+					ctx.addIssue({
+						code: 'custom',
+						path: ['passbackAmount'],
+						message: 'Passback amount cannot exceed revenue achieved'
+					});
+				}
+			}
+		}
+	});
+
+type UploadedDoc = Awaited<ReturnType<typeof toUploadedFile>>;
+
+const resolveUploadedFile = async (
+	file: File | null | undefined,
+	path: string,
+	existing: UploadedDoc | null | undefined
+) => {
+	const uploaded = await toUploadedFile(file, path);
+	return uploaded ?? existing ?? null;
+};
+
+export const updateSale = form(updateSaleSchema, async (data) => {
+	const timestamp = FieldValue.serverTimestamp();
+	const saleRef = firestore.collection('sales').doc(data.id);
+	const existingSnap = await saleRef.get();
+
+	if (!existingSnap.exists) {
+		throw error(404, 'Sale not found');
+	}
+
+	const existingSale = existingSnap.data() as Record<string, unknown>;
+	const createdByUid =
+		(existingSale?.createdByUid as string | undefined) ?? data.dealOwners[0]?.userId ?? 'unknown';
+	const basePath = `sales/${createdByUid}/${data.id}`;
+
+	const existingClient = (existingSale.clientDetails as Record<string, unknown>) ?? {};
+	const existingJoint =
+		(existingSale.jointBuyers as Array<Record<string, unknown>> | undefined) ?? [];
+
+	const [primaryPassportFile, primaryNationalIdFile, primaryAmlFormFile] = await Promise.all([
+		resolveUploadedFile(
+			data.passportFile,
+			`${basePath}/primary/passport`,
+			existingClient.passportFile as UploadedDoc
+		),
+		resolveUploadedFile(
+			data.nationalIdFile,
+			`${basePath}/primary/national-id`,
+			existingClient.nationalIdFile as UploadedDoc
+		),
+		resolveUploadedFile(
+			data.amlFormFile,
+			`${basePath}/primary/aml-form`,
+			existingClient.amlFormFile as UploadedDoc
+		)
+	]);
+
+	const jointBuyers = await Promise.all(
+		data.jointBuyers.map(async (buyer, index) => {
+			const existingBuyer = existingJoint[index] ?? {};
+			const [passportFile, nationalIdFile] = await Promise.all([
+				resolveUploadedFile(
+					buyer.passportFile,
+					`${basePath}/joint/${index}/passport`,
+					existingBuyer.passportFile as UploadedDoc
+				),
+				resolveUploadedFile(
+					buyer.nationalIdFile,
+					`${basePath}/joint/${index}/national-id`,
+					existingBuyer.nationalIdFile as UploadedDoc
+				)
+			]);
+
+			return {
+				firstName: buyer.firstName,
+				lastName: buyer.lastName,
+				email: buyer.email,
+				phone: buyer.phone,
+				passportFile,
+				nationalIdFile
+			};
+		})
+	);
+
+	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile] = await Promise.all([
+		resolveUploadedFile(
+			data.bookingFormFile,
+			`${basePath}/booking-form`,
+			existingSale.bookingFormFile as UploadedDoc
+		),
+		resolveUploadedFile(
+			data.paymentReceiptFile,
+			`${basePath}/payment-receipt`,
+			existingSale.paymentReceiptFile as UploadedDoc
+		),
+		resolveUploadedFile(
+			data.refferalAgreementFile,
+			`${basePath}/referral-agreement`,
+			existingSale.refferalAgreementFile as UploadedDoc
+		)
+	]);
+
+	let revenueAchieved: number | undefined;
+	let revenueAfterPassback: number | undefined;
+	if (data.commissionPercentage !== undefined) {
+		const unitValueNum = parseFloat(data.unitValue.replace(/,/g, ''));
+		if (!isNaN(unitValueNum)) {
+			revenueAchieved = Math.round((unitValueNum * data.commissionPercentage) / 100);
+			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
+		}
+	}
+
+	await Promise.all(
+		[
+			data.callerManagerEmail,
+			data.closerManagerEmail,
+			data.callerSeniorManagerEmail,
+			data.closerSeniorManagerEmail
+		]
+			.filter(Boolean)
+			.map((email) => ensureRoleExists(email!))
+	);
+
+	const updatedRecord = {
+		status: existingSale.status ?? 'pending',
+		financeStatus: existingSale.financeStatus ?? 'pending',
+		complianceStatus: existingSale.complianceStatus ?? 'pending',
+		commissionStatus: existingSale.commissionStatus ?? 'pending',
+		invoiceFile: existingSale.invoiceFile ?? { status: 'pending' },
+		invoiceStage: data.invoiceStage,
+		tentativeEligibilityDate: data.tentativeEligibilityDate || null,
+		clientDetails: {
+			firstName: data.firstName,
+			lastName: data.lastName,
+			email: data.email,
+			phone: data.phone,
+			passportFile: primaryPassportFile,
+			nationalIdFile: primaryNationalIdFile,
+			amlFormFile: primaryAmlFormFile
+		},
+		jointBuyers,
+		dealOwners: data.dealOwners,
+		dealOwnerIds: data.dealOwners.map((owner) => owner.userId),
+		dealStage: data.dealStage,
+		paymentValue: data.paymentValue,
+		bookingFormFile,
+		paymentReceiptFile,
+		refferalAgreementFile,
+		saleType: data.saleType,
+		developer: data.developer,
+		project: data.project,
+		...(data.community && { community: data.community }),
+		propertyType: data.propertyType,
+		...(data.bedroomType && { bedroomType: data.bedroomType }),
+		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
+		...(data.propertySize && { propertySize: data.propertySize }),
+		...(data.plotArea && { plotArea: data.plotArea }),
+		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
+		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
+		unitNo: data.unitNo,
+		unitValue: data.unitValue,
+		saleDate: data.saleDate,
+		...(data.nationality && { nationality: data.nationality }),
+		...(data.residentStatus && { residentStatus: data.residentStatus }),
+		...(data.commissionPercentage !== undefined && {
+			commissionPercentage: data.commissionPercentage
+		}),
+		...(revenueAchieved !== undefined && { revenueAchieved }),
+		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
+		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
+		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
+		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
+		...(data.callerSeniorManagerEmail && {
+			callerSeniorManagerEmail: data.callerSeniorManagerEmail
+		}),
+		...(data.closerSeniorManagerEmail && {
+			closerSeniorManagerEmail: data.closerSeniorManagerEmail
+		}),
+		commnets: existingSale.commnets ?? [],
+		createdByUid: existingSale.createdByUid ?? createdByUid,
+		createdByEmail: existingSale.createdByEmail ?? data.dealOwners[0]?.email ?? null,
+		createdAt: existingSale.createdAt ?? timestamp,
+		updatedAt: timestamp
+	};
+
+	try {
+		await saleRef.set(updatedRecord);
+	} catch (err) {
+		console.error('Failed to update sale in Firestore', err);
+		throw error(500, 'Unable to update sale right now. Please try again.');
+	}
+
+	redirect(303, '/agent/sales-tracker');
+});

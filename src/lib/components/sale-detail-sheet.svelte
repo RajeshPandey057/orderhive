@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -94,6 +96,13 @@
 	const openEditPassback = () => {
 		editPassbackValue = sale?.passbackAmount != null ? String(sale.passbackAmount) : '';
 		editPassbackOpen = true;
+	};
+
+	const openEditSale = () => {
+		if (!sale?.id) return;
+		onOpenChange?.(false);
+		open = false;
+		goto(resolve(`/agent/sales-tracker/edit/${sale.id}`));
 	};
 
 	const savePassback = async () => {
@@ -548,7 +557,7 @@
 			<Sheet.Title class="text-2xl font-medium">Sale</Sheet.Title>
 			<div class="flex flex-row gap-2">
 				{#if canEdit}
-					<Button variant="outline" size="sm" onclick={openEditPassback}>
+					<Button variant="outline" size="sm" onclick={openEditSale}>
 						<Pencil class="mr-2 h-4 w-4" /> Edit
 					</Button>
 				{/if}
