@@ -20,7 +20,15 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 	agent: ['/agent', '/listing', '/dashboard', '/profile'],
 	compliance: ['/compliance', '/dashboard', '/profile'],
 	finance: ['/finance', '/dashboard', '/profile'],
-	'super-admin': ['/admin', '/agent', '/listing', '/compliance', '/finance', '/dashboard', '/profile']
+	'super-admin': [
+		'/admin',
+		'/agent',
+		'/listing',
+		'/compliance',
+		'/finance',
+		'/dashboard',
+		'/profile'
+	]
 };
 
 // Menu items for each role
@@ -29,7 +37,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
-		{ title: 'View Listings', url: '/listings', external: true },
+		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		{ title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' }
@@ -37,7 +45,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	agent: [
 		{ title: 'Dashboard', url: '/agent/dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
-		{ title: 'View Listings', url: '/listings', external: true },
+		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
@@ -59,7 +67,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
-		{ title: 'View Listings', url: '/listings', external: true },
+		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		{ title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' },

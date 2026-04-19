@@ -1,242 +1,13 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { listingsStore } from '$lib/stores/listings';
 	import FullLogo from '$lib/svg/full-logo.svelte';
-	import MapPinIcon from '~icons/lucide/map-pin';
 	import ArrowLeftIcon from '~icons/lucide/arrow-left';
 	import Building2Icon from '~icons/lucide/building-2';
 	import DollarSignIcon from '~icons/lucide/dollar-sign';
 	import FileTextIcon from '~icons/lucide/file-text';
-	import MailIcon from '~icons/lucide/mail';
-
-	const mockListings: Listing[] = [
-		{
-			id: 'lst-001',
-			listingType: 'portal',
-			listedByEmails: ['agent@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo1.jpg' }],
-			propertyAddress: { buildingName: 'Siraj Tower', area: 'Arjan', city: 'Dubai', country: 'UAE' },
-			clientName: 'Siraj Properties LLC',
-			clientPhone: '+971501234567',
-			clientEmail: 'client@example.com',
-			developer: 'Arjan Developers',
-			community: 'Arjan',
-			project: 'Siraj Tower',
-			unitNo: '1204',
-			propertyType: 'apartment',
-			bedroomType: '1bed',
-			propertySize: 857,
-			builtUpArea: 857,
-			buyingPrice: 750000,
-			liquidityInvested: 50000,
-			sellingPrice: 920000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-002',
-			listingType: 'portal',
-			listedByEmails: ['agent@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo2.jpg' }],
-			propertyAddress: {
-				buildingName: 'Bloom Heights',
-				area: 'Jumeirah Village Circle',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Prime Holdings',
-			clientPhone: '+971509876543',
-			clientEmail: 'client2@example.com',
-			developer: 'Bloom Living',
-			community: 'Jumeirah Village Circle',
-			project: 'Bloom Heights',
-			unitNo: '308',
-			propertyType: 'apartment',
-			bedroomType: '2bed',
-			propertySize: 1150,
-			builtUpArea: 1150,
-			buyingPrice: 1100000,
-			liquidityInvested: 80000,
-			sellingPrice: 1350000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-003',
-			listingType: 'portal',
-			listedByEmails: ['agent2@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo3.jpg' }],
-			propertyAddress: {
-				buildingName: 'Azizi Riviera',
-				area: 'Meydan',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Riviera Realty',
-			clientPhone: '+971502345678',
-			clientEmail: 'client3@example.com',
-			developer: 'Azizi Developments',
-			community: 'Meydan',
-			project: 'Azizi Riviera',
-			unitNo: '512',
-			propertyType: 'apartment',
-			bedroomType: 'studio',
-			propertySize: 450,
-			builtUpArea: 450,
-			buyingPrice: 420000,
-			liquidityInvested: 30000,
-			sellingPrice: 540000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-004',
-			listingType: 'internal',
-			listedByEmails: ['agent@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo4.jpg' }],
-			propertyAddress: {
-				buildingName: 'The Address Residences',
-				area: 'Downtown Dubai',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Downtown Developments',
-			clientPhone: '+971501122334',
-			clientEmail: 'client4@example.com',
-			developer: 'Emaar Properties',
-			community: 'Downtown Dubai',
-			project: 'The Address Residences',
-			unitNo: '2801',
-			propertyType: 'apartment',
-			bedroomType: '2bed+maid',
-			propertySize: 1620,
-			builtUpArea: 1620,
-			buyingPrice: 3200000,
-			liquidityInvested: 200000,
-			sellingPrice: 3850000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-005',
-			listingType: 'portal',
-			listedByEmails: ['agent3@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo5.jpg' }],
-			propertyAddress: {
-				buildingName: 'Palm Vista',
-				area: 'Palm Jumeirah',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Palm Properties',
-			clientPhone: '+971505566778',
-			clientEmail: 'client5@example.com',
-			developer: 'Nakheel',
-			community: 'Palm Jumeirah',
-			project: 'Palm Vista',
-			unitNo: 'G-04',
-			propertyType: 'villa',
-			bedroomType: '4bed',
-			propertySize: 4200,
-			builtUpArea: 4200,
-			buyingPrice: 9500000,
-			liquidityInvested: 500000,
-			sellingPrice: 11200000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-006',
-			listingType: 'portal',
-			listedByEmails: ['agent2@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo6.jpg' }],
-			propertyAddress: {
-				buildingName: 'Creek Harbour Tower',
-				area: 'Dubai Creek Harbour',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Creek Holdings',
-			clientPhone: '+971507788990',
-			clientEmail: 'client6@example.com',
-			developer: 'Emaar Properties',
-			community: 'Dubai Creek Harbour',
-			project: 'Creek Harbour Tower',
-			unitNo: '1506',
-			propertyType: 'apartment',
-			bedroomType: '1bed',
-			propertySize: 720,
-			builtUpArea: 720,
-			buyingPrice: 980000,
-			liquidityInvested: 60000,
-			sellingPrice: 1180000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-007',
-			listingType: 'internal',
-			listedByEmails: ['agent@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo7.jpg' }],
-			propertyAddress: {
-				buildingName: 'Merano Tower',
-				area: 'Business Bay',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Bay Investments',
-			clientPhone: '+971502233445',
-			clientEmail: 'client7@example.com',
-			developer: 'Omniyat',
-			community: 'Business Bay',
-			project: 'Merano Tower',
-			unitNo: '1902',
-			propertyType: 'apartment',
-			bedroomType: '3bed',
-			propertySize: 1890,
-			builtUpArea: 1890,
-			buyingPrice: 2600000,
-			liquidityInvested: 180000,
-			sellingPrice: 3100000,
-			createdAt: new Date().toISOString()
-		},
-		{
-			id: 'lst-008',
-			listingType: 'portal',
-			listedByEmails: ['agent3@indglobal.com'],
-			mediaAssets: [{ type: 'photo', fileName: 'photo8.jpg' }],
-			propertyAddress: {
-				buildingName: 'Sobha Hartland',
-				area: 'Mohammed Bin Rashid City',
-				city: 'Dubai',
-				country: 'UAE'
-			},
-			clientName: 'Hartland Properties',
-			clientPhone: '+971509988776',
-			clientEmail: 'client8@example.com',
-			developer: 'Sobha Realty',
-			community: 'Mohammed Bin Rashid City',
-			project: 'Sobha Hartland',
-			unitNo: 'TH-12',
-			propertyType: 'townhouse',
-			bedroomType: '3bed+maid',
-			propertySize: 2750,
-			builtUpArea: 2750,
-			buyingPrice: 3800000,
-			liquidityInvested: 250000,
-			sellingPrice: 4500000,
-			createdAt: new Date().toISOString()
-		}
-	];
+	import MapPinIcon from '~icons/lucide/map-pin';
 
 	function formatPrice(value?: number): string {
 		return new Intl.NumberFormat('en-AE').format(value ?? 0);
-	}
-
-	function slugify(value: string): string {
-		return value
-			.toLowerCase()
-			.trim()
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/^-+|-+$/g, '');
-	}
-
-	function getListingSlug(listing: Listing): string {
-		return `${slugify(listing.project)}-${listing.id.toLowerCase()}`;
 	}
 
 	function getPlaceholderGalleryImages(listingId: string): string[] {
@@ -249,24 +20,18 @@
 		];
 	}
 
-	const allListings = $derived.by(() => {
-		const map = new Map<string, Listing>();
-		for (const listing of [...$listingsStore, ...mockListings]) {
-			if (!map.has(listing.id)) {
-				map.set(listing.id, listing);
-			}
-		}
-		return Array.from(map.values());
-	});
+	let { data } = $props();
 
-	const listing = $derived(allListings.find((item) => getListingSlug(item) === $page.params.slug));
+	const listing = $derived(data.firestoreListing as Listing | null);
 
 	const propertyTypeLabel = $derived(
 		(listing?.propertyType ?? '').charAt(0).toUpperCase() + (listing?.propertyType ?? '').slice(1)
 	);
 
 	const bedroomLabel = $derived(
-		listing?.bedroomType ? listing.bedroomType.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed') : 'N/A'
+		listing?.bedroomType
+			? listing.bedroomType.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed')
+			: 'N/A'
 	);
 
 	const galleryImages = $derived(listing ? getPlaceholderGalleryImages(listing.id) : []);
@@ -279,12 +44,12 @@
 				<FullLogo />
 			</a>
 			<div class="hidden h-6 w-px bg-border sm:block"></div>
-			<span class="text-base font-semibold tracking-tight text-foreground sm:text-lg">Listings</span>
+			<span class="text-base font-semibold tracking-tight text-foreground sm:text-lg">Listings</span
+			>
 		</div>
 	</header>
 
 	<main class="mx-auto max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8">
-
 		{#if !listing}
 			<div class="rounded-xl border border-border bg-card p-6 text-center">
 				<h1 class="text-xl font-semibold text-foreground">Property not found</h1>
@@ -310,12 +75,15 @@
 							<h1 class="text-2xl font-bold text-foreground sm:text-3xl">{listing.project}</h1>
 							<p class="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
 								<MapPinIcon class="h-4 w-4" />
-								{listing.propertyAddress.buildingName ?? listing.project}, {listing.propertyAddress.area ??
+								{listing.propertyAddress.buildingName ?? listing.project}, {listing.propertyAddress
+									.area ??
 									listing.community ??
 									'Area N/A'}, {listing.propertyAddress.city ?? 'City N/A'}
 							</p>
 						</div>
-						<p class="text-2xl font-bold text-foreground sm:text-3xl">AED {formatPrice(listing.sellingPrice)}</p>
+						<p class="text-2xl font-bold text-foreground sm:text-3xl">
+							AED {formatPrice(listing.sellingPrice)}
+						</p>
 					</div>
 					<div class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
 						<div class="rounded-lg bg-muted/50 p-3">
@@ -344,12 +112,12 @@
 							/>
 						</div>
 						<div class="grid grid-cols-2 gap-2 md:col-span-4 md:grid-cols-1">
-							{#each galleryImages.slice(1) as image, index}
+							{#each galleryImages.slice(1) as image, index (image)}
 								<div class="overflow-hidden rounded-lg">
 									<img
 										src={image}
 										alt={`${listing.project} gallery image ${index + 2}`}
-										class="h-28 w-full object-cover sm:h-[92px]"
+										class="h-28 w-full object-cover sm:h-23"
 										loading="lazy"
 									/>
 								</div>
@@ -365,13 +133,41 @@
 							Property Information
 						</h2>
 						<div class="space-y-3 text-sm">
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Developer</span><span class="text-right font-medium">{listing.developer}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Community</span><span class="text-right font-medium">{listing.community ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Property Size</span><span class="text-right font-medium">{listing.propertySize ?? 'N/A'} sqft</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Built Up Area</span><span class="text-right font-medium">{listing.builtUpArea ?? 'N/A'} sqft</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Plot Area</span><span class="text-right font-medium">{listing.plotArea ?? 'N/A'} sqft</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Gross Floor Area</span><span class="text-right font-medium">{listing.grossFloorArea ?? 'N/A'} sqft</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Commercial Type</span><span class="text-right font-medium">{listing.commercialSubType ?? 'N/A'}</span></div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Developer</span><span
+									class="text-right font-medium">{listing.developer}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Community</span><span
+									class="text-right font-medium">{listing.community ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Property Size</span><span
+									class="text-right font-medium">{listing.propertySize ?? 'N/A'} sqft</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Built Up Area</span><span
+									class="text-right font-medium">{listing.builtUpArea ?? 'N/A'} sqft</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Plot Area</span><span
+									class="text-right font-medium">{listing.plotArea ?? 'N/A'} sqft</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Gross Floor Area</span><span
+									class="text-right font-medium">{listing.grossFloorArea ?? 'N/A'} sqft</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Commercial Type</span><span
+									class="text-right font-medium">{listing.commercialSubType ?? 'N/A'}</span
+								>
+							</div>
 						</div>
 					</div>
 
@@ -381,10 +177,27 @@
 							Financial Details
 						</h2>
 						<div class="space-y-3 text-sm">
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Buying Price</span><span class="text-right font-medium">AED {formatPrice(listing.buyingPrice)}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Liquidity Invested</span><span class="text-right font-medium">AED {formatPrice(listing.liquidityInvested)}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Selling Price</span><span class="text-right font-medium">AED {formatPrice(listing.sellingPrice)}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Created At</span><span class="text-right font-medium">{new Date(listing.createdAt).toLocaleString()}</span></div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Buying Price</span><span
+									class="text-right font-medium">AED {formatPrice(listing.buyingPrice)}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Liquidity Invested</span><span
+									class="text-right font-medium">AED {formatPrice(listing.liquidityInvested)}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Selling Price</span><span
+									class="text-right font-medium">AED {formatPrice(listing.sellingPrice)}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Created At</span><span
+									class="text-right font-medium"
+									>{new Date(listing.createdAt).toLocaleString()}</span
+								>
+							</div>
 						</div>
 					</div>
 				</section>
@@ -396,42 +209,84 @@
 							Address Details
 						</h2>
 						<div class="space-y-3 text-sm">
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Address Line 1</span><span class="text-right font-medium">{listing.propertyAddress.addressLine1 ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Address Line 2</span><span class="text-right font-medium">{listing.propertyAddress.addressLine2 ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Building Name</span><span class="text-right font-medium">{listing.propertyAddress.buildingName ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Street</span><span class="text-right font-medium">{listing.propertyAddress.street ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Area</span><span class="text-right font-medium">{listing.propertyAddress.area ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">City</span><span class="text-right font-medium">{listing.propertyAddress.city ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Country</span><span class="text-right font-medium">{listing.propertyAddress.country ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Postal Code</span><span class="text-right font-medium">{listing.propertyAddress.postalCode ?? 'N/A'}</span></div>
-							<div class="flex justify-between gap-4"><span class="text-muted-foreground">Landmark</span><span class="text-right font-medium">{listing.propertyAddress.landmark ?? 'N/A'}</span></div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Address Line 1</span><span
+									class="text-right font-medium"
+									>{listing.propertyAddress.addressLine1 ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Address Line 2</span><span
+									class="text-right font-medium"
+									>{listing.propertyAddress.addressLine2 ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Building Name</span><span
+									class="text-right font-medium"
+									>{listing.propertyAddress.buildingName ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Street</span><span
+									class="text-right font-medium">{listing.propertyAddress.street ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Area</span><span class="text-right font-medium"
+									>{listing.propertyAddress.area ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">City</span><span class="text-right font-medium"
+									>{listing.propertyAddress.city ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Country</span><span
+									class="text-right font-medium">{listing.propertyAddress.country ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Postal Code</span><span
+									class="text-right font-medium">{listing.propertyAddress.postalCode ?? 'N/A'}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">Landmark</span><span
+									class="text-right font-medium">{listing.propertyAddress.landmark ?? 'N/A'}</span
+								>
+							</div>
 						</div>
 					</div>
 
 					<div class="space-y-6">
 						<div class="rounded-xl border border-border bg-card p-5 sm:p-6">
 							<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
-								<MailIcon class="h-5 w-5" />
-								Client & Agent Details
-							</h2>
-							<div class="space-y-3 text-sm">
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Client Name</span><span class="text-right font-medium">{listing.clientName}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Client Email</span><span class="text-right font-medium">{listing.clientEmail}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Client Phone</span><span class="text-right font-medium">{listing.clientPhone}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Listed By</span><span class="text-right font-medium break-all">{listing.listedByEmails.join(', ') || 'N/A'}</span></div>
-							</div>
-						</div>
-
-						<div class="rounded-xl border border-border bg-card p-5 sm:p-6">
-							<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
 								<FileTextIcon class="h-5 w-5" />
 								Documents & Media
 							</h2>
 							<div class="space-y-3 text-sm">
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Title Deed / Qood</span><span class="text-right font-medium">{listing.titleDeedFileName ?? 'N/A'}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Passport</span><span class="text-right font-medium">{listing.passportFileName ?? 'N/A'}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Emirates ID</span><span class="text-right font-medium">{listing.emiratesIdFileName ?? 'N/A'}</span></div>
-								<div class="flex justify-between gap-4"><span class="text-muted-foreground">Media Assets</span><span class="text-right font-medium">{listing.mediaAssets?.length ?? 0}</span></div>
+								<div class="flex justify-between gap-4">
+									<span class="text-muted-foreground">Title Deed / Qood</span><span
+										class="text-right font-medium">{listing.titleDeedFileName ?? 'N/A'}</span
+									>
+								</div>
+								<div class="flex justify-between gap-4">
+									<span class="text-muted-foreground">Passport</span><span
+										class="text-right font-medium">{listing.passportFileName ?? 'N/A'}</span
+									>
+								</div>
+								<div class="flex justify-between gap-4">
+									<span class="text-muted-foreground">Emirates ID</span><span
+										class="text-right font-medium">{listing.emiratesIdFileName ?? 'N/A'}</span
+									>
+								</div>
+								<div class="flex justify-between gap-4">
+									<span class="text-muted-foreground">Media Assets</span><span
+										class="text-right font-medium">{listing.mediaAssets?.length ?? 0}</span
+									>
+								</div>
 							</div>
 						</div>
 					</div>

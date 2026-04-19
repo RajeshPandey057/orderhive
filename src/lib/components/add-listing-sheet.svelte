@@ -72,6 +72,7 @@
 	>([]);
 	let nextAssetId = $state(1);
 	let errors = $state<Record<string, string>>({});
+	let saving = $state(false);
 	let developerPopoverOpen = $state(false);
 	let pictureInputRef: HTMLInputElement | undefined = $state(undefined);
 	let videoInputRef: HTMLInputElement | undefined = $state(undefined);
@@ -305,6 +306,9 @@
 		<form
 			enctype="multipart/form-data"
 			{...createListing.enhance(async ({ form, submit }) => {
+				// Client-side pre-validation for instant UX feedback
+				if (!validate()) return;
+
 				// Populate hidden file inputs via DataTransfer for media assets
 				const photos = mediaAssets.filter((a) => a.type === 'photo').map((a) => a.file);
 				const videos = mediaAssets.filter((a) => a.type === 'video').map((a) => a.file);
@@ -319,9 +323,7 @@
 					videoInputRef.files = dt.files;
 				}
 
-				// Client-side pre-validation for instant UX feedback
-				if (!validate()) return;
-
+				saving = true;
 				try {
 					await submit();
 					const issues = createListing.fields.allIssues();
@@ -333,6 +335,8 @@
 					}
 				} catch {
 					toast.error('Failed to add listing. Please try again.');
+				} finally {
+					saving = false;
 				}
 			})}
 		>
@@ -341,7 +345,7 @@
 			<input type="hidden" name="createdByEmail" value={currentUserEmail} />
 			<input type="hidden" name="listingType" value={listingType} />
 			<input type="hidden" name="developer" value={developer} />
-			{#each listedByEmails.map((e) => e.trim()).filter(Boolean) as email}
+			{#each listedByEmails.map((e) => e.trim()).filter(Boolean) as email (email)}
 				<input type="hidden" name="listedByEmails" value={email} />
 			{/each}
 			<input
@@ -369,8 +373,8 @@
 					<Sheet.Close class={buttonVariants({ variant: 'outline', size: 'sm' })}>
 						<Pencil class="mr-2 h-4 w-4" /> Save as Draft
 					</Sheet.Close>
-					<Button type="submit" size="sm" disabled={!!createListing.pending}>
-						{#if createListing.pending}
+					<Button type="submit" size="sm" disabled={saving}>
+						{#if saving}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 							Saving...
 						{:else}
@@ -418,27 +422,25 @@
 				</div>
 
 				{#if activeTab === 'property-details'}
-					<!--
-			<Field.Set>
-				<Field.Legend class="text-lg font-medium">Listing Type</Field.Legend>
-				<div class="mt-3 flex gap-2">
-					<Button
-						type="button"
-						variant={listingType === 'internal' ? 'default' : 'outline'}
-						onclick={() => (listingType = 'internal')}
-					>
-						Internal
-					</Button>
-					<Button
-						type="button"
-						variant={listingType === 'portal' ? 'default' : 'outline'}
-						onclick={() => (listingType = 'portal')}
-					>
-						Portal
-					</Button>
-				</div>
-			</Field.Set>
-			-->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Listing Type</Field.Legend>
+						<div class="mt-3 flex gap-2">
+							<Button
+								type="button"
+								variant={listingType === 'internal' ? 'default' : 'outline'}
+								onclick={() => (listingType = 'internal')}
+							>
+								Internal
+							</Button>
+							<Button
+								type="button"
+								variant={listingType === 'portal' ? 'default' : 'outline'}
+								onclick={() => (listingType = 'portal')}
+							>
+								Portal
+							</Button>
+						</div>
+					</Field.Set>
 
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
@@ -610,7 +612,7 @@
 											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 											bind:value={bedroomType}
 										>
-											{#each apartmentBedroomTypes as option}
+											{#each apartmentBedroomTypes as option (option)}
 												<option value={option}>{formatBedroomLabel(option)}</option>
 											{/each}
 										</select>
@@ -632,7 +634,7 @@
 											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 											bind:value={bedroomType}
 										>
-											{#each villaTownhouseBedroomTypes as option}
+											{#each villaTownhouseBedroomTypes as option (option)}
 												<option value={option}>{formatBedroomLabel(option)}</option>
 											{/each}
 										</select>
