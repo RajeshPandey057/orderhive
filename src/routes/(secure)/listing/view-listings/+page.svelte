@@ -98,7 +98,11 @@
 			.replace(/^-+|-+$/g, '');
 	}
 
-	function getListingUrl(listing: Listing): string {
+	function getDetailUrl(listing: Listing): string {
+		return `/listing/view-listings/${listing.id.toLowerCase()}`;
+	}
+
+	function getPortalUrl(listing: Listing): string {
 		return `/listings/${slugify(listing.project)}-${listing.id.toLowerCase()}`;
 	}
 
@@ -316,13 +320,11 @@
 					role="link"
 					tabindex="0"
 					aria-label={`View details for ${listing.project}`}
-					onclick={() => {
-						if (isPortal) window.location.href = getListingUrl(listing);
-					}}
+					onclick={() => (window.location.href = getDetailUrl(listing))}
 					onkeydown={(e) => {
-						if (isPortal && (e.key === 'Enter' || e.key === ' ')) {
+						if (e.key === 'Enter' || e.key === ' ') {
 							e.preventDefault();
-							window.location.href = getListingUrl(listing);
+							window.location.href = getDetailUrl(listing);
 						}
 					}}
 				>
@@ -422,7 +424,7 @@
 							</div>
 							{#if isPortal}
 								<a
-									href={getListingUrl(listing)}
+									href={getPortalUrl(listing)}
 									onclick={(e) => e.stopPropagation()}
 									class="text-xs font-medium text-teal-600 hover:underline"
 								>
