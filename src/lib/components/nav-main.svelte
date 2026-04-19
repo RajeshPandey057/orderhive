@@ -11,6 +11,7 @@
 			url: string;
 			icon?: typeof ChevronRightIcon;
 			isActive?: boolean;
+			external?: boolean;
 			items?: {
 				title: string;
 				url: string;
@@ -64,18 +65,23 @@
 					{/snippet}
 				</Collapsible.Root>
 			{:else}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent={item.title} isActive={item.isActive}>
-						{#snippet child({ props })}
-							<a href={item.url} {...props}>
-								{#if item.icon}
-									<item.icon />
-								{/if}
-								<span>{item.title}</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton tooltipContent={item.title} isActive={item.isActive}>
+					{#snippet child({ props })}
+						<a
+							href={item.url}
+							{...props}
+							target={item.external ? '_blank' : undefined}
+							rel={item.external ? 'noopener noreferrer' : undefined}
+						>
+							{#if item.icon}
+								<item.icon />
+							{/if}
+							<span>{item.title}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
 			{/if}
 		{/each}
 	</Sidebar.Menu>

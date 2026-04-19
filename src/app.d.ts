@@ -279,6 +279,59 @@ declare global {
 		updatedAt: FieldValue;
 	};
 	type APIResponse<T = object> = { success: false; error: string } | { success: true; data: T };
+	type Listing = {
+		id: string;
+		listingType: 'internal' | 'portal';
+		listedByEmails: string[];
+		mediaAssets: { type: 'photo' | 'video'; fileName: string }[];
+		propertyAddress: {
+			addressLine1?: string;
+			addressLine2?: string;
+			buildingName?: string;
+			street?: string;
+			area?: string;
+			city?: string;
+			country?: string;
+			postalCode?: string;
+			landmark?: string;
+		};
+		clientName: string;
+		clientPhone: string;
+		clientEmail: string;
+		developer: string;
+		community?: string;
+		project: string;
+		unitNo: string;
+		propertyType: 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
+		bedroomType?:
+			| 'studio'
+			| '1bed'
+			| '2bed'
+			| '2bed+maid'
+			| '3bed'
+			| '3bed+maid'
+			| '4bed'
+			| '5bed'
+			| '6-7bed'
+			| 'duplex'
+			| 'penthouse'
+			| 'podium-townhouse';
+		commercialSubType?: 'office' | 'warehouse';
+		propertySize?: number;
+		plotArea?: number;
+		builtUpArea?: number;
+		grossFloorArea?: number;
+		titleDeedFileName?: string;
+		passportFileName?: string;
+		emiratesIdFileName?: string;
+		videoFileName?: string;
+		picturesFileName?: string;
+		floorPlansFileName?: string;
+		buyingPrice: number;
+		liquidityInvested: number;
+		sellingPrice: number;
+		createdAt: string;
+	};
 	namespace Superforms {
 		type Message = { type: 'error' | 'success' | 'warning'; text: string };
 	}

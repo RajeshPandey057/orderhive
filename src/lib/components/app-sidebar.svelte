@@ -1,11 +1,13 @@
 <script lang="ts" module>
 	import LucideBell from '~icons/lucide/bell';
+	import LucideBuilding2 from '~icons/lucide/building-2';
 	import LucideBookMarked from '~icons/lucide/book-marked';
 	import LucideCalendarClock from '~icons/lucide/calendar-clock';
 	import LucideClipboardCheck from '~icons/lucide/clipboard-check';
 	import LucideUploadCloud from '~icons/lucide/cloud-upload';
 	import LucideFileText from '~icons/lucide/file-text';
 	import LucideLayoutPanelTop from '~icons/lucide/layout-panel-top';
+	import LucideList from '~icons/lucide/list';
 	import LucideReceipt from '~icons/lucide/receipt';
 	import LucideShield from '~icons/lucide/shield';
 	import LucideUserCog from '~icons/lucide/user-cog';
@@ -17,6 +19,8 @@
 		'Sales Tracker': LucideBookMarked,
 		Notifications: LucideBell,
 		'Access Management': LucideShield,
+		'Listing Management': LucideBuilding2,
+		'View Listings': LucideList,
 		'All Sales': LucideReceipt,
 		'Team Management': LucideUsers,
 		'Pending Sales': LucideClipboardCheck,
@@ -64,7 +68,8 @@
 					title: item.title,
 					url: item.url,
 					icon: getIconForMenuItem(item.title),
-					isActive: isMenuItemActive(item.url, page.url.pathname)
+					isActive: isMenuItemActive(item.url, page.url.pathname),
+					external: item.external
 				}))
 			: []
 	);

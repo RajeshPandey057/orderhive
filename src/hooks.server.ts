@@ -17,7 +17,7 @@ export const handle: Handle = ({ event, resolve }) => {
 
 	// In local dev, inject a super-admin user so auth is not required
 	if (import.meta.env.DEV) {
-		locals.user = { uid: 'dev-user', email: 'dev@localhost', role: 'super-admin' };
+		locals.user = { uid: 'dev-user', email: 'dev@example.com', role: 'super-admin' };
 		return resolve(event);
 	}
 
