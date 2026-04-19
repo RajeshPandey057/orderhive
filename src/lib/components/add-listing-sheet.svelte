@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -332,6 +333,7 @@
 						open = false;
 						toast.success('Property listing added');
 						resetForm();
+						await invalidateAll();
 					}
 				} catch {
 					toast.error('Failed to add listing. Please try again.');
@@ -421,7 +423,7 @@
 					</div>
 				</div>
 
-				{#if activeTab === 'property-details'}
+				<div class:hidden={activeTab !== 'property-details'}>
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Listing Type</Field.Legend>
 						<div class="mt-3 flex gap-2">
@@ -985,7 +987,8 @@
 							</div>
 						</Field.Group>
 					</Field.Set>
-				{:else}
+				</div>
+				<div class:hidden={activeTab !== 'property-photo-videos'}>
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Photo/Videos</Field.Legend>
 						<Field.Group>
@@ -1052,7 +1055,7 @@
 							{/if}
 						</Field.Group>
 					</Field.Set>
-				{/if}
+				</div>
 			</div>
 		</form>
 	</Sheet.Content>

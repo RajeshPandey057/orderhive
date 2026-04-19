@@ -1,23 +1,28 @@
 import { form } from '$app/server';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
-import { error, redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
 const toUploadedFile = async (file: File | null | undefined, path: string) => {
 	if (!file || file.size <= 0) return null;
-	const uploaded = await uploadFileWithLink(file, path);
-	if (!uploaded) return null;
+	try {
+		const uploaded = await uploadFileWithLink(file, path);
+		if (!uploaded) return null;
 
-	return {
-		...uploaded,
-		original: {
-			name: file.name,
-			size: file.size,
-			type: file.type,
-			lastModified: file.lastModified
-		}
-	};
+		return {
+			...uploaded,
+			original: {
+				name: file.name,
+				size: file.size,
+				type: file.type,
+				lastModified: file.lastModified
+			}
+		};
+	} catch (err) {
+		console.error(`File upload failed for ${path}:`, err);
+		return null;
+	}
 };
 
 async function generateListingId(): Promise<string> {
@@ -116,15 +121,18 @@ const listingSchema = z
 			.default([]),
 
 		// Pricing
-		buyingPrice: z.coerce.number().min(0, 'Buying price is required'),
-		liquidityInvested: z.coerce.number().min(0, 'Liquidity invested is required'),
-		sellingPrice: z.coerce.number().min(0, 'Selling price is required'),
+		buyingPrice: z.number().min(0, 'Buying price is required'),
+		liquidityInvested: z.number().min(0, 'Liquidity invested is required'),
+		sellingPrice: z.number().min(0, 'Selling price is required'),
 
 		// Listed by agents
-		listedByEmails: z.preprocess(
-			(val) => (typeof val === 'string' ? [val] : val),
+		listedByEmails: z.union([
+			z
+				.string()
+				.min(1)
+				.transform((s): string[] => [s]),
 			z.array(z.string().min(1)).min(1, 'At least one agent is required')
-		)
+		])
 	})
 	.superRefine((data, ctx) => {
 		if (data.propertyType === 'apartment') {
@@ -227,7 +235,17 @@ const listingSchema = z
 		}
 	});
 
-export const createListing = form(listingSchema, async (data) => {
+export const createListing = form('unchecked', async (rawData, issue) => {
+	const result = listingSchema.safeParse(rawData);
+	if (!result.success) {
+		for (const err of result.error.issues) {
+			const key = err.path.join('.') || '_form';
+			issue[key] = err.message;
+		}
+		return;
+	}
+	const data = result.data;
+
 	const timestamp = FieldValue.serverTimestamp();
 	const listingId = await generateListingId();
 	const basePath = `listings/${data.createdByUid}/${listingId}`;
@@ -244,8 +262,10 @@ export const createListing = form(listingSchema, async (data) => {
 	const videoFileInputs = Array.isArray(data.videoFiles) ? data.videoFiles : [];
 
 	const [uploadedPictures, uploadedVideos] = await Promise.all([
-		Promise.all(pictureFileInputs.map((f) => toUploadedFile(f, `${basePath}/pictures`))),
-		Promise.all(videoFileInputs.map((f) => toUploadedFile(f, `${basePath}/video`)))
+		Promise.all(
+			pictureFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/pictures`))
+		),
+		Promise.all(videoFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/video`)))
 	]);
 
 	const mediaAssets = [
@@ -289,7 +309,9 @@ export const createListing = form(listingSchema, async (data) => {
 		buyingPrice: data.buyingPrice,
 		liquidityInvested: data.liquidityInvested,
 		sellingPrice: data.sellingPrice,
-		listedByEmails: data.listedByEmails,
+		listedByEmails: Array.isArray(data.listedByEmails)
+			? data.listedByEmails
+			: [data.listedByEmails],
 		// Full file metadata for downloads / compliance
 		attachments: {
 			titleDeed: titleDeedFile ?? null,
@@ -310,6 +332,4 @@ export const createListing = form(listingSchema, async (data) => {
 		console.error('Failed to save listing to Firestore', err);
 		throw error(500, 'Unable to save listing right now. Please try again.');
 	}
-
-	redirect(303, '/listing/listing-management');
 });
