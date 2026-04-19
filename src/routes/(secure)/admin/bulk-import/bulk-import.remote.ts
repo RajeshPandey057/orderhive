@@ -608,6 +608,17 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			})),
 			dealOwners,
 			dealOwnerIds: dealOwners.map((o) => o.userId),
+			splits: dealOwners.map((o) => ({
+				agentId: o.userId,
+				agentName: o.name,
+				agentEmail: o.email,
+				agentPhotoURL: o.photoURL,
+				ownerRole: (o.ownerRole === 'closer' && dealOwners.indexOf(o) >= 2
+					? 'extra'
+					: o.ownerRole) as 'caller' | 'closer' | 'extra',
+				percentage: o.split
+			})),
+			splitAgentIds: dealOwners.map((o) => o.userId),
 			dealStage: primary.deal_stage ?? '',
 			paymentValue: primary.payment_value ?? 0,
 			bookingFormFile: makeFileRecord(primary.booking_form_url),

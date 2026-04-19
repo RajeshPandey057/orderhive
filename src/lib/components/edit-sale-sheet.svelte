@@ -3,9 +3,10 @@
 	import { resolve } from '$app/paths';
 	import AMLFormInline from '$lib/components/aml-form-inline.svelte';
 	import DealPercentage from '$lib/components/deal-percentage.svelte';
+	import type { SplitEntry } from '$lib/components/order-split.svelte';
+	import OrderSplit from '$lib/components/order-split.svelte';
 	import PhoneInput from '$lib/components/phone-input.svelte';
 	import ReferralFormInline from '$lib/components/referral-form-inline.svelte';
-	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
@@ -19,7 +20,7 @@
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
-	import { firekitCollection, firekitUser } from 'svelte-firekit';
+	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import CheckCircled from '~icons/lucide/check-circle-2';
@@ -37,15 +38,26 @@
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
 	import { updateSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
-	import { searchUsers as searchUsersRemote } from '../../routes/(secure)/users.remote';
 
 	let {
 		userRole,
 		sale
 	}: {
-		userRole?: 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin';
+		userRole?:
+			| 'admin'
+			| 'agent'
+			| 'compliance'
+			| 'finance'
+			| 'super-admin'
+			| 'manager'
+			| 'senior-manager';
 		sale: Sale;
 	} = $props();
+
+	const canEditSale = $derived(userRole === 'admin' || userRole === 'super-admin');
+	const isFinanceRole = $derived(userRole === 'finance');
+	const isComplianceRole = $derived(userRole === 'compliance');
+	const isReadOnly = $derived(!canEditSale && !isFinanceRole && !isComplianceRole);
 
 	const canUploadManually = $derived(
 		userRole === 'admin' || userRole === 'compliance' || userRole === 'super-admin'
@@ -53,7 +65,6 @@
 
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
-	let nextOwnerKey = 0;
 	let tentativeEligibilityDate = $state<DateValue | undefined>(undefined);
 	let saleDateValue = $state<DateValue | undefined>(undefined);
 	let saleDatePickerOpen = $state(false);
@@ -104,52 +115,8 @@
 	};
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
-	let ownerPopoverOpen = $state<Record<number, boolean>>({ 0: false });
-	let ownerSearchValues = $state<Record<number, string>>({ 0: '' });
-
-	type FirestoreUser = {
-		id: string;
-		email: string;
-		displayName?: string;
-		photoURL?: string;
-	};
-
-	type DealOwnerRow = {
-		key: number;
-		userId: string;
-		email: string;
-		name: string;
-		ownerRole: 'caller' | 'closer';
-		split: number;
-		photoURL?: string;
-	};
 
 	const rolesCollection = firekitCollection<Role>('roles');
-
-	// Per-owner search results and loading state
-	let ownerSearchResults = $state<Record<number, FirestoreUser[]>>({ 0: [] });
-	let ownerSearchLoading = $state<Record<number, boolean>>({ 0: false });
-
-	let searchDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
-
-	const searchUsers = async (ownerKey: number, term: string) => {
-		ownerSearchLoading[ownerKey] = true;
-		try {
-			ownerSearchResults[ownerKey] = await searchUsersRemote({ q: term.trim() });
-		} catch {
-			ownerSearchResults[ownerKey] = [];
-		} finally {
-			ownerSearchLoading[ownerKey] = false;
-		}
-	};
-
-	$effect(() => {
-		for (const [keyStr, term] of Object.entries(ownerSearchValues)) {
-			const key = Number(keyStr);
-			if (searchDebounceTimers[key]) clearTimeout(searchDebounceTimers[key]);
-			searchDebounceTimers[key] = setTimeout(() => searchUsers(key, term), 300);
-		}
-	});
 
 	// Derived options for manager dropdowns (filtered by agentRole)
 	const seniorManagerOptions = $derived(
@@ -168,62 +135,56 @@
 		updateSale.fields.closerSeniorManagerEmail?.set(selectedCloserSeniorManagerEmail || undefined);
 	});
 
-	let dealOwners = $state<DealOwnerRow[]>([
-		{
-			key: nextOwnerKey++,
-			userId: firekitUser.uid ?? '',
-			email: firekitUser.email ?? '',
-			name: firekitUser.displayName ?? 'You',
-			ownerRole: 'caller',
-			split: 100,
-			photoURL: firekitUser.photoURL ?? undefined
+	// Initialize splits from existing sale data (prefer new splits[], fall back to dealOwners[])
+	function initSplitsFromSale(s: Sale): SplitEntry[] {
+		if (Array.isArray(s.splits) && s.splits.length > 0) {
+			return s.splits.map((split, idx) => ({
+				key: idx,
+				agentId: split.agentId,
+				agentName: split.agentName,
+				agentEmail: (split as { agentEmail?: string }).agentEmail ?? '',
+				agentPhotoURL: (split as { agentPhotoURL?: string }).agentPhotoURL ?? undefined,
+				ownerRole: split.ownerRole,
+				percentage: split.percentage
+			}));
 		}
-	]);
+		// Fall back to legacy dealOwners
+		return s.dealOwners.map((owner, idx) => ({
+			key: idx,
+			agentId: owner.userId,
+			agentName: owner.name,
+			agentEmail: owner.email,
+			agentPhotoURL: owner.photoURL ?? undefined,
+			ownerRole: (idx >= 2 ? 'extra' : owner.ownerRole) as 'caller' | 'closer' | 'extra',
+			percentage: owner.split
+		}));
+	}
 
-	const syncDealOwners = () => {
-		updateSale.fields.dealOwners.set(
-			dealOwners.map((owner) => ({
-				userId: owner.userId,
-				email: owner.email,
-				name: owner.name,
-				photoURL: owner.photoURL || '',
-				ownerRole: owner.ownerRole,
-				split: Number(owner.split) || 0
+	let dealSplits = $state<SplitEntry[]>([]);
+
+	$effect(() => {
+		dealSplits = initSplitsFromSale(sale);
+	});
+
+	const syncSplits = (splits: SplitEntry[]) => {
+		updateSale.fields.splits.set(
+			splits.map((s) => ({
+				agentId: s.agentId,
+				agentName: s.agentName,
+				agentEmail: s.agentEmail,
+				agentPhotoURL: s.agentPhotoURL ?? '',
+				ownerRole: s.ownerRole,
+				percentage: Number(s.percentage) || 0
 			}))
 		);
 	};
 
-	syncDealOwners();
+	$effect(() => {
+		syncSplits(dealSplits);
+	});
 
-	const splitTotal = $derived(
-		dealOwners.reduce((total, owner) => total + (Number(owner.split) || 0), 0)
-	);
+	const splitTotal = $derived(dealSplits.reduce((t, s) => t + (Number(s.percentage) || 0), 0));
 	const splitRemaining = $derived(100 - splitTotal);
-	const canEditSplit = $derived(userRole === 'compliance' || userRole === 'finance');
-	const ownerGridClass = $derived(
-		dealOwners.length > 1
-			? 'grid-cols-[minmax(0,1.6fr)_160px_160px_40px]'
-			: 'grid-cols-[minmax(0,1.6fr)_160px_40px]'
-	);
-
-	let splitPreset = $state<'70/30' | '55/45'>('70/30');
-
-	const callerSplit = (preset: '70/30' | '55/45') => (preset === '70/30' ? 70 : 55);
-	const closerSplit = (preset: '70/30' | '55/45') => (preset === '70/30' ? 30 : 45);
-
-	const handlePresetChange = (preset: '70/30' | '55/45') => {
-		splitPreset = preset;
-		dealOwners = dealOwners.map((owner, idx) => ({
-			...owner,
-			split:
-				idx < 2
-					? owner.ownerRole === 'caller'
-						? callerSplit(preset)
-						: closerSplit(preset)
-					: owner.split
-		}));
-		syncDealOwners();
-	};
 
 	// Track uploaded files
 	let uploadedFiles = $state<Record<string, File | null>>({
@@ -356,115 +317,6 @@
 		}
 		const input = document.getElementById(`joint-${fieldName}-${buyerKey}`) as HTMLInputElement;
 		if (input) input.value = '';
-	};
-
-	const handleOwnerSelect = (ownerKey: number, userId: string) => {
-		const selectedUser = (ownerSearchResults[ownerKey] ?? []).find(
-			(user: FirestoreUser) => user.id === userId
-		);
-
-		dealOwners = dealOwners.map((owner) =>
-			owner.key === ownerKey
-				? {
-						...owner,
-						userId,
-						email: selectedUser?.email ?? '',
-						name: selectedUser?.displayName ?? selectedUser?.email ?? 'Owner',
-						photoURL: selectedUser?.photoURL
-					}
-				: owner
-		);
-
-		syncDealOwners();
-	};
-
-	const handleSplitChange = (ownerKey: number, value: string) => {
-		const numericSplit = Number(value);
-		dealOwners = dealOwners.map((owner) =>
-			owner.key === ownerKey
-				? {
-						...owner,
-						split: Number.isNaN(numericSplit) ? 0 : numericSplit
-					}
-				: owner
-		);
-
-		syncDealOwners();
-	};
-
-	const handleRoleChange = (ownerKey: number, role: 'caller' | 'closer') => {
-		dealOwners = dealOwners.map((owner) =>
-			owner.key === ownerKey
-				? {
-						...owner,
-						ownerRole: role,
-						split: canEditSplit
-							? owner.split
-							: role === 'caller'
-								? callerSplit(splitPreset)
-								: closerSplit(splitPreset)
-					}
-				: owner
-		);
-		syncDealOwners();
-	};
-
-	const addDealOwner = () => {
-		const isFirstTwo = dealOwners.length < 2;
-		const defaultRole: 'caller' | 'closer' = 'closer';
-		const defaultSplit = isFirstTwo
-			? canEditSplit
-				? Math.max(0, splitRemaining)
-				: closerSplit(splitPreset)
-			: 0;
-
-		// When adding the 2nd agent, reset the first (solo caller at 100%) to the preset split
-		if (dealOwners.length === 1 && !canEditSplit) {
-			dealOwners = dealOwners.map((owner) => ({
-				...owner,
-				split: callerSplit(splitPreset)
-			}));
-		}
-
-		const newOwnerKey = nextOwnerKey++;
-		ownerPopoverOpen[newOwnerKey] = false;
-		ownerSearchValues[newOwnerKey] = '';
-		ownerSearchResults[newOwnerKey] = [];
-		ownerSearchLoading[newOwnerKey] = false;
-		// Trigger an initial full-load for the new owner's dropdown
-		searchUsers(newOwnerKey, '');
-
-		dealOwners = [
-			...dealOwners,
-			{
-				key: newOwnerKey,
-				userId: '',
-				email: '',
-				name: '',
-				ownerRole: defaultRole,
-				split: defaultSplit
-			}
-		];
-
-		syncDealOwners();
-	};
-
-	const removeDealOwner = (ownerKey: number) => {
-		if (dealOwners.length === 1) return;
-		delete ownerPopoverOpen[ownerKey];
-		delete ownerSearchValues[ownerKey];
-		delete ownerSearchResults[ownerKey];
-		delete ownerSearchLoading[ownerKey];
-		if (searchDebounceTimers[ownerKey]) clearTimeout(searchDebounceTimers[ownerKey]);
-		delete searchDebounceTimers[ownerKey];
-		dealOwners = dealOwners.filter((owner) => owner.key !== ownerKey);
-
-		// When only one agent remains, give them 100%
-		if (dealOwners.length === 1) {
-			dealOwners = dealOwners.map((owner) => ({ ...owner, split: 100 }));
-		}
-
-		syncDealOwners();
 	};
 
 	const saleTypes = [
@@ -667,21 +519,8 @@
 			tentativeEligibilityDate = parseDate(sale.tentativeEligibilityDate.slice(0, 10));
 		}
 
-		dealOwners = sale.dealOwners.map((owner, index) => ({
-			key: index,
-			userId: owner.userId,
-			email: owner.email,
-			name: owner.name,
-			ownerRole: owner.ownerRole,
-			split: owner.split,
-			photoURL: owner.photoURL
-		}));
-		nextOwnerKey = dealOwners.length;
-		ownerPopoverOpen = Object.fromEntries(dealOwners.map((owner) => [owner.key, false]));
-		ownerSearchValues = Object.fromEntries(dealOwners.map((owner) => [owner.key, '']));
-		ownerSearchResults = Object.fromEntries(dealOwners.map((owner) => [owner.key, []]));
-		ownerSearchLoading = Object.fromEntries(dealOwners.map((owner) => [owner.key, false]));
-		syncDealOwners();
+		dealSplits = initSplitsFromSale(sale);
+		syncSplits(dealSplits);
 
 		jointBuyers = sale.jointBuyers.map((_, index) => ({ key: index }));
 		nextJointKey = jointBuyers.length;
@@ -2124,302 +1963,12 @@
 
 			<!-- Deal Owners Section -->
 			<Field.Set>
-				<Field.Legend
-					class={[
-						'flex items-center justify-between text-lg font-medium',
-						{
-							'flex-wrap gap-2 sm:flex-nowrap': splitRemaining !== 0
-						}
-					]}
-				>
-					<span>Deal Owners</span>
-					<span
-						class={[
-							'ml-4 text-right text-sm',
-							{
-								'text-muted-foreground': splitRemaining === 0,
-								'text-destructive': splitRemaining !== 0
-							}
-						]}
-					>
-						{splitRemaining === 0
-							? 'Split totals 100%'
-							: splitRemaining > 0
-								? `Remaining ${splitRemaining.toFixed(0)}%`
-								: `Over by ${Math.abs(splitRemaining).toFixed(0)}%`}
-					</span>
-				</Field.Legend>
-
-				<div class="space-y-3 rounded-xl border border-border/60 bg-background/60">
-					<div
-						class="grid {ownerGridClass} items-center gap-4 rounded-t-xl bg-muted/30 px-4 py-3 text-sm font-medium text-muted-foreground"
-					>
-						<span>Owners</span>
-						<span class="text-center">Select Role</span>
-						{#if dealOwners.length > 1}
-							{#if canEditSplit}
-								<span class="text-center">Split %</span>
-							{:else}
-								<Select.Root
-									type="single"
-									value={splitPreset}
-									onValueChange={(value) => handlePresetChange(value as '70/30' | '55/45')}
-								>
-									<Select.Trigger class="w-full">
-										<span>{splitPreset}</span>
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="70/30">
-											<div class="flex flex-col text-left">
-												<span class="text-sm font-medium">70/30</span>
-												<span class="text-xs text-muted-foreground">Caller 70% / Closer 30%</span>
-											</div>
-										</Select.Item>
-										<Select.Item value="55/45">
-											<div class="flex flex-col text-left">
-												<span class="text-sm font-medium">55/45</span>
-												<span class="text-xs text-muted-foreground">Caller 55% / Closer 45%</span>
-											</div>
-										</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							{/if}
-						{/if}
-						<span></span>
-					</div>
-
-					{#each dealOwners as owner, index (owner.key)}
-						<div
-							class="grid {ownerGridClass} items-center gap-4 border-t border-border/40 px-4 py-3"
-						>
-							<div class="flex min-w-0 items-center gap-3 md:gap-4">
-								<Avatar.Root
-									class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase"
-								>
-									{#if owner.photoURL}
-										<Avatar.Image src={owner.photoURL} alt={owner.name || owner.email} />
-									{/if}
-									<Avatar.Fallback>{owner.name?.[0] || owner.email?.[0] || 'A'}</Avatar.Fallback>
-								</Avatar.Root>
-								<div class="min-w-0 flex-1 space-y-1">
-									<Popover.Root bind:open={ownerPopoverOpen[owner.key]}>
-										<Popover.Trigger class="w-full">
-											<Button
-												role="combobox"
-												variant="outline"
-												type="button"
-												class="h-auto w-full justify-start gap-2 px-3 py-2"
-											>
-												<div class="flex min-w-0 flex-col overflow-hidden text-left">
-													<span class="truncate text-sm leading-tight font-medium">
-														{owner.userId === firekitUser.uid ? 'You' : owner.name || 'Add owner'}
-													</span>
-													<span class="truncate text-xs leading-tight text-muted-foreground">
-														{owner.email || 'Select an agent…'}
-													</span>
-												</div>
-											</Button>
-										</Popover.Trigger>
-										<Popover.Content class="w-72 p-0" align="start">
-											<Command.Root shouldFilter={false}>
-												<Command.Input
-													placeholder="Search agent…"
-													bind:value={ownerSearchValues[owner.key]}
-												/>
-												<Command.List>
-													<Command.Empty>
-														{#if ownerSearchLoading[owner.key]}
-															<span
-																class="flex items-center gap-2 py-2 text-sm text-muted-foreground"
-															>
-																<Loader2 class="h-3 w-3 animate-spin" /> Searching…
-															</span>
-														{:else}
-															No agent found.
-														{/if}
-													</Command.Empty>
-													<Command.Group>
-														{#each ownerSearchResults[owner.key] ?? [] as user (user.id)}
-															<Command.Item
-																value={user.id}
-																onSelect={() => {
-																	handleOwnerSelect(owner.key, user.id);
-																	ownerPopoverOpen[owner.key] = false;
-																	ownerSearchValues[owner.key] = '';
-																}}
-															>
-																<div class="flex flex-col">
-																	<span class="text-sm font-medium">
-																		{user.displayName ?? user.email ?? 'Owner'}
-																	</span>
-																	{#if user.email}
-																		<span class="text-xs text-muted-foreground">{user.email}</span>
-																	{/if}
-																</div>
-															</Command.Item>
-														{/each}
-													</Command.Group>
-												</Command.List>
-											</Command.Root>
-										</Popover.Content>
-									</Popover.Root>
-									<input
-										class="sr-only"
-										{...updateSale.fields.dealOwners[index]?.userId.as('text')}
-										value={owner.userId}
-									/>
-									<input
-										class="sr-only"
-										{...updateSale.fields.dealOwners[index]?.email.as('email')}
-										value={owner.email}
-									/>
-									{#each updateSale.fields.dealOwners[index]?.userId.issues() ?? [] as issue, i (i)}
-										<Field.Error class="text-xs text-destructive">{issue.message}</Field.Error>
-									{/each}
-									{#each updateSale.fields.dealOwners[index]?.email.issues() ?? [] as issue, i (i)}
-										<Field.Error class="text-xs text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</div>
-							</div>
-
-							<div class="flex items-center justify-center">
-								{#if dealOwners.length === 1}
-									<span
-										class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
-									>
-										100%
-									</span>
-									<input
-										class="sr-only"
-										name={updateSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
-											`dealOwners[${index}].ownerRole`}
-										value={owner.ownerRole}
-									/>
-								{:else if index < 2}
-									<Select.Root
-										type="single"
-										value={owner.ownerRole}
-										onValueChange={(value) =>
-											handleRoleChange(owner.key, value as 'caller' | 'closer')}
-									>
-										<Select.Trigger class="w-full">
-											<span class="capitalize">{owner.ownerRole}</span>
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="caller">
-												<div class="flex flex-col text-left">
-													<span class="text-sm font-medium">Caller</span>
-													<span class="text-xs text-muted-foreground"
-														>{callerSplit(splitPreset)}% split</span
-													>
-												</div>
-											</Select.Item>
-											<Select.Item value="closer">
-												<div class="flex flex-col text-left">
-													<span class="text-sm font-medium">Closer</span>
-													<span class="text-xs text-muted-foreground"
-														>{closerSplit(splitPreset)}% split</span
-													>
-												</div>
-											</Select.Item>
-										</Select.Content>
-									</Select.Root>
-									<input
-										class="sr-only"
-										name={updateSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
-											`dealOwners[${index}].ownerRole`}
-										value={owner.ownerRole}
-									/>
-								{:else}
-									<input
-										class="sr-only"
-										name={updateSale.fields.dealOwners[index]?.ownerRole?.as('text').name ??
-											`dealOwners[${index}].ownerRole`}
-										value={owner.ownerRole}
-									/>
-								{/if}
-							</div>
-
-							{#if dealOwners.length > 1}
-								{#if index < 2}
-									{#if canEditSplit}
-										<div class="flex items-center justify-end gap-2">
-											<Input
-												{...updateSale.fields.dealOwners[index]?.split.as('number')}
-												class="h-10 w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-												type="number"
-												min="0"
-												max="100"
-												step="1"
-												value={owner.split}
-												oninput={(event) =>
-													handleSplitChange(owner.key, (event.target as HTMLInputElement).value)}
-											/>
-											{#each updateSale.fields.dealOwners[index]?.split.issues() ?? [] as issue, i (i)}
-												<Field.Error class="col-span-2 text-xs text-destructive"
-													>{issue.message}</Field.Error
-												>
-											{/each}
-										</div>
-									{:else}
-										<div class="flex items-center justify-center">
-											<span
-												class="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"
-											>
-												{owner.split}%
-											</span>
-											<input
-												class="sr-only"
-												{...updateSale.fields.dealOwners[index]?.split.as('number')}
-												value={owner.split}
-											/>
-										</div>
-									{/if}
-								{:else}
-									<!-- 3rd+ agents: no split selector, just persist the value -->
-									<div>
-										<input
-											class="sr-only"
-											{...updateSale.fields.dealOwners[index]?.split.as('number')}
-											value={owner.split}
-										/>
-									</div>
-								{/if}
-							{/if}
-
-							<div class="flex items-center justify-end">
-								{#if dealOwners.length > 1}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										class="text-muted-foreground"
-										onclick={() => removeDealOwner(owner.key)}
-										aria-label="Remove owner"
-									>
-										<Trash2 class="h-4 w-4" />
-									</Button>
-								{/if}
-							</div>
-						</div>
-					{/each}
-
-					<div class="flex items-center justify-between border-t border-border/40 px-4 py-3">
-						<Button type="button" variant="outline" class="gap-2" onclick={addDealOwner}>
-							<Plus class="h-4 w-4" />
-							Add another agent
-						</Button>
-						<div class="text-sm text-muted-foreground">
-							<span class={splitRemaining === 0 ? 'text-emerald-600' : 'text-destructive'}>
-								{splitRemaining === 0
-									? 'Ready to submit'
-									: splitRemaining > 0
-										? `Allocate ${splitRemaining.toFixed(0)}% more`
-										: `Reduce ${Math.abs(splitRemaining).toFixed(0)}%`}
-							</span>
-						</div>
-					</div>
-				</div>
+				<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
+				<OrderSplit
+					bind:splits={dealSplits}
+					disabled={isReadOnly}
+					onsplitschange={(s) => syncSplits(s)}
+				/>
 			</Field.Set>
 			<Field.Separator />
 

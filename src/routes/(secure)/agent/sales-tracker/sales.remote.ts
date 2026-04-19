@@ -41,6 +41,19 @@ const buyerSchema = z.object({
 	})
 });
 
+const splitSchema = z.object({
+	agentId: z.string().min(1, 'Agent is required'),
+	agentName: z.string().min(1, 'Agent name is required'),
+	agentEmail: z.email('Agent email is required'),
+	agentPhotoURL: z.string().optional(),
+	ownerRole: z.enum(['caller', 'closer', 'extra']),
+	percentage: z
+		.number()
+		.min(0, 'Percentage must be at least 0')
+		.max(100, 'Percentage cannot exceed 100')
+});
+
+// Keep the legacy schema for backward-compat reads
 const dealOwnerSchema = z.object({
 	userId: z.string().min(1, 'Owner is required'),
 	email: z.email('Owner email is required'),
@@ -58,17 +71,16 @@ const saleSchema = z
 		passportFile: buyerSchema.shape.passportFile,
 		nationalIdFile: buyerSchema.shape.nationalIdFile,
 
-		// Deal Owners
-		dealOwners: z
-			.array(dealOwnerSchema)
+		// Deal Splits (new N-agent model)
+		splits: z
+			.array(splitSchema)
 			.min(1, 'At least one deal owner is required')
-			.superRefine((owners, ctx) => {
-				const total = owners.reduce((sum, owner) => sum + owner.split, 0);
-
+			.superRefine((splits, ctx) => {
+				const total = splits.reduce((sum, s) => sum + s.percentage, 0);
 				if (Math.round(total * 100) / 100 !== 100) {
 					ctx.addIssue({
 						code: 'custom',
-						message: 'Deal owner split must total 100%'
+						message: 'Deal split percentages must total 100%'
 					});
 				}
 			}),
@@ -313,7 +325,8 @@ async function generateSaleId(): Promise<string> {
 
 export const createSale = form(saleSchema, async (data) => {
 	const timestamp = FieldValue.serverTimestamp();
-	const createdByUid = data.dealOwners[0]?.userId ?? 'unknown';
+	const createdByUid = data.splits[0]?.agentId ?? 'unknown';
+	const createdByEmail = data.splits[0]?.agentEmail ?? null;
 
 	// Generate predictable sale ID
 	const saleId = await generateSaleId();
@@ -375,6 +388,20 @@ export const createSale = form(saleSchema, async (data) => {
 			.map((email) => ensureRoleExists(email!))
 	);
 
+	// Build legacy dealOwners shape for backward compat (caller/closer only)
+	const dealOwners = data.splits
+		.filter((s) => s.ownerRole === 'caller' || s.ownerRole === 'closer')
+		.map((s) => ({
+			userId: s.agentId,
+			email: s.agentEmail,
+			name: s.agentName,
+			photoURL: s.agentPhotoURL ?? '',
+			ownerRole: s.ownerRole as 'caller' | 'closer',
+			split: s.percentage
+		}));
+
+	const splitAgentIds = data.splits.map((s) => s.agentId);
+
 	const saleRecord = {
 		status: 'pending',
 		financeStatus: 'pending',
@@ -393,8 +420,10 @@ export const createSale = form(saleSchema, async (data) => {
 			amlFormFile: primaryAmlFormFile
 		},
 		jointBuyers,
-		dealOwners: data.dealOwners,
-		dealOwnerIds: data.dealOwners.map((owner) => owner.userId),
+		splits: data.splits,
+		splitAgentIds,
+		dealOwners,
+		dealOwnerIds: splitAgentIds,
 		dealStage: data.dealStage,
 		paymentValue: data.paymentValue,
 		bookingFormFile,
@@ -430,7 +459,7 @@ export const createSale = form(saleSchema, async (data) => {
 		...(data.closerSeniorManagerEmail && {
 			closerSeniorManagerEmail: data.closerSeniorManagerEmail
 		}),
-		createdByEmail: data.dealOwners[0]?.email ?? null,
+		createdByEmail,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};
@@ -463,16 +492,15 @@ const updateSaleSchema = z
 		phone: buyerUpdateSchema.shape.phone,
 		passportFile: buyerUpdateSchema.shape.passportFile,
 		nationalIdFile: buyerUpdateSchema.shape.nationalIdFile,
-		dealOwners: z
-			.array(dealOwnerSchema)
+		splits: z
+			.array(splitSchema)
 			.min(1, 'At least one deal owner is required')
-			.superRefine((owners, ctx) => {
-				const total = owners.reduce((sum, owner) => sum + owner.split, 0);
-
+			.superRefine((splits, ctx) => {
+				const total = splits.reduce((sum, s) => sum + s.percentage, 0);
 				if (Math.round(total * 100) / 100 !== 100) {
 					ctx.addIssue({
 						code: 'custom',
-						message: 'Deal owner split must total 100%'
+						message: 'Deal split percentages must total 100%'
 					});
 				}
 			}),
@@ -661,8 +689,21 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 
 	const existingSale = existingSnap.data() as Record<string, unknown>;
 	const createdByUid =
-		(existingSale?.createdByUid as string | undefined) ?? data.dealOwners[0]?.userId ?? 'unknown';
+		(existingSale?.createdByUid as string | undefined) ?? data.splits[0]?.agentId ?? 'unknown';
 	const basePath = `sales/${createdByUid}/${data.id}`;
+
+	// Build legacy dealOwners for backward compat
+	const dealOwners = data.splits
+		.filter((s) => s.ownerRole === 'caller' || s.ownerRole === 'closer')
+		.map((s) => ({
+			userId: s.agentId,
+			email: s.agentEmail,
+			name: s.agentName,
+			photoURL: s.agentPhotoURL ?? '',
+			ownerRole: s.ownerRole as 'caller' | 'closer',
+			split: s.percentage
+		}));
+	const splitAgentIds = data.splits.map((s) => s.agentId);
 
 	const existingClient = (existingSale.clientDetails as Record<string, unknown>) ?? {};
 	const existingJoint =
@@ -770,8 +811,10 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 			amlFormFile: primaryAmlFormFile
 		},
 		jointBuyers,
-		dealOwners: data.dealOwners,
-		dealOwnerIds: data.dealOwners.map((owner) => owner.userId),
+		splits: data.splits,
+		splitAgentIds,
+		dealOwners,
+		dealOwnerIds: splitAgentIds,
 		dealStage: data.dealStage,
 		paymentValue: data.paymentValue,
 		bookingFormFile,
@@ -809,7 +852,7 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		}),
 		commnets: existingSale.commnets ?? [],
 		createdByUid: existingSale.createdByUid ?? createdByUid,
-		createdByEmail: existingSale.createdByEmail ?? data.dealOwners[0]?.email ?? null,
+		createdByEmail: existingSale.createdByEmail ?? data.splits[0]?.agentEmail ?? null,
 		createdAt: existingSale.createdAt ?? timestamp,
 		updatedAt: timestamp
 	};

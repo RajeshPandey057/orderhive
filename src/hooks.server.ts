@@ -5,7 +5,18 @@ interface UserData {
 	uid: string;
 	email: string;
 	role: AccessType;
+	managedTeamIds?: string[];
 }
+
+const VALID_ROLES: AccessType[] = [
+	'admin',
+	'agent',
+	'compliance',
+	'finance',
+	'super-admin',
+	'manager',
+	'senior-manager'
+];
 
 export const handle: Handle = ({ event, resolve }) => {
 	const isSecureRoute = event.route.id?.startsWith('/(secure)');
@@ -27,8 +38,13 @@ export const handle: Handle = ({ event, resolve }) => {
 	if (session) {
 		try {
 			const userData: UserData = JSON.parse(session);
-			if (userData.uid && userData.email && userData.role) {
-				locals.user = userData;
+			if (userData.uid && userData.email && userData.role && VALID_ROLES.includes(userData.role)) {
+				locals.user = {
+					uid: userData.uid,
+					email: userData.email,
+					role: userData.role,
+					...(userData.managedTeamIds && { managedTeamIds: userData.managedTeamIds })
+				};
 			}
 		} catch {
 			// Invalid cookie, clear it

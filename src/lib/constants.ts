@@ -6,7 +6,14 @@ export const WEEK_IN_SECONDS = 60 * 60 * 24 * 7;
 export const WEEK_IN_MILLISECONDS = 60 * 60 * 24 * 7 * 1000;
 export const options = { path: '/', httpOnly: true, secure: !dev, maxAge: WEEK_IN_SECONDS };
 
-export type AccessType = 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin';
+export type AccessType =
+	| 'admin'
+	| 'agent'
+	| 'compliance'
+	| 'finance'
+	| 'super-admin'
+	| 'manager'
+	| 'senior-manager';
 
 interface MenuItem {
 	title: string;
@@ -18,6 +25,8 @@ interface MenuItem {
 export const ROLE_ROUTES: Record<AccessType, string[]> = {
 	admin: ['/admin', '/listing', '/dashboard', '/profile'],
 	agent: ['/agent', '/listing', '/dashboard', '/profile'],
+	manager: ['/agent', '/listing', '/dashboard', '/profile'],
+	'senior-manager': ['/agent', '/listing', '/dashboard', '/profile'],
 	compliance: ['/compliance', '/dashboard', '/profile'],
 	finance: ['/finance', '/dashboard', '/profile'],
 	'super-admin': [
@@ -47,6 +56,20 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
+		{ title: 'Notifications', url: '/agent/notifications' }
+	],
+	manager: [
+		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listing/view-listings' },
+		{ title: 'Team Sales', url: '/agent/sales-tracker' },
+		{ title: 'Notifications', url: '/agent/notifications' }
+	],
+	'senior-manager': [
+		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listing/view-listings' },
+		{ title: 'Team Sales', url: '/agent/sales-tracker' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	compliance: [
@@ -90,6 +113,8 @@ export function getDefaultRoute(role: AccessType): string {
 		case 'super-admin':
 			return '/admin/dashboard';
 		case 'agent':
+		case 'manager':
+		case 'senior-manager':
 			return '/agent/dashboard';
 		case 'compliance':
 			return '/compliance/dashboard';

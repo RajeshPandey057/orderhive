@@ -17,14 +17,28 @@
 	const filteredSales = $derived.by(() => {
 		if (!salesCollection.data) return [];
 
-		// If user is an agent, only show sales where they are a deal owner
-		if (data?.user?.role === 'agent' && data?.user?.uid) {
-			const userUid = data.user.uid;
-			console.log('Filtering sales for agent with UID:', userUid);
-			return salesCollection.data.filter((sale) => sale.dealOwnerIds.includes(userUid));
+		const userRole = data?.user?.role;
+		const userUid = data?.user?.uid;
+
+		if (userRole === 'agent' && userUid) {
+			return salesCollection.data.filter(
+				(sale) =>
+					(sale.splitAgentIds ?? []).includes(userUid) ||
+					(sale.dealOwnerIds ?? []).includes(userUid)
+			);
 		}
 
-		// For other roles (admin, finance, compliance), show all sales
+		if ((userRole === 'manager' || userRole === 'senior-manager') && userUid) {
+			const teamIds: string[] = data?.user?.managedTeamIds ?? [];
+			const ids = [userUid, ...teamIds];
+			return salesCollection.data.filter((sale) =>
+				ids.some(
+					(id) => (sale.splitAgentIds ?? []).includes(id) || (sale.dealOwnerIds ?? []).includes(id)
+				)
+			);
+		}
+
+		// admin, super-admin, finance, compliance: show all
 		return salesCollection.data;
 	});
 

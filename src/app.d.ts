@@ -15,7 +15,15 @@ declare global {
 		createdAt?: FieldValue;
 		updatedAt?: FieldValue;
 		seniorManagerEmail?: string;
-		accessType: 'admin' | 'agent' | 'finance' | 'compliance' | 'super-admin';
+		accessType:
+			| 'admin'
+			| 'agent'
+			| 'finance'
+			| 'compliance'
+			| 'super-admin'
+			| 'manager'
+			| 'senior-manager';
+		managedTeamIds?: string[];
 	};
 	type Sale = {
 		id: string;
@@ -198,6 +206,15 @@ declare global {
 			split: number;
 		}[];
 		dealOwnerIds: string[];
+		splits?: {
+			agentId: string;
+			agentName: string;
+			agentEmail?: string;
+			agentPhotoURL?: string;
+			percentage: number;
+			ownerRole: 'caller' | 'closer' | 'extra';
+		}[];
+		splitAgentIds?: string[];
 		dealStage: 'eoi' | 'booking';
 		paymentValue: number;
 		bookingFormFile: {
@@ -341,7 +358,15 @@ declare global {
 			user: {
 				uid: string;
 				email: string;
-				role: 'admin' | 'agent' | 'compliance' | 'finance' | 'super-admin';
+				role:
+					| 'admin'
+					| 'agent'
+					| 'compliance'
+					| 'finance'
+					| 'super-admin'
+					| 'manager'
+					| 'senior-manager';
+				managedTeamIds?: string[];
 			} | null;
 		}
 		// interface PageData {}

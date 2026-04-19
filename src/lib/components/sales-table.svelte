@@ -31,7 +31,14 @@
 
 	interface Props {
 		data: Sale[];
-		role?: 'agent' | 'finance' | 'admin' | 'compliance' | 'super-admin';
+		role?:
+			| 'agent'
+			| 'finance'
+			| 'admin'
+			| 'compliance'
+			| 'super-admin'
+			| 'manager'
+			| 'senior-manager';
 	}
 
 	let { data = [], role }: Props = $props();

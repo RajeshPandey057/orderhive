@@ -21,7 +21,14 @@
 	interface Props {
 		open?: boolean;
 		sale?: Sale | null;
-		role?: 'agent' | 'finance' | 'admin' | 'compliance' | 'super-admin';
+		role?:
+			| 'agent'
+			| 'finance'
+			| 'admin'
+			| 'compliance'
+			| 'super-admin'
+			| 'manager'
+			| 'senior-manager';
 		onOpenChange?: (open: boolean) => void;
 	}
 
@@ -92,11 +99,6 @@
 	let editPassbackOpen = $state(false);
 	let editPassbackValue = $state('');
 	let isSavingPassback = $state(false);
-
-	const openEditPassback = () => {
-		editPassbackValue = sale?.passbackAmount != null ? String(sale.passbackAmount) : '';
-		editPassbackOpen = true;
-	};
 
 	const openEditSale = () => {
 		if (!sale?.id) return;
@@ -1559,26 +1561,29 @@
 				<div class="rounded-lg border">
 					<Table.Root>
 						<Table.Body>
-							{#each sale?.dealOwners ?? [] as owner, i (owner.userId)}
+							{#each (sale?.splits?.length ? sale.splits : sale?.dealOwners?.map( (o) => ({ agentId: o.userId, agentName: o.name, agentEmail: o.email, ownerRole: o.ownerRole, percentage: o.split }) )) ?? [] as entry, i (i)}
 								<Table.Row>
 									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
 										Agent {i + 1}
 									</Table.Cell>
 									<Table.Cell class="font-medium">
-										<a href="mailto:{owner.email}" class="text-orange-500 hover:underline">
-											{owner.email}
+										<a
+											href="mailto:{entry.agentEmail ?? ''}"
+											class="text-orange-500 hover:underline"
+										>
+											{entry.agentName || (entry.agentEmail ?? '')}
 										</a>
 									</Table.Cell>
 									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
 										Role
 									</Table.Cell>
 									<Table.Cell class="font-medium capitalize">
-										{owner.ownerRole ?? '-'}
+										{entry.ownerRole ?? '-'}
 									</Table.Cell>
 									<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
 										% Split
 									</Table.Cell>
-									<Table.Cell class="font-medium">{owner.split}%</Table.Cell>
+									<Table.Cell class="font-medium">{entry.percentage}%</Table.Cell>
 								</Table.Row>
 							{/each}
 						</Table.Body>

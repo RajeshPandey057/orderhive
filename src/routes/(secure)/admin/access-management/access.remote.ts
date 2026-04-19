@@ -7,23 +7,27 @@ import { z } from 'zod';
 // Define the schema for the invite user form using Zod
 const inviteUserSchema = z.object({
 	email: z.email('Valid email is required'),
-	accessType: z.enum(['admin', 'agent', 'finance', 'compliance'], {
+	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
 		message: 'Access type is required'
 	}),
 	// Agent-specific fields (optional, required only when accessType is 'agent')
 	agentRole: z.string().optional(),
-	agentLevel: z.string().optional()
+	agentLevel: z.string().optional(),
+	// Manager-specific fields
+	managedTeamIds: z.array(z.string()).optional()
 });
 
 // Define the schema for update user form
 const updateUserSchema = z.object({
 	email: z.email('Valid email is required'),
-	accessType: z.enum(['admin', 'agent', 'finance', 'compliance'], {
+	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
 		message: 'Access type is required'
 	}),
 	// Agent-specific fields (optional, required only when accessType is 'agent')
 	agentRole: z.string().optional(),
-	agentLevel: z.string().optional()
+	agentLevel: z.string().optional(),
+	// Manager-specific fields
+	managedTeamIds: z.array(z.string()).optional()
 });
 
 // Define the schema for delete user command
@@ -58,6 +62,11 @@ export const inviteUser = form(inviteUserSchema, async (data) => {
 		if (data.agentLevel) {
 			roleRecord.agentLevel = data.agentLevel;
 		}
+	}
+
+	// Add managedTeamIds for manager/senior-manager
+	if (data.accessType === 'manager' || data.accessType === 'senior-manager') {
+		roleRecord.managedTeamIds = data.managedTeamIds ?? [];
 	}
 
 	try {
@@ -100,6 +109,13 @@ export const updateUser = form(updateUserSchema, async (data) => {
 		// Clear agent fields if not agent
 		updateRecord.agentRole = '';
 		updateRecord.agentLevel = '';
+	}
+
+	// Handle managedTeamIds for manager/senior-manager
+	if (data.accessType === 'manager' || data.accessType === 'senior-manager') {
+		updateRecord.managedTeamIds = data.managedTeamIds ?? [];
+	} else {
+		updateRecord.managedTeamIds = [];
 	}
 
 	try {

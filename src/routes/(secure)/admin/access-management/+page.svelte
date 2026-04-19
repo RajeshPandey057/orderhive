@@ -22,7 +22,14 @@
 	// State for filters
 	let searchQuery = $state('');
 	let selectedFilter = $state<
-		'all' | 'admin' | 'agent' | 'compliance' | 'finance' | 'senior-manager' | 'reporting-manager'
+		| 'all'
+		| 'admin'
+		| 'agent'
+		| 'compliance'
+		| 'finance'
+		| 'manager'
+		| 'senior-manager'
+		| 'reporting-manager'
 	>('all');
 
 	// Dialog state
@@ -43,7 +50,7 @@
 		let filtered = rolesCollection.data;
 
 		// Apply access type filter
-		if (selectedFilter === 'senior-manager' || selectedFilter === 'reporting-manager') {
+		if (selectedFilter === 'reporting-manager') {
 			filtered = filtered.filter((role) => role.agentRole === selectedFilter);
 		} else if (selectedFilter !== 'all') {
 			filtered = filtered.filter((role) => role.accessType === selectedFilter);
@@ -69,7 +76,9 @@
 		{ value: 'admin', label: 'Admin' },
 		{ value: 'agent', label: 'Agent' },
 		{ value: 'compliance', label: 'Compliance' },
-		{ value: 'finance', label: 'Finance' }
+		{ value: 'finance', label: 'Finance' },
+		{ value: 'manager', label: 'Manager' },
+		{ value: 'senior-manager', label: 'Senior Manager' }
 	];
 
 	// Agent role options
@@ -391,6 +400,13 @@
 				onclick={() => (selectedFilter = 'finance')}
 			>
 				Finance
+			</Button>
+			<Button
+				variant={selectedFilter === 'manager' ? 'default' : 'outline'}
+				size="sm"
+				onclick={() => (selectedFilter = 'manager')}
+			>
+				Manager
 			</Button>
 			<Button
 				variant={selectedFilter === 'senior-manager' ? 'default' : 'outline'}

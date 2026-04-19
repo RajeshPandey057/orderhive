@@ -28,7 +28,7 @@ export const authenticatedRedirect = command(AuthInput, async (input) => {
 			};
 		}
 
-		const roleData = roleDoc.data() as { accessType: AccessType };
+		const roleData = roleDoc.data() as { accessType: AccessType; managedTeamIds?: string[] };
 		const role = roleData?.accessType;
 
 		if (!role) {
@@ -43,9 +43,15 @@ export const authenticatedRedirect = command(AuthInput, async (input) => {
 
 		console.log('User role found:', role);
 
-		// Store simple user data in cookie
-		const userData = JSON.stringify({ uid, email, role });
-		cookies.set(SESSION_TOKEN, userData, options);
+		// Store user data in cookie (include managedTeamIds for manager/senior-manager)
+		const sessionPayload: Record<string, unknown> = { uid, email, role };
+		if (
+			(role === 'manager' || role === 'senior-manager') &&
+			Array.isArray(roleData.managedTeamIds)
+		) {
+			sessionPayload.managedTeamIds = roleData.managedTeamIds;
+		}
+		cookies.set(SESSION_TOKEN, JSON.stringify(sessionPayload), options);
 
 		// Determine redirect destination
 		const redirectTo = url.searchParams.get('redirectTo');
