@@ -213,6 +213,8 @@ declare global {
 			agentPhotoURL?: string;
 			percentage: number;
 			ownerRole: 'caller' | 'closer' | 'extra';
+			managerEmail?: string;
+			seniorManagerEmail?: string;
 		}[];
 		splitAgentIds?: string[];
 		dealStage: 'eoi' | 'booking';

@@ -99,7 +99,7 @@
 					>
 				</Empty.Header>
 				<Empty.Content>
-					<AddSaleSheet />
+					<AddSaleSheet userRole={data?.user?.role} />
 				</Empty.Content>
 			</Empty.Root>
 		</div>

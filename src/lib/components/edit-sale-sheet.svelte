@@ -614,19 +614,19 @@
 					<Field.Group>
 						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
-								<Input bind:value={clientFirstName} placeholder="First Name" />
+								<Input bind:value={clientFirstName} placeholder="First Name" disabled={!canEditSale} />
 								{#each updateSale.fields.firstName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Input bind:value={clientLastName} placeholder="Last Name" />
+								<Input bind:value={clientLastName} placeholder="Last Name" disabled={!canEditSale} />
 								{#each updateSale.fields.lastName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Input bind:value={clientEmail} type="email" placeholder="Email" />
+								<Input bind:value={clientEmail} type="email" placeholder="Email" disabled={!canEditSale} />
 								{#each updateSale.fields.email.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
@@ -637,6 +637,7 @@
 								bind:value={clientPhoneValue}
 								bind:country={clientPhoneCountry}
 								showCountrySelect={true}
+								disabled={!canEditSale}
 							/>
 						</Field.Field>
 						<input
@@ -655,6 +656,7 @@
 											class="w-full justify-start text-left font-normal"
 											id="sale-date"
 											type="button"
+											disabled={!canEditSale}
 										>
 											{#if saleDateValue}
 												{new Date(
@@ -707,6 +709,7 @@
 									id="nationality"
 									{...updateSale.fields.nationality?.as('text')}
 									placeholder="e.g. Indian"
+									disabled={!canEditSale}
 								/>
 							</Field.Field>
 							<Field.Field>
@@ -721,6 +724,7 @@
 										updateSale.fields.residentStatus?.set(
 											(v || undefined) as 'resident' | 'non-resident' | undefined
 										)}
+									disabled={!canEditSale}
 								>
 									<Select.Trigger>
 										{#if updateSale.fields.residentStatus?.value() === 'resident'}
@@ -990,6 +994,7 @@
 								type="single"
 								value={updateSale.fields.saleType.value() ?? ''}
 								onValueChange={(v) => updateSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
+								disabled={!canEditSale}
 							>
 								<Select.Trigger id="dealype">
 									<div class="flex items-center gap-2">
@@ -1017,6 +1022,7 @@
 										role="combobox"
 										aria-expanded={developerPopoverOpen}
 										class="w-full justify-start gap-2"
+										disabled={!canEditSale}
 									>
 										<Hammer class="h-4 w-4" />
 										<span class="truncate">{developerLabel}</span>
@@ -1063,6 +1069,7 @@
 										role="combobox"
 										aria-expanded={communityPopoverOpen}
 										class="w-full justify-start gap-2"
+										disabled={!canEditSale}
 									>
 										<Home class="h-4 w-4" />
 										<span class="truncate">{communityLabel}</span>
@@ -1112,6 +1119,7 @@
 									updateSale.fields.propertyType.set(
 										v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
 									)}
+								disabled={!canEditSale}
 							>
 								<Select.Trigger id="propertyType">
 									<div class="flex items-center gap-2">
@@ -1146,6 +1154,7 @@
 												Parameters<typeof updateSale.fields.bedroomType.set>[0]
 											>
 										)}
+									disabled={!canEditSale}
 								>
 									<Select.Trigger id="bedroomType">
 										<div class="flex items-center gap-2">
@@ -1192,6 +1201,7 @@
 												Parameters<typeof updateSale.fields.bedroomType.set>[0]
 											>
 										)}
+									disabled={!canEditSale}
 								>
 									<Select.Trigger id="bedroomType">
 										<div class="flex items-center gap-2">
@@ -1248,6 +1258,7 @@
 									value={updateSale.fields.commercialSubType.value() ?? ''}
 									onValueChange={(v) =>
 										updateSale.fields.commercialSubType.set(v as 'office' | 'warehouse')}
+									disabled={!canEditSale}
 								>
 									<Select.Trigger id="commercialSubType">
 										<div class="flex items-center gap-2">
@@ -1322,6 +1333,7 @@
 								<InputGroup.Input
 									{...updateSale.fields.project.as('text')}
 									placeholder="Select Project"
+									disabled={!canEditSale}
 								/>
 								<InputGroup.Addon>
 									<Building />
@@ -1333,7 +1345,7 @@
 						</Field.Field>
 						<Field.Field>
 							<InputGroup.Root id="unitNo">
-								<InputGroup.Input {...updateSale.fields.unitNo.as('text')} placeholder="Unit No" />
+								<InputGroup.Input {...updateSale.fields.unitNo.as('text')} placeholder="Unit No" disabled={!canEditSale} disabled={!canEditSale} />
 								<InputGroup.Addon>
 									<Home />
 								</InputGroup.Addon>
@@ -1347,6 +1359,7 @@
 								<InputGroup.Input
 									{...updateSale.fields.unitValue.as('text')}
 									placeholder="Unit Value"
+									disabled={!canEditSale}
 								/>
 								<InputGroup.Addon>
 									<PriceTag />
@@ -1366,6 +1379,7 @@
 									max="100"
 									step="0.01"
 									placeholder="e.g. 5"
+									disabled={!canEditSale && !isFinanceRole}
 								/>
 								<InputGroup.Addon>%</InputGroup.Addon>
 							</InputGroup.Root>
@@ -1421,6 +1435,7 @@
 									min="0"
 									step="0.01"
 									placeholder="e.g. 55500"
+									disabled={!canEditSale && !isFinanceRole}
 								/>
 							</InputGroup.Root>
 							{#each updateSale.fields.passbackAmount?.issues() ?? [] as issue, i (i)}
@@ -1446,6 +1461,7 @@
 								type="email"
 								{...updateSale.fields.callerManagerEmail?.as('text')}
 								placeholder="caller-manager@example.com"
+								disabled={!canEditSale}
 							/>
 							{#each updateSale.fields.callerManagerEmail?.issues() ?? [] as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -1458,6 +1474,7 @@
 								type="email"
 								{...updateSale.fields.closerManagerEmail?.as('text')}
 								placeholder="closer-manager@example.com"
+								disabled={!canEditSale}
 							/>
 							{#each updateSale.fields.closerManagerEmail?.issues() ?? [] as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -1469,6 +1486,7 @@
 								type="single"
 								value={selectedCallerSeniorManagerEmail}
 								onValueChange={(v) => (selectedCallerSeniorManagerEmail = v ?? '')}
+								disabled={!canEditSale}
 							>
 								<Select.Trigger>
 									{selectedCallerSeniorManagerEmail
@@ -1504,6 +1522,7 @@
 								type="single"
 								value={selectedCloserSeniorManagerEmail}
 								onValueChange={(v) => (selectedCloserSeniorManagerEmail = v ?? '')}
+								disabled={!canEditSale}
 							>
 								<Select.Trigger>
 									{selectedCloserSeniorManagerEmail
@@ -1831,6 +1850,7 @@
 								id="eligible-first-half"
 								bind:checked={firstHalfChecked}
 								onCheckedChange={handleHalfChange}
+								disabled={!canEditSale && !isFinanceRole}
 							/>
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-first-half" class="text-sm font-normal">
@@ -1844,6 +1864,7 @@
 								id="eligible-second-half"
 								bind:checked={secondHalfChecked}
 								onCheckedChange={handleHalfChange}
+								disabled={!canEditSale && !isFinanceRole}
 							/>
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-second-half" class="text-sm font-normal">
@@ -1862,6 +1883,7 @@
 								id="eligible-full"
 								bind:checked={fullChecked}
 								onCheckedChange={handleFullChange}
+								disabled={!canEditSale && !isFinanceRole}
 							/>
 							<div class="flex flex-col gap-1">
 								<Field.Label for="eligible-full" class="text-sm font-normal">
@@ -1880,6 +1902,7 @@
 								id="not-yet-eligible"
 								bind:checked={notEligibleChecked}
 								onCheckedChange={handleNotEligibleChange}
+								disabled={!canEditSale && !isFinanceRole}
 							/>
 							<div class="flex flex-col gap-1">
 								<Field.Label for="not-yet-eligible" class="text-sm font-normal">
@@ -1966,7 +1989,7 @@
 				<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
 				<OrderSplit
 					bind:splits={dealSplits}
-					disabled={isReadOnly}
+					disabled={!canEditSale}
 					onsplitschange={(s) => syncSplits(s)}
 				/>
 			</Field.Set>
@@ -1992,13 +2015,13 @@
 						<Field.Group>
 							<div class="grid grid-cols-3 gap-4">
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" />
+									<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" disabled={!canEditSale} />
 								</Field.Field>
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" />
+									<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" disabled={!canEditSale} />
 								</Field.Field>
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].email`} placeholder="Email" type="email" />
+									<Input name={`jointBuyers[${index}].email`} placeholder="Email" type="email" disabled={!canEditSale} />
 								</Field.Field>
 							</div>
 
@@ -2007,6 +2030,7 @@
 									bind:value={jointBuyerPhoneValues[buyer.key]}
 									bind:country={jointBuyerPhoneCountries[buyer.key]}
 									showCountrySelect={true}
+									disabled={!canEditSale}
 								></PhoneInput>
 							</Field.Field>
 							<input

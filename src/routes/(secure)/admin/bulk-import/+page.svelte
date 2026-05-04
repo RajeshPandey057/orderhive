@@ -157,6 +157,18 @@
 			notes: "Email of the closer's senior manager (must be a valid email)."
 		},
 		{
+			column: 'third_agent_manager_email',
+			required: 'No',
+			notes:
+				"Email of the third agent's regional manager / RM (must be a valid email). Only used when third_agent_email is provided."
+		},
+		{
+			column: 'third_agent_senior_manager_email',
+			required: 'No',
+			notes:
+				"Email of the third agent's senior manager / SM (must be a valid email). Only used when third_agent_email is provided."
+		},
+		{
 			column: 'commission_percentage',
 			required: 'No',
 			notes:

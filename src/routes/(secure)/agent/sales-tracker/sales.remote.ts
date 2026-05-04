@@ -50,7 +50,9 @@ const splitSchema = z.object({
 	percentage: z
 		.number()
 		.min(0, 'Percentage must be at least 0')
-		.max(100, 'Percentage cannot exceed 100')
+		.max(100, 'Percentage cannot exceed 100'),
+	managerEmail: z.string().optional(),
+	seniorManagerEmail: z.string().optional()
 });
 
 // Keep the legacy schema for backward-compat reads

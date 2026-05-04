@@ -23,7 +23,7 @@
 			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 			<h1 class="text-2xl font-medium">Sales Tracker</h1>
 		</div>
-		<AddSaleSheet />
+		<AddSaleSheet userRole={data?.user?.role} />
 	</div>
 </header>
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -65,7 +65,7 @@
 					>
 				</Empty.Header>
 				<Empty.Content>
-					<AddSaleSheet />
+					<AddSaleSheet userRole={data?.user?.role} />
 				</Empty.Content>
 			</Empty.Root>
 		</div>
