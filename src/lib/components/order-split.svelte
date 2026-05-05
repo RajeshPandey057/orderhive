@@ -207,7 +207,7 @@
 	{#if !disabled}
 		<div class="flex flex-wrap gap-1.5">
 			<span class="flex items-center text-xs text-muted-foreground">Preset:</span>
-			{#each PRESETS as preset}
+			{#each PRESETS as preset (preset.label)}
 				<button
 					type="button"
 					class="rounded border border-input bg-muted/40 px-2 py-0.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -234,7 +234,10 @@
 				</span>
 
 				<!-- Agent picker -->
-				<Popover.Root bind:open={popoverOpen[split.key]}>
+				<Popover.Root
+					open={popoverOpen[split.key] ?? false}
+					onOpenChange={(v) => (popoverOpen[split.key] = v)}
+				>
 					<Popover.Trigger
 						{disabled}
 						class="flex h-9 min-w-48 items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
