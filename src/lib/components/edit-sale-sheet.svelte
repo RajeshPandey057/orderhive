@@ -127,8 +127,22 @@
 				ownerRole: split.ownerRole,
 				percentage: split.percentage,
 				// Restore manager/SM data from per-split field (new model)
-				managerEmail: split.managerEmail ?? (split.ownerRole === 'caller' ? s.callerManagerEmail : split.ownerRole === 'closer' ? s.closerManagerEmail : undefined) ?? '',
-				seniorManagerEmail: split.seniorManagerEmail ?? (split.ownerRole === 'caller' ? s.callerSeniorManagerEmail : split.ownerRole === 'closer' ? s.closerSeniorManagerEmail : undefined) ?? ''
+				managerEmail:
+					split.managerEmail ??
+					(split.ownerRole === 'caller'
+						? s.callerManagerEmail
+						: split.ownerRole === 'closer'
+							? s.closerManagerEmail
+							: undefined) ??
+					'',
+				seniorManagerEmail:
+					split.seniorManagerEmail ??
+					(split.ownerRole === 'caller'
+						? s.callerSeniorManagerEmail
+						: split.ownerRole === 'closer'
+							? s.closerSeniorManagerEmail
+							: undefined) ??
+					''
 			}));
 		}
 		// Fall back to legacy dealOwners
@@ -141,8 +155,11 @@
 			ownerRole: (idx >= 2 ? 'extra' : owner.ownerRole) as 'caller' | 'closer' | 'extra',
 			percentage: owner.split,
 			// Fallback from top-level fields for legacy records
-			managerEmail: (owner.ownerRole === 'caller' ? s.callerManagerEmail : s.closerManagerEmail) ?? '',
-			seniorManagerEmail: (owner.ownerRole === 'caller' ? s.callerSeniorManagerEmail : s.closerSeniorManagerEmail) ?? ''
+			managerEmail:
+				(owner.ownerRole === 'caller' ? s.callerManagerEmail : s.closerManagerEmail) ?? '',
+			seniorManagerEmail:
+				(owner.ownerRole === 'caller' ? s.callerSeniorManagerEmail : s.closerSeniorManagerEmail) ??
+				''
 		}));
 	}
 
@@ -597,19 +614,32 @@
 					<Field.Group>
 						<div class="grid grid-cols-3 gap-4">
 							<Field.Field>
-								<Input bind:value={clientFirstName} placeholder="First Name" disabled={!canEditSale} />
+								<Input
+									bind:value={clientFirstName}
+									placeholder="First Name"
+									disabled={!canEditSale}
+								/>
 								{#each updateSale.fields.firstName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Input bind:value={clientLastName} placeholder="Last Name" disabled={!canEditSale} />
+								<Input
+									bind:value={clientLastName}
+									placeholder="Last Name"
+									disabled={!canEditSale}
+								/>
 								{#each updateSale.fields.lastName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
 							</Field.Field>
 							<Field.Field>
-								<Input bind:value={clientEmail} type="email" placeholder="Email" disabled={!canEditSale} />
+								<Input
+									bind:value={clientEmail}
+									type="email"
+									placeholder="Email"
+									disabled={!canEditSale}
+								/>
 								{#each updateSale.fields.email.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 								{/each}
@@ -1328,7 +1358,11 @@
 						</Field.Field>
 						<Field.Field>
 							<InputGroup.Root id="unitNo">
-								<InputGroup.Input {...updateSale.fields.unitNo.as('text')} placeholder="Unit No" disabled={!canEditSale} disabled={!canEditSale} />
+								<InputGroup.Input
+									{...updateSale.fields.unitNo.as('text')}
+									placeholder="Unit No"
+									disabled={!canEditSale}
+								/>
 								<InputGroup.Addon>
 									<Home />
 								</InputGroup.Addon>
@@ -1888,13 +1922,26 @@
 						<Field.Group>
 							<div class="grid grid-cols-3 gap-4">
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" disabled={!canEditSale} />
+									<Input
+										name={`jointBuyers[${index}].firstName`}
+										placeholder="First Name"
+										disabled={!canEditSale}
+									/>
 								</Field.Field>
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" disabled={!canEditSale} />
+									<Input
+										name={`jointBuyers[${index}].lastName`}
+										placeholder="Last Name"
+										disabled={!canEditSale}
+									/>
 								</Field.Field>
 								<Field.Field>
-									<Input name={`jointBuyers[${index}].email`} placeholder="Email" type="email" disabled={!canEditSale} />
+									<Input
+										name={`jointBuyers[${index}].email`}
+										placeholder="Email"
+										type="email"
+										disabled={!canEditSale}
+									/>
 								</Field.Field>
 							</div>
 
