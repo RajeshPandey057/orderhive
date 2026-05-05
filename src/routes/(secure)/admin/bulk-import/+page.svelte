@@ -53,36 +53,81 @@
 			notes: 'Must match a user in the system.'
 		},
 		{
-			column: 'closer_email',
-			required: 'No',
-			notes: 'Must match a user in the system if provided.'
+			column: 'caller_manager_email',
+			required: 'Yes (primary)',
+			notes: 'Valid email. Required for caller in strict mode.'
 		},
 		{
-			column: 'third_agent_email',
-			required: 'No',
-			notes:
-				'If provided, enables 3-agent split mode — requires caller_split, closer_split, third_agent_split.'
-		},
-		{
-			column: 'split_preset',
-			required: 'No',
-			notes: '"70/30" or "55/45". Used in 2-agent mode. Defaults to 70/30.'
+			column: 'caller_senior_manager_email',
+			required: 'Yes (primary)',
+			notes: "Email of the caller's senior manager. Required for caller in strict mode."
 		},
 		{
 			column: 'caller_split',
 			required: 'No',
 			notes:
-				'Number 0-100. Required when third_agent_email is set. caller_split + closer_split + third_agent_split must equal 100.'
+				'Number 0-100. All provided splits must sum to 100. Defaults to 100 if no closer is set.'
+		},
+		{
+			column: 'closer_email',
+			required: 'No',
+			notes: 'Must match a user in the system if provided.'
+		},
+		{
+			column: 'closer_manager_email',
+			required: 'Yes (when closer_email set)',
+			notes: 'Valid email. Required when closer_email is provided in strict mode.'
+		},
+		{
+			column: 'closer_senior_manager_email',
+			required: 'Yes (when closer_email set)',
+			notes:
+				"Email of the closer's senior manager. Required when closer_email is provided in strict mode."
 		},
 		{
 			column: 'closer_split',
 			required: 'No',
-			notes: 'Number 0-100. Required when third_agent_email is set.'
+			notes: 'Number 0-100. Required when closer_email is set.'
 		},
 		{
-			column: 'third_agent_split',
+			column: 'closer2_email',
 			required: 'No',
-			notes: 'Number 0-100. Required when third_agent_email is set.'
+			notes: 'Second closer (Closer 2). Must match a user in the system if provided.'
+		},
+		{
+			column: 'closer2_manager_email',
+			required: 'Yes (when closer2_email set)',
+			notes: 'Required when closer2_email is provided in strict mode.'
+		},
+		{
+			column: 'closer2_senior_manager_email',
+			required: 'Yes (when closer2_email set)',
+			notes: 'Required when closer2_email is provided in strict mode.'
+		},
+		{
+			column: 'closer2_split',
+			required: 'No',
+			notes: 'Number 0-100. Required when closer2_email is set.'
+		},
+		{
+			column: 'closer3_email',
+			required: 'No',
+			notes: 'Third closer (Closer 3). Must match a user in the system if provided.'
+		},
+		{
+			column: 'closer3_manager_email',
+			required: 'Yes (when closer3_email set)',
+			notes: 'Required when closer3_email is provided in strict mode.'
+		},
+		{
+			column: 'closer3_senior_manager_email',
+			required: 'Yes (when closer3_email set)',
+			notes: 'Required when closer3_email is provided in strict mode.'
+		},
+		{
+			column: 'closer3_split',
+			required: 'No',
+			notes: 'Number 0-100. Required when closer3_email is set.'
 		},
 		{ column: 'deal_stage', required: 'Yes (primary)', notes: '"eoi" or "booking".' },
 		{

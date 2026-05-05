@@ -46,7 +46,7 @@ const splitSchema = z.object({
 	agentName: z.string().min(1, 'Agent name is required'),
 	agentEmail: z.email('Agent email is required'),
 	agentPhotoURL: z.string().optional(),
-	ownerRole: z.enum(['caller', 'closer', 'extra']),
+	ownerRole: z.enum(['caller', 'closer', 'closer2', 'closer3']),
 	percentage: z
 		.number()
 		.min(0, 'Percentage must be at least 0')
@@ -86,21 +86,19 @@ const saleSchema = z
 					});
 				}
 				splits.forEach((s, i) => {
-					if (s.ownerRole === 'caller' || s.ownerRole === 'closer') {
-						if (!s.managerEmail || s.managerEmail.trim() === '') {
-							ctx.addIssue({
-								code: 'custom',
-								path: [i, 'managerEmail'],
-								message: `Manager email is required for the ${s.ownerRole}`
-							});
-						}
-						if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
-							ctx.addIssue({
-								code: 'custom',
-								path: [i, 'seniorManagerEmail'],
-								message: `Senior manager email is required for the ${s.ownerRole}`
-							});
-						}
+					if (!s.managerEmail || s.managerEmail.trim() === '') {
+						ctx.addIssue({
+							code: 'custom',
+							path: [i, 'managerEmail'],
+							message: `Manager email is required for the ${s.ownerRole}`
+						});
+					}
+					if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
+						ctx.addIssue({
+							code: 'custom',
+							path: [i, 'seniorManagerEmail'],
+							message: `Senior manager email is required for the ${s.ownerRole}`
+						});
 					}
 				});
 			}),

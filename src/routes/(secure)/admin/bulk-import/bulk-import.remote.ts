@@ -29,11 +29,16 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		aml_form_url: z.string().optional().or(z.literal('')),
 		caller_email: z.string().optional().or(z.literal('')),
 		closer_email: z.string().optional().or(z.literal('')),
-		split_preset: z.string().optional().or(z.literal('')),
 		caller_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
 		closer_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
-		third_agent_email: z.string().optional().or(z.literal('')),
-		third_agent_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		closer2_email: z.string().optional().or(z.literal('')),
+		closer2_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		closer2_manager_email: z.string().optional().or(z.literal('')),
+		closer2_senior_manager_email: z.string().optional().or(z.literal('')),
+		closer3_email: z.string().optional().or(z.literal('')),
+		closer3_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
+		closer3_manager_email: z.string().optional().or(z.literal('')),
+		closer3_senior_manager_email: z.string().optional().or(z.literal('')),
 		deal_stage: z.string().optional().or(z.literal('')),
 		payment_value: z.coerce.number().optional().or(z.literal('')),
 		booking_form_url: z.string().optional().or(z.literal('')),
@@ -98,6 +103,30 @@ function buildPrimaryRowSchema(lenient: boolean) {
 				data.closer_senior_manager_email,
 				'closer_senior_manager_email',
 				'closer_senior_manager_email is required when closer_email is set'
+			);
+		}
+		if (data.closer2_email && data.closer2_email.trim() !== '') {
+			req(
+				data.closer2_manager_email,
+				'closer2_manager_email',
+				'closer2_manager_email is required when closer2_email is set'
+			);
+			req(
+				data.closer2_senior_manager_email,
+				'closer2_senior_manager_email',
+				'closer2_senior_manager_email is required when closer2_email is set'
+			);
+		}
+		if (data.closer3_email && data.closer3_email.trim() !== '') {
+			req(
+				data.closer3_manager_email,
+				'closer3_manager_email',
+				'closer3_manager_email is required when closer3_email is set'
+			);
+			req(
+				data.closer3_senior_manager_email,
+				'closer3_senior_manager_email',
+				'closer3_senior_manager_email is required when closer3_email is set'
 			);
 		}
 
@@ -458,127 +487,94 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		const callerEmail = primary.caller_email ?? '';
 		const callerUser = callerEmail ? await resolveUserByEmail(callerEmail) : null;
 
-		// Build deal owners — support 3-agent splits
+		// Build deal owners from explicit per-agent columns
 		const dealOwners: (Sale['dealOwners'][number] & {
 			managerEmail?: string;
 			seniorManagerEmail?: string;
 		})[] = [];
 
-		const hasThirdAgent = primary.third_agent_email && primary.third_agent_email.trim() !== '';
+		// Validate splits sum to 100 when explicitly provided
+		const splitsDefined = [
+			primary.caller_split,
+			primary.closer_split,
+			primary.closer2_split,
+			primary.closer3_split
+		].some((s) => typeof s === 'number');
 
-		if (hasThirdAgent) {
-			// Explicit 3-agent splits
-			const cs = typeof primary.caller_split === 'number' ? primary.caller_split : 0;
-			const clos = typeof primary.closer_split === 'number' ? primary.closer_split : 0;
-			const ts = typeof primary.third_agent_split === 'number' ? primary.third_agent_split : 0;
-
-			if (!lenient && Math.round(cs + clos + ts) !== 100) {
+		if (!lenient && splitsDefined) {
+			const total =
+				(typeof primary.caller_split === 'number' ? primary.caller_split : 0) +
+				(typeof primary.closer_split === 'number' ? primary.closer_split : 0) +
+				(typeof primary.closer2_split === 'number' ? primary.closer2_split : 0) +
+				(typeof primary.closer3_split === 'number' ? primary.closer3_split : 0);
+			if (Math.round(total) !== 100) {
 				importErrors.push({
 					order_id: orderId,
 					row: group.primaryIdx,
-					message: `caller_split + closer_split + third_agent_split must sum to 100 (got ${cs + clos + ts})`
+					message: `Split percentages must sum to 100 (got ${total})`
 				});
 				continue;
 			}
+		}
 
-			if (callerUser) {
-				dealOwners.push({
-					userId: callerUser.uid,
-					email: callerUser.email,
-					name: callerUser.displayName ?? callerUser.email,
-					photoURL: callerUser.photoURL ?? '',
-					ownerRole: 'caller',
-					split: cs,
-					...(primary.caller_manager_email && { managerEmail: primary.caller_manager_email }),
-					...(primary.caller_senior_manager_email && {
-						seniorManagerEmail: primary.caller_senior_manager_email
-					})
-				});
-			}
-			if (primary.closer_email && primary.closer_email.trim() !== '') {
-				const closerUser = await resolveUserByEmail(primary.closer_email);
-				dealOwners.push({
-					userId: closerUser.uid,
-					email: closerUser.email,
-					name: closerUser.displayName ?? closerUser.email,
-					photoURL: closerUser.photoURL ?? '',
-					ownerRole: 'closer',
-					split: clos,
-					...(primary.closer_manager_email && { managerEmail: primary.closer_manager_email }),
-					...(primary.closer_senior_manager_email && {
-						seniorManagerEmail: primary.closer_senior_manager_email
-					})
-				});
-			}
-			const thirdUser = await resolveUserByEmail(primary.third_agent_email!);
+		if (callerUser) {
 			dealOwners.push({
-				userId: thirdUser.uid,
-				email: thirdUser.email,
-				name: thirdUser.displayName ?? thirdUser.email,
-				photoURL: thirdUser.photoURL ?? '',
-				ownerRole: 'closer',
-				split: ts,
-				...(primary.third_agent_manager_email && {
-					managerEmail: primary.third_agent_manager_email
-				}),
-				...(primary.third_agent_senior_manager_email && {
-					seniorManagerEmail: primary.third_agent_senior_manager_email
+				userId: callerUser.uid,
+				email: callerUser.email,
+				name: callerUser.displayName ?? callerUser.email,
+				photoURL: callerUser.photoURL ?? '',
+				ownerRole: 'caller',
+				split: typeof primary.caller_split === 'number' ? primary.caller_split : 100,
+				...(primary.caller_manager_email && { managerEmail: primary.caller_manager_email }),
+				...(primary.caller_senior_manager_email && {
+					seniorManagerEmail: primary.caller_senior_manager_email
 				})
 			});
-		} else {
-			// 2-agent mode — use split_preset
-			const rawPreset = (primary.split_preset ?? '').toString().trim();
-			if (rawPreset === '100') {
-				// Single owner — full split
-				if (callerUser) {
-					dealOwners.push({
-						userId: callerUser.uid,
-						email: callerUser.email,
-						name: callerUser.displayName ?? callerUser.email,
-						photoURL: callerUser.photoURL ?? '',
-						ownerRole: 'caller',
-						split: 100,
-						...(primary.caller_manager_email && { managerEmail: primary.caller_manager_email }),
-						...(primary.caller_senior_manager_email && {
-							seniorManagerEmail: primary.caller_senior_manager_email
-						})
-					});
-				}
-			} else {
-				const splitPreset = rawPreset === '55/45' ? '55/45' : '70/30';
-				const callerSplit = splitPreset === '55/45' ? 55 : 70;
-				const closerSplit = splitPreset === '55/45' ? 45 : 30;
-
-				if (callerUser) {
-					dealOwners.push({
-						userId: callerUser.uid,
-						email: callerUser.email,
-						name: callerUser.displayName ?? callerUser.email,
-						photoURL: callerUser.photoURL ?? '',
-						ownerRole: 'caller',
-						split: callerSplit,
-						...(primary.caller_manager_email && { managerEmail: primary.caller_manager_email }),
-						...(primary.caller_senior_manager_email && {
-							seniorManagerEmail: primary.caller_senior_manager_email
-						})
-					});
-				}
-				if (primary.closer_email && primary.closer_email.trim() !== '') {
-					const closerUser = await resolveUserByEmail(primary.closer_email);
-					dealOwners.push({
-						userId: closerUser.uid,
-						email: closerUser.email,
-						name: closerUser.displayName ?? closerUser.email,
-						photoURL: closerUser.photoURL ?? '',
-						ownerRole: 'closer',
-						split: closerSplit,
-						...(primary.closer_manager_email && { managerEmail: primary.closer_manager_email }),
-						...(primary.closer_senior_manager_email && {
-							seniorManagerEmail: primary.closer_senior_manager_email
-						})
-					});
-				}
-			}
+		}
+		if (primary.closer_email && primary.closer_email.trim() !== '') {
+			const closerUser = await resolveUserByEmail(primary.closer_email);
+			dealOwners.push({
+				userId: closerUser.uid,
+				email: closerUser.email,
+				name: closerUser.displayName ?? closerUser.email,
+				photoURL: closerUser.photoURL ?? '',
+				ownerRole: 'closer',
+				split: typeof primary.closer_split === 'number' ? primary.closer_split : 0,
+				...(primary.closer_manager_email && { managerEmail: primary.closer_manager_email }),
+				...(primary.closer_senior_manager_email && {
+					seniorManagerEmail: primary.closer_senior_manager_email
+				})
+			});
+		}
+		if (primary.closer2_email && primary.closer2_email.trim() !== '') {
+			const closer2User = await resolveUserByEmail(primary.closer2_email);
+			dealOwners.push({
+				userId: closer2User.uid,
+				email: closer2User.email,
+				name: closer2User.displayName ?? closer2User.email,
+				photoURL: closer2User.photoURL ?? '',
+				ownerRole: 'closer2',
+				split: typeof primary.closer2_split === 'number' ? primary.closer2_split : 0,
+				...(primary.closer2_manager_email && { managerEmail: primary.closer2_manager_email }),
+				...(primary.closer2_senior_manager_email && {
+					seniorManagerEmail: primary.closer2_senior_manager_email
+				})
+			});
+		}
+		if (primary.closer3_email && primary.closer3_email.trim() !== '') {
+			const closer3User = await resolveUserByEmail(primary.closer3_email);
+			dealOwners.push({
+				userId: closer3User.uid,
+				email: closer3User.email,
+				name: closer3User.displayName ?? closer3User.email,
+				photoURL: closer3User.photoURL ?? '',
+				ownerRole: 'closer3',
+				split: typeof primary.closer3_split === 'number' ? primary.closer3_split : 0,
+				...(primary.closer3_manager_email && { managerEmail: primary.closer3_manager_email }),
+				...(primary.closer3_senior_manager_email && {
+					seniorManagerEmail: primary.closer3_senior_manager_email
+				})
+			});
 		}
 
 		// Calculate commission and passback derived values
@@ -659,9 +655,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 				agentName: o.name,
 				agentEmail: o.email,
 				agentPhotoURL: o.photoURL,
-				ownerRole: (o.ownerRole === 'closer' && dealOwners.indexOf(o) >= 2
-					? 'extra'
-					: o.ownerRole) as 'caller' | 'closer' | 'extra',
+				ownerRole: o.ownerRole as 'caller' | 'closer' | 'closer2' | 'closer3',
 				percentage: o.split,
 				...(o.managerEmail && { managerEmail: o.managerEmail }),
 				...(o.seniorManagerEmail && { seniorManagerEmail: o.seniorManagerEmail })

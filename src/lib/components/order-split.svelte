@@ -17,7 +17,7 @@
 		agentName: string;
 		agentEmail: string;
 		agentPhotoURL?: string;
-		ownerRole: 'caller' | 'closer' | 'extra';
+		ownerRole: 'caller' | 'closer' | 'closer2' | 'closer3';
 		percentage: number;
 		managerEmail?: string;
 		managerName?: string;
@@ -46,9 +46,9 @@
 			if (s.ownerRole === 'closer') return { ...s, percentage: preset.closer };
 			return { ...s, percentage: 0 };
 		});
-		// If third > 0 and no extra row exists, add one
-		const hasExtra = updated.some((s) => s.ownerRole === 'extra');
-		if (preset.third > 0 && !hasExtra) {
+		// If third > 0 and no closer2 row exists, add one
+		const hasCloser2 = updated.some((s) => s.ownerRole === 'closer2');
+		if (preset.third > 0 && !hasCloser2) {
 			const newKey = nextKey++;
 			updated = [
 				...updated,
@@ -57,7 +57,7 @@
 					agentId: '',
 					agentName: '',
 					agentEmail: '',
-					ownerRole: 'extra',
+					ownerRole: 'closer2',
 					percentage: preset.third,
 					managerEmail: '',
 					seniorManagerEmail: ''
@@ -72,9 +72,9 @@
 			smPopoverOpen[newKey] = false;
 			smSearchValues[newKey] = '';
 			smSearchResults[newKey] = [];
-		} else if (preset.third > 0 && hasExtra) {
+		} else if (preset.third > 0 && hasCloser2) {
 			updated = updated.map((s) =>
-				s.ownerRole === 'extra' ? { ...s, percentage: preset.third } : s
+				s.ownerRole === 'closer2' ? { ...s, percentage: preset.third } : s
 			);
 		}
 		splits = updated;
@@ -110,17 +110,22 @@
 	const remaining = $derived(100 - totalPercentage);
 	const isValid = $derived(Math.round(totalPercentage * 100) / 100 === 100);
 
-	const getRoleLabel = (role: 'caller' | 'closer' | 'extra') => {
-		if (role === 'caller') return 'Caller';
-		if (role === 'closer') return 'Closer';
-		return 'Extra';
+	const ROLE_LABELS: Record<string, string> = {
+		caller: 'Caller',
+		closer: 'Closer',
+		closer2: 'Closer 2',
+		closer3: 'Closer 3'
 	};
+	const getRoleLabel = (role: string) => ROLE_LABELS[role] ?? role;
 
-	const getRoleBadgeClass = (role: 'caller' | 'closer' | 'extra') => {
-		if (role === 'caller') return 'bg-blue-100 text-blue-700';
-		if (role === 'closer') return 'bg-purple-100 text-purple-700';
-		return 'bg-gray-100 text-gray-600';
+	const ROLE_BADGE_CLASSES: Record<string, string> = {
+		caller: 'bg-blue-100 text-blue-700',
+		closer: 'bg-purple-100 text-purple-700',
+		closer2: 'bg-indigo-100 text-indigo-700',
+		closer3: 'bg-violet-100 text-violet-700'
 	};
+	const getRoleBadgeClass = (role: string) =>
+		ROLE_BADGE_CLASSES[role] ?? 'bg-gray-100 text-gray-600';
 
 	const getRemainingBadgeClass = () => {
 		if (remaining === 0) return 'bg-green-100 text-green-700';
@@ -224,8 +229,10 @@
 
 	function addAgent() {
 		const newKey = nextKey++;
-		// Second added agent becomes 'closer'; any further additions become 'extra'
+		// Assign roles in order: closer, closer2, closer3
 		const hasCloser = splits.some((s) => s.ownerRole === 'closer');
+		const hasCloser2 = splits.some((s) => s.ownerRole === 'closer2');
+		const nextRole = !hasCloser ? 'closer' : !hasCloser2 ? 'closer2' : 'closer3';
 		splits = [
 			...splits,
 			{
@@ -233,7 +240,7 @@
 				agentId: '',
 				agentName: '',
 				agentEmail: '',
-				ownerRole: hasCloser ? 'extra' : 'closer',
+				ownerRole: nextRole,
 				percentage: 0,
 				managerEmail: '',
 				seniorManagerEmail: ''
@@ -306,7 +313,11 @@
 	<!-- Split rows -->
 	{#each splits as split (split.key)}
 		{@const isLocked = split.ownerRole === 'caller' || split.ownerRole === 'closer'}
-		{@const requiresManager = split.ownerRole === 'caller' || split.ownerRole === 'closer'}
+		{@const requiresManager =
+			split.ownerRole === 'caller' ||
+			split.ownerRole === 'closer' ||
+			split.ownerRole === 'closer2' ||
+			split.ownerRole === 'closer3'}
 		<div class="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-2">
 			<!-- Agent row -->
 			<div class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
