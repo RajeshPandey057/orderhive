@@ -144,29 +144,26 @@
 			notes: '"first-half", "second-half", "full", or "not-yet-eligible".'
 		},
 		{ column: 'tentative_eligibility_date', required: 'No', notes: 'DD/MM/YYYY format.' },
-		{ column: 'caller_manager_email', required: 'No', notes: 'Valid email if provided.' },
-		{ column: 'closer_manager_email', required: 'No', notes: 'Valid email if provided.' },
+		{
+			column: 'caller_manager_email',
+			required: 'Yes (primary)',
+			notes: 'Valid email. Required for caller in strict mode.'
+		},
+		{
+			column: 'closer_manager_email',
+			required: 'Yes (when closer_email set)',
+			notes: 'Valid email. Required when closer_email is provided in strict mode.'
+		},
 		{
 			column: 'caller_senior_manager_email',
-			required: 'No',
-			notes: "Email of the caller's senior manager (must be a valid email)."
+			required: 'Yes (primary)',
+			notes: "Email of the caller's senior manager. Required for caller in strict mode."
 		},
 		{
 			column: 'closer_senior_manager_email',
-			required: 'No',
-			notes: "Email of the closer's senior manager (must be a valid email)."
-		},
-		{
-			column: 'third_agent_manager_email',
-			required: 'No',
+			required: 'Yes (when closer_email set)',
 			notes:
-				"Email of the third agent's regional manager / RM (must be a valid email). Only used when third_agent_email is provided."
-		},
-		{
-			column: 'third_agent_senior_manager_email',
-			required: 'No',
-			notes:
-				"Email of the third agent's senior manager / SM (must be a valid email). Only used when third_agent_email is provided."
+				"Email of the closer's senior manager. Required when closer_email is provided in strict mode."
 		},
 		{
 			column: 'commission_percentage',

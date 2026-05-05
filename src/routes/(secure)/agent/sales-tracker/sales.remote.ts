@@ -85,6 +85,24 @@ const saleSchema = z
 						message: 'Deal split percentages must total 100%'
 					});
 				}
+				splits.forEach((s, i) => {
+					if (s.ownerRole === 'caller' || s.ownerRole === 'closer') {
+						if (!s.managerEmail || s.managerEmail.trim() === '') {
+							ctx.addIssue({
+								code: 'custom',
+								path: [i, 'managerEmail'],
+								message: `Manager email is required for the ${s.ownerRole}`
+							});
+						}
+						if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
+							ctx.addIssue({
+								code: 'custom',
+								path: [i, 'seniorManagerEmail'],
+								message: `Senior manager email is required for the ${s.ownerRole}`
+							});
+						}
+					}
+				});
 			}),
 
 		// Joint Buyers (unlimited)
@@ -166,11 +184,7 @@ const saleSchema = z
 			.min(0, 'Commission % must be at least 0')
 			.max(100, 'Commission % cannot exceed 100')
 			.optional(),
-		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional(),
-		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		callerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
-		closerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
+		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional()
 	})
 	.superRefine((data, ctx) => {
 		// Apartment validation
@@ -378,16 +392,15 @@ export const createSale = form(saleSchema, async (data) => {
 		}
 	}
 
-	// Ensure role documents exist for any manager emails entered
+	// Ensure role documents exist for any manager/SM emails in splits
 	await Promise.all(
 		[
-			data.callerManagerEmail,
-			data.closerManagerEmail,
-			data.callerSeniorManagerEmail,
-			data.closerSeniorManagerEmail
-		]
-			.filter(Boolean)
-			.map((email) => ensureRoleExists(email!))
+			...new Set(
+				data.splits
+					.flatMap((s) => [s.managerEmail, s.seniorManagerEmail])
+					.filter((e): e is string => !!e && e.trim() !== '')
+			)
+		].map((email) => ensureRoleExists(email))
 	);
 
 	// Build legacy dealOwners shape for backward compat (caller/closer only)
@@ -453,14 +466,6 @@ export const createSale = form(saleSchema, async (data) => {
 		...(revenueAchieved !== undefined && { revenueAchieved }),
 		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
 		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
-		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
-		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
-		...(data.callerSeniorManagerEmail && {
-			callerSeniorManagerEmail: data.callerSeniorManagerEmail
-		}),
-		...(data.closerSeniorManagerEmail && {
-			closerSeniorManagerEmail: data.closerSeniorManagerEmail
-		}),
 		createdByEmail,
 		createdAt: timestamp,
 		updatedAt: timestamp
@@ -505,6 +510,24 @@ const updateSaleSchema = z
 						message: 'Deal split percentages must total 100%'
 					});
 				}
+				splits.forEach((s, i) => {
+					if (s.ownerRole === 'caller' || s.ownerRole === 'closer') {
+						if (!s.managerEmail || s.managerEmail.trim() === '') {
+							ctx.addIssue({
+								code: 'custom',
+								path: [i, 'managerEmail'],
+								message: `Manager email is required for the ${s.ownerRole}`
+							});
+						}
+						if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
+							ctx.addIssue({
+								code: 'custom',
+								path: [i, 'seniorManagerEmail'],
+								message: `Senior manager email is required for the ${s.ownerRole}`
+							});
+						}
+					}
+				});
 			}),
 		jointBuyers: z.array(buyerUpdateSchema).default([]),
 		dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
@@ -570,11 +593,7 @@ const updateSaleSchema = z
 			.min(0, 'Commission % must be at least 0')
 			.max(100, 'Commission % cannot exceed 100')
 			.optional(),
-		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional(),
-		callerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		closerManagerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
-		callerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal('')),
-		closerSeniorManagerEmail: z.email('Valid email is required').optional().or(z.literal(''))
+		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional()
 	})
 	.superRefine((data, ctx) => {
 		if (data.propertyType === 'apartment') {
@@ -786,13 +805,12 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 
 	await Promise.all(
 		[
-			data.callerManagerEmail,
-			data.closerManagerEmail,
-			data.callerSeniorManagerEmail,
-			data.closerSeniorManagerEmail
-		]
-			.filter(Boolean)
-			.map((email) => ensureRoleExists(email!))
+			...new Set(
+				data.splits
+					.flatMap((s) => [s.managerEmail, s.seniorManagerEmail])
+					.filter((e): e is string => !!e && e.trim() !== '')
+			)
+		].map((email) => ensureRoleExists(email))
 	);
 
 	const updatedRecord = {
@@ -844,14 +862,6 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		...(revenueAchieved !== undefined && { revenueAchieved }),
 		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
 		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
-		...(data.callerManagerEmail && { callerManagerEmail: data.callerManagerEmail }),
-		...(data.closerManagerEmail && { closerManagerEmail: data.closerManagerEmail }),
-		...(data.callerSeniorManagerEmail && {
-			callerSeniorManagerEmail: data.callerSeniorManagerEmail
-		}),
-		...(data.closerSeniorManagerEmail && {
-			closerSeniorManagerEmail: data.closerSeniorManagerEmail
-		}),
 		commnets: existingSale.commnets ?? [],
 		createdByUid: existingSale.createdByUid ?? createdByUid,
 		createdByEmail: existingSale.createdByEmail ?? data.splits[0]?.agentEmail ?? null,

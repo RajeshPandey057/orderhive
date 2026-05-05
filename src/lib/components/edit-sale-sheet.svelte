@@ -20,7 +20,6 @@
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
-	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import CheckCircled from '~icons/lucide/check-circle-2';
@@ -116,25 +115,6 @@
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
 
-	const rolesCollection = firekitCollection<Role>('roles');
-
-	// Derived options for manager dropdowns (filtered by agentRole)
-	const seniorManagerOptions = $derived(
-		rolesCollection.data?.filter((r) => r.agentRole === 'senior-manager') ?? []
-	);
-
-	// Selected manager emails
-	let selectedCallerSeniorManagerEmail = $state('');
-	let selectedCloserSeniorManagerEmail = $state('');
-
-	// Sync manager emails to form fields
-	$effect(() => {
-		updateSale.fields.callerSeniorManagerEmail?.set(selectedCallerSeniorManagerEmail || undefined);
-	});
-	$effect(() => {
-		updateSale.fields.closerSeniorManagerEmail?.set(selectedCloserSeniorManagerEmail || undefined);
-	});
-
 	// Initialize splits from existing sale data (prefer new splits[], fall back to dealOwners[])
 	function initSplitsFromSale(s: Sale): SplitEntry[] {
 		if (Array.isArray(s.splits) && s.splits.length > 0) {
@@ -145,7 +125,10 @@
 				agentEmail: (split as { agentEmail?: string }).agentEmail ?? '',
 				agentPhotoURL: (split as { agentPhotoURL?: string }).agentPhotoURL ?? undefined,
 				ownerRole: split.ownerRole,
-				percentage: split.percentage
+				percentage: split.percentage,
+				// Restore manager/SM data from per-split field (new model)
+				managerEmail: split.managerEmail ?? (split.ownerRole === 'caller' ? s.callerManagerEmail : split.ownerRole === 'closer' ? s.closerManagerEmail : undefined) ?? '',
+				seniorManagerEmail: split.seniorManagerEmail ?? (split.ownerRole === 'caller' ? s.callerSeniorManagerEmail : split.ownerRole === 'closer' ? s.closerSeniorManagerEmail : undefined) ?? ''
 			}));
 		}
 		// Fall back to legacy dealOwners
@@ -156,7 +139,10 @@
 			agentEmail: owner.email,
 			agentPhotoURL: owner.photoURL ?? undefined,
 			ownerRole: (idx >= 2 ? 'extra' : owner.ownerRole) as 'caller' | 'closer' | 'extra',
-			percentage: owner.split
+			percentage: owner.split,
+			// Fallback from top-level fields for legacy records
+			managerEmail: (owner.ownerRole === 'caller' ? s.callerManagerEmail : s.closerManagerEmail) ?? '',
+			seniorManagerEmail: (owner.ownerRole === 'caller' ? s.callerSeniorManagerEmail : s.closerSeniorManagerEmail) ?? ''
 		}));
 	}
 
@@ -174,7 +160,9 @@
 				agentEmail: s.agentEmail,
 				agentPhotoURL: s.agentPhotoURL ?? '',
 				ownerRole: s.ownerRole,
-				percentage: Number(s.percentage) || 0
+				percentage: Number(s.percentage) || 0,
+				managerEmail: s.managerEmail ?? '',
+				seniorManagerEmail: s.seniorManagerEmail ?? ''
 			}))
 		);
 	};
@@ -506,11 +494,6 @@
 		updateSale.fields.residentStatus?.set(sale.residentStatus ?? undefined);
 		updateSale.fields.commissionPercentage.set(sale.commissionPercentage ?? undefined);
 		updateSale.fields.passbackAmount.set(sale.passbackAmount ?? undefined);
-		updateSale.fields.callerManagerEmail?.set(sale.callerManagerEmail ?? undefined);
-		updateSale.fields.closerManagerEmail?.set(sale.closerManagerEmail ?? undefined);
-
-		selectedCallerSeniorManagerEmail = sale.callerSeniorManagerEmail ?? '';
-		selectedCloserSeniorManagerEmail = sale.closerSeniorManagerEmail ?? '';
 
 		if (sale.saleDate) {
 			saleDateValue = parseDate(sale.saleDate.slice(0, 10));
@@ -1441,116 +1424,6 @@
 							{#each updateSale.fields.passbackAmount?.issues() ?? [] as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
-						</Field.Field>
-					</div>
-				</Field.Group>
-			</Field.Set>
-			<Field.Separator />
-
-			<!-- Manager Details Section -->
-			<Field.Set>
-				<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-					Manager Details <span class="text-sm font-normal text-muted-foreground">(Optional)</span>
-				</Field.Legend>
-				<Field.Group>
-					<div class="grid grid-cols-2 gap-4">
-						<Field.Field>
-							<Field.Label for="callerManagerEmail">Caller Manager Email</Field.Label>
-							<Input
-								id="callerManagerEmail"
-								type="email"
-								{...updateSale.fields.callerManagerEmail?.as('text')}
-								placeholder="caller-manager@example.com"
-								disabled={!canEditSale}
-							/>
-							{#each updateSale.fields.callerManagerEmail?.issues() ?? [] as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label for="closerManagerEmail">Closer Manager Email</Field.Label>
-							<Input
-								id="closerManagerEmail"
-								type="email"
-								{...updateSale.fields.closerManagerEmail?.as('text')}
-								placeholder="closer-manager@example.com"
-								disabled={!canEditSale}
-							/>
-							{#each updateSale.fields.closerManagerEmail?.issues() ?? [] as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>Caller Senior Manager</Field.Label>
-							<Select.Root
-								type="single"
-								value={selectedCallerSeniorManagerEmail}
-								onValueChange={(v) => (selectedCallerSeniorManagerEmail = v ?? '')}
-								disabled={!canEditSale}
-							>
-								<Select.Trigger>
-									{selectedCallerSeniorManagerEmail
-										? seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)
-												?.firstName
-											? `${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.lastName ?? ''}`.trim()
-											: selectedCallerSeniorManagerEmail
-										: 'Select Caller Senior Manager'}
-								</Select.Trigger>
-								<Select.Content>
-									{#if seniorManagerOptions.length === 0}
-										<div class="px-3 py-2 text-sm text-muted-foreground">
-											No senior managers found
-										</div>
-									{:else}
-										{#each seniorManagerOptions as mgr (mgr.email)}
-											<Select.Item value={mgr.email}>
-												{#if mgr.firstName || mgr.lastName}
-													{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
-												{:else}
-													{mgr.email}
-												{/if}
-											</Select.Item>
-										{/each}
-									{/if}
-								</Select.Content>
-							</Select.Root>
-							<input type="hidden" {...updateSale.fields.callerSeniorManagerEmail?.as('text')} />
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>Closer Senior Manager</Field.Label>
-							<Select.Root
-								type="single"
-								value={selectedCloserSeniorManagerEmail}
-								onValueChange={(v) => (selectedCloserSeniorManagerEmail = v ?? '')}
-								disabled={!canEditSale}
-							>
-								<Select.Trigger>
-									{selectedCloserSeniorManagerEmail
-										? seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)
-												?.firstName
-											? `${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.lastName ?? ''}`.trim()
-											: selectedCloserSeniorManagerEmail
-										: 'Select Closer Senior Manager'}
-								</Select.Trigger>
-								<Select.Content>
-									{#if seniorManagerOptions.length === 0}
-										<div class="px-3 py-2 text-sm text-muted-foreground">
-											No senior managers found
-										</div>
-									{:else}
-										{#each seniorManagerOptions as mgr (mgr.email)}
-											<Select.Item value={mgr.email}>
-												{#if mgr.firstName || mgr.lastName}
-													{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
-												{:else}
-													{mgr.email}
-												{/if}
-											</Select.Item>
-										{/each}
-									{/if}
-								</Select.Content>
-							</Select.Root>
-							<input type="hidden" {...updateSale.fields.closerSeniorManagerEmail?.as('text')} />
 						</Field.Field>
 					</div>
 				</Field.Group>

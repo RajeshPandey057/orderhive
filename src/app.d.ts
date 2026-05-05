@@ -288,10 +288,6 @@ declare global {
 		saleDate?: string;
 		nationality?: string;
 		residentStatus?: 'resident' | 'non-resident';
-		callerManagerEmail?: string;
-		closerManagerEmail?: string;
-		callerSeniorManagerEmail?: string;
-		closerSeniorManagerEmail?: string;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

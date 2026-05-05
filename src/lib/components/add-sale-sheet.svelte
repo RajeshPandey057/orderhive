@@ -19,7 +19,7 @@
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { type DateValue } from '@internationalized/date';
 	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
-	import { firekitCollection, firekitUser } from 'svelte-firekit';
+	import { firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import CheckCircled from '~icons/lucide/check-circle-2';
@@ -112,25 +112,6 @@
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
 
-	const rolesCollection = firekitCollection<Role>('roles');
-
-	// Derived options for manager dropdowns (filtered by agentRole)
-	const seniorManagerOptions = $derived(
-		rolesCollection.data?.filter((r) => r.agentRole === 'senior-manager') ?? []
-	);
-
-	// Selected manager emails
-	let selectedCallerSeniorManagerEmail = $state('');
-	let selectedCloserSeniorManagerEmail = $state('');
-
-	// Sync manager emails to form fields
-	$effect(() => {
-		createSale.fields.callerSeniorManagerEmail?.set(selectedCallerSeniorManagerEmail || undefined);
-	});
-	$effect(() => {
-		createSale.fields.closerSeniorManagerEmail?.set(selectedCloserSeniorManagerEmail || undefined);
-	});
-
 	let dealSplits = $state<SplitEntry[]>([
 		{
 			key: 0,
@@ -151,7 +132,9 @@
 				agentEmail: s.agentEmail,
 				agentPhotoURL: s.agentPhotoURL ?? '',
 				ownerRole: s.ownerRole,
-				percentage: Number(s.percentage) || 0
+				percentage: Number(s.percentage) || 0,
+				managerEmail: s.managerEmail ?? '',
+				seniorManagerEmail: s.seniorManagerEmail ?? ''
 			}))
 		);
 	};
@@ -1291,115 +1274,6 @@
 				</Field.Set>
 				<Field.Separator />
 
-				<!-- Manager Details Section -->
-				<Field.Set>
-					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Manager Details <span class="text-sm font-normal text-muted-foreground">(Optional)</span
-						>
-					</Field.Legend>
-					<Field.Group>
-						<div class="grid grid-cols-2 gap-4">
-							<Field.Field>
-								<Field.Label for="callerManagerEmail">Caller Manager Email</Field.Label>
-								<Input
-									id="callerManagerEmail"
-									type="email"
-									{...createSale.fields.callerManagerEmail?.as('text')}
-									placeholder="caller-manager@example.com"
-								/>
-								{#each createSale.fields.callerManagerEmail?.issues() ?? [] as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field>
-								<Field.Label for="closerManagerEmail">Closer Manager Email</Field.Label>
-								<Input
-									id="closerManagerEmail"
-									type="email"
-									{...createSale.fields.closerManagerEmail?.as('text')}
-									placeholder="closer-manager@example.com"
-								/>
-								{#each createSale.fields.closerManagerEmail?.issues() ?? [] as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field>
-								<Field.Label>Caller Senior Manager</Field.Label>
-								<Select.Root
-									type="single"
-									value={selectedCallerSeniorManagerEmail}
-									onValueChange={(v) => (selectedCallerSeniorManagerEmail = v ?? '')}
-								>
-									<Select.Trigger>
-										{selectedCallerSeniorManagerEmail
-											? seniorManagerOptions.find(
-													(r) => r.email === selectedCallerSeniorManagerEmail
-												)?.firstName
-												? `${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCallerSeniorManagerEmail)?.lastName ?? ''}`.trim()
-												: selectedCallerSeniorManagerEmail
-											: 'Select Caller Senior Manager'}
-									</Select.Trigger>
-									<Select.Content>
-										{#if seniorManagerOptions.length === 0}
-											<div class="px-3 py-2 text-sm text-muted-foreground">
-												No senior managers found
-											</div>
-										{:else}
-											{#each seniorManagerOptions as mgr (mgr.email)}
-												<Select.Item value={mgr.email}>
-													{#if mgr.firstName || mgr.lastName}
-														{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
-													{:else}
-														{mgr.email}
-													{/if}
-												</Select.Item>
-											{/each}
-										{/if}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.callerSeniorManagerEmail?.as('text')} />
-							</Field.Field>
-							<Field.Field>
-								<Field.Label>Closer Senior Manager</Field.Label>
-								<Select.Root
-									type="single"
-									value={selectedCloserSeniorManagerEmail}
-									onValueChange={(v) => (selectedCloserSeniorManagerEmail = v ?? '')}
-								>
-									<Select.Trigger>
-										{selectedCloserSeniorManagerEmail
-											? seniorManagerOptions.find(
-													(r) => r.email === selectedCloserSeniorManagerEmail
-												)?.firstName
-												? `${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.firstName} ${seniorManagerOptions.find((r) => r.email === selectedCloserSeniorManagerEmail)?.lastName ?? ''}`.trim()
-												: selectedCloserSeniorManagerEmail
-											: 'Select Closer Senior Manager'}
-									</Select.Trigger>
-									<Select.Content>
-										{#if seniorManagerOptions.length === 0}
-											<div class="px-3 py-2 text-sm text-muted-foreground">
-												No senior managers found
-											</div>
-										{:else}
-											{#each seniorManagerOptions as mgr (mgr.email)}
-												<Select.Item value={mgr.email}>
-													{#if mgr.firstName || mgr.lastName}
-														{mgr.firstName ?? ''} {mgr.lastName ?? ''} — {mgr.email}
-													{:else}
-														{mgr.email}
-													{/if}
-												</Select.Item>
-											{/each}
-										{/if}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.closerSeniorManagerEmail?.as('text')} />
-							</Field.Field>
-						</div>
-					</Field.Group>
-				</Field.Set>
-				<Field.Separator />
-
 				<!-- Deal Status Section -->
 				<Field.Set>
 					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
@@ -1822,7 +1696,7 @@
 					{/if}
 
 					{#each createSale.fields.invoiceStage.value() ?? [] as stage (stage)}
-						<input type="hidden" name="invoiceStage" value={stage} />
+						<input type="hidden" name="invoiceStage[]" value={stage} />
 					{/each}
 				</Field.Set>
 				<Field.Separator />
@@ -1831,6 +1705,18 @@
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
 					<OrderSplit bind:splits={dealSplits} onsplitschange={(s) => syncSplits(s)} />
+					{#each dealSplits as split, index (split.key)}
+						<input type="hidden" name="splits[{index}].agentId" value={split.agentId} />
+						<input type="hidden" name="splits[{index}].agentEmail" value={split.agentEmail} />
+						<input type="hidden" name="splits[{index}].agentName" value={split.agentName} />
+						<input
+							type="hidden"
+							name="splits[{index}].agentPhotoURL"
+							value={split.agentPhotoURL ?? ''}
+						/>
+						<input type="hidden" name="splits[{index}].ownerRole" value={split.ownerRole} />
+						<input type="hidden" name="n:splits[{index}].percentage" value={split.percentage} />
+					{/each}
 				</Field.Set>
 				<Field.Separator />
 

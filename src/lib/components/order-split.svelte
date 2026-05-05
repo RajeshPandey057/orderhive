@@ -20,7 +20,9 @@
 		ownerRole: 'caller' | 'closer' | 'extra';
 		percentage: number;
 		managerEmail?: string;
+		managerName?: string;
 		seniorManagerEmail?: string;
+		seniorManagerName?: string;
 	};
 
 	interface Props {
@@ -56,12 +58,20 @@
 					agentName: '',
 					agentEmail: '',
 					ownerRole: 'extra',
-					percentage: preset.third
+					percentage: preset.third,
+					managerEmail: '',
+					seniorManagerEmail: ''
 				}
 			];
-			popoverOpen[newKey] = false;
-			searchValues[newKey] = '';
-			searchResults[newKey] = [];
+			agentPopoverOpen[newKey] = false;
+			agentSearchValues[newKey] = '';
+			agentSearchResults[newKey] = [];
+			managerPopoverOpen[newKey] = false;
+			managerSearchValues[newKey] = '';
+			managerSearchResults[newKey] = [];
+			smPopoverOpen[newKey] = false;
+			smSearchValues[newKey] = '';
+			smSearchResults[newKey] = [];
 		} else if (preset.third > 0 && hasExtra) {
 			updated = updated.map((s) =>
 				s.ownerRole === 'extra' ? { ...s, percentage: preset.third } : s
@@ -73,14 +83,28 @@
 
 	let nextKey = $state(splits.length > 0 ? Math.max(...splits.map((s) => s.key)) + 1 : 0);
 
-	// Per-row search state
-	let popoverOpen = $state<Record<number, boolean>>({});
-	let searchValues = $state<Record<number, string>>({});
-	let searchResults = $state<
-		Record<number, { id: string; email: string; displayName?: string; photoURL?: string }[]>
-	>({});
-	let searchLoading = $state<Record<number, boolean>>({});
-	let debounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+	type UserResult = { id: string; email: string; displayName?: string; photoURL?: string };
+
+	// --- Agent search state ---
+	let agentPopoverOpen = $state<Record<number, boolean>>({});
+	let agentSearchValues = $state<Record<number, string>>({});
+	let agentSearchResults = $state<Record<number, UserResult[]>>({});
+	let agentSearchLoading = $state<Record<number, boolean>>({});
+	let agentDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+
+	// --- Manager search state ---
+	let managerPopoverOpen = $state<Record<number, boolean>>({});
+	let managerSearchValues = $state<Record<number, string>>({});
+	let managerSearchResults = $state<Record<number, UserResult[]>>({});
+	let managerSearchLoading = $state<Record<number, boolean>>({});
+	let managerDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+
+	// --- Senior Manager search state ---
+	let smPopoverOpen = $state<Record<number, boolean>>({});
+	let smSearchValues = $state<Record<number, string>>({});
+	let smSearchResults = $state<Record<number, UserResult[]>>({});
+	let smSearchLoading = $state<Record<number, boolean>>({});
+	let smDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
 
 	const totalPercentage = $derived(splits.reduce((sum, s) => sum + (Number(s.percentage) || 0), 0));
 	const remaining = $derived(100 - totalPercentage);
@@ -104,27 +128,51 @@
 		return 'bg-amber-100 text-amber-700';
 	};
 
-	async function doSearch(key: number, term: string) {
-		searchLoading[key] = true;
+	// Generic debounced search
+	async function doSearch(
+		loading: Record<number, boolean>,
+		results: Record<number, UserResult[]>,
+		key: number,
+		term: string
+	) {
+		loading[key] = true;
 		try {
-			searchResults[key] = await searchUsersRemote({ q: term.trim() });
+			results[key] = await searchUsersRemote({ q: term.trim() });
 		} catch {
-			searchResults[key] = [];
+			results[key] = [];
 		} finally {
-			searchLoading[key] = false;
+			loading[key] = false;
 		}
 	}
 
-	function handleSearchInput(key: number, value: string) {
-		searchValues[key] = value;
-		if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
-		debounceTimers[key] = setTimeout(() => doSearch(key, value), 300);
+	function handleAgentSearchInput(key: number, value: string) {
+		agentSearchValues[key] = value;
+		if (agentDebounceTimers[key]) clearTimeout(agentDebounceTimers[key]);
+		agentDebounceTimers[key] = setTimeout(
+			() => doSearch(agentSearchLoading, agentSearchResults, key, value),
+			300
+		);
 	}
 
-	function selectAgent(
-		key: number,
-		agent: { id: string; email: string; displayName?: string; photoURL?: string }
-	) {
+	function handleManagerSearchInput(key: number, value: string) {
+		managerSearchValues[key] = value;
+		if (managerDebounceTimers[key]) clearTimeout(managerDebounceTimers[key]);
+		managerDebounceTimers[key] = setTimeout(
+			() => doSearch(managerSearchLoading, managerSearchResults, key, value),
+			300
+		);
+	}
+
+	function handleSmSearchInput(key: number, value: string) {
+		smSearchValues[key] = value;
+		if (smDebounceTimers[key]) clearTimeout(smDebounceTimers[key]);
+		smDebounceTimers[key] = setTimeout(
+			() => doSearch(smSearchLoading, smSearchResults, key, value),
+			300
+		);
+	}
+
+	function selectAgent(key: number, agent: UserResult) {
 		splits = splits.map((s) =>
 			s.key === key
 				? {
@@ -136,7 +184,35 @@
 					}
 				: s
 		);
-		popoverOpen[key] = false;
+		agentPopoverOpen[key] = false;
+		onsplitschange?.(splits);
+	}
+
+	function selectManager(key: number, user: UserResult) {
+		splits = splits.map((s) =>
+			s.key === key
+				? {
+						...s,
+						managerEmail: user.email,
+						managerName: user.displayName ?? user.email
+					}
+				: s
+		);
+		managerPopoverOpen[key] = false;
+		onsplitschange?.(splits);
+	}
+
+	function selectSeniorManager(key: number, user: UserResult) {
+		splits = splits.map((s) =>
+			s.key === key
+				? {
+						...s,
+						seniorManagerEmail: user.email,
+						seniorManagerName: user.displayName ?? user.email
+					}
+				: s
+		);
+		smPopoverOpen[key] = false;
 		onsplitschange?.(splits);
 	}
 
@@ -146,18 +222,10 @@
 		onsplitschange?.(splits);
 	}
 
-	function updateManagerEmail(key: number, value: string) {
-		splits = splits.map((s) => (s.key === key ? { ...s, managerEmail: value } : s));
-		onsplitschange?.(splits);
-	}
-
-	function updateSeniorManagerEmail(key: number, value: string) {
-		splits = splits.map((s) => (s.key === key ? { ...s, seniorManagerEmail: value } : s));
-		onsplitschange?.(splits);
-	}
-
 	function addAgent() {
 		const newKey = nextKey++;
+		// Second added agent becomes 'closer'; any further additions become 'extra'
+		const hasCloser = splits.some((s) => s.ownerRole === 'closer');
 		splits = [
 			...splits,
 			{
@@ -165,23 +233,39 @@
 				agentId: '',
 				agentName: '',
 				agentEmail: '',
-				ownerRole: 'extra',
+				ownerRole: hasCloser ? 'extra' : 'closer',
 				percentage: 0,
 				managerEmail: '',
 				seniorManagerEmail: ''
 			}
 		];
-		popoverOpen[newKey] = false;
-		searchValues[newKey] = '';
-		searchResults[newKey] = [];
+		agentPopoverOpen[newKey] = false;
+		agentSearchValues[newKey] = '';
+		agentSearchResults[newKey] = [];
+		managerPopoverOpen[newKey] = false;
+		managerSearchValues[newKey] = '';
+		managerSearchResults[newKey] = [];
+		smPopoverOpen[newKey] = false;
+		smSearchValues[newKey] = '';
+		smSearchResults[newKey] = [];
 		onsplitschange?.(splits);
 	}
 
 	function removeAgent(key: number) {
 		splits = splits.filter((s) => s.key !== key);
-		delete popoverOpen[key];
-		delete searchValues[key];
-		delete searchResults[key];
+		for (const store of [
+			agentPopoverOpen,
+			agentSearchValues,
+			agentSearchResults,
+			managerPopoverOpen,
+			managerSearchValues,
+			managerSearchResults,
+			smPopoverOpen,
+			smSearchValues,
+			smSearchResults
+		]) {
+			delete store[key];
+		}
 		onsplitschange?.(splits);
 	}
 </script>
@@ -222,7 +306,9 @@
 	<!-- Split rows -->
 	{#each splits as split (split.key)}
 		{@const isLocked = split.ownerRole === 'caller' || split.ownerRole === 'closer'}
-		<div class="space-y-1.5 rounded-lg border border-border/50 bg-muted/10 p-2">
+		{@const requiresManager = split.ownerRole === 'caller' || split.ownerRole === 'closer'}
+		<div class="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-2">
+			<!-- Agent row -->
 			<div class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
 				<!-- Role badge -->
 				<span
@@ -235,8 +321,8 @@
 
 				<!-- Agent picker -->
 				<Popover.Root
-					open={popoverOpen[split.key] ?? false}
-					onOpenChange={(v) => (popoverOpen[split.key] = v)}
+					open={agentPopoverOpen[split.key] ?? false}
+					onOpenChange={(v) => (agentPopoverOpen[split.key] = v)}
 				>
 					<Popover.Trigger
 						{disabled}
@@ -260,31 +346,32 @@
 						<Command.Root>
 							<Command.Input
 								placeholder="Search agents…"
-								value={searchValues[split.key] ?? ''}
-								oninput={(e) => handleSearchInput(split.key, (e.target as HTMLInputElement).value)}
+								value={agentSearchValues[split.key] ?? ''}
+								oninput={(e) =>
+									handleAgentSearchInput(split.key, (e.target as HTMLInputElement).value)}
 							/>
 							<Command.List>
-								{#if searchLoading[split.key]}
+								{#if agentSearchLoading[split.key]}
 									<div class="flex items-center justify-center py-4">
 										<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
 									</div>
-								{:else if (searchResults[split.key] ?? []).length === 0}
+								{:else if (agentSearchResults[split.key] ?? []).length === 0}
 									<Command.Empty>
-										{(searchValues[split.key] ?? '').trim()
-											? 'No agents found.'
-											: 'Type to search agents…'}
+										{(agentSearchValues[split.key] ?? '').trim()
+											? 'No users found.'
+											: 'Type to search…'}
 									</Command.Empty>
 								{:else}
 									<Command.Group>
-										{#each searchResults[split.key] ?? [] as agent (agent.id)}
+										{#each agentSearchResults[split.key] ?? [] as agent (agent.id)}
 											<Command.Item value={agent.id} onSelect={() => selectAgent(split.key, agent)}>
 												<Avatar.Root class="h-5 w-5">
 													{#if agent.photoURL}
 														<Avatar.Image src={agent.photoURL} alt={agent.displayName} />
 													{/if}
-													<Avatar.Fallback class="text-[10px]"
-														>{getInitials(agent.displayName ?? agent.email)}</Avatar.Fallback
-													>
+													<Avatar.Fallback class="text-[10px]">
+														{getInitials(agent.displayName ?? agent.email)}
+													</Avatar.Fallback>
 												</Avatar.Root>
 												<div class="ml-2 min-w-0">
 													<div class="truncate text-sm font-medium">
@@ -333,24 +420,167 @@
 				{/if}
 			</div>
 
-			<!-- RM / SM email sub-row -->
+			<!-- Manager / Senior Manager row -->
 			<div class="grid grid-cols-2 gap-2 pl-1">
-				<Input
-					type="email"
-					{disabled}
-					value={split.managerEmail ?? ''}
-					oninput={(e) => updateManagerEmail(split.key, (e.target as HTMLInputElement).value)}
-					placeholder="RM email (optional)"
-					class="h-7 text-xs"
-				/>
-				<Input
-					type="email"
-					{disabled}
-					value={split.seniorManagerEmail ?? ''}
-					oninput={(e) => updateSeniorManagerEmail(split.key, (e.target as HTMLInputElement).value)}
-					placeholder="SM email (optional)"
-					class="h-7 text-xs"
-				/>
+				<!-- Manager picker -->
+				<div class="space-y-0.5">
+					<span class="text-[10px] font-medium text-muted-foreground">
+						Manager{requiresManager ? ' *' : ''}
+					</span>
+					<Popover.Root
+						open={managerPopoverOpen[split.key] ?? false}
+						onOpenChange={(v) => (managerPopoverOpen[split.key] = v)}
+					>
+						<Popover.Trigger
+							{disabled}
+							class="flex h-8 w-full items-center justify-start gap-1.5 rounded-md border border-input bg-background px-2.5 text-left text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 {requiresManager &&
+							!split.managerEmail
+								? 'border-destructive/60'
+								: ''}"
+						>
+							{#if split.managerEmail}
+								<Avatar.Root class="h-4 w-4">
+									<Avatar.Fallback class="text-[8px]">
+										{getInitials(split.managerName ?? split.managerEmail)}
+									</Avatar.Fallback>
+								</Avatar.Root>
+								<span class="truncate">{split.managerName ?? split.managerEmail}</span>
+							{:else}
+								<UserRound class="h-3 w-3 text-muted-foreground" />
+								<span class="text-muted-foreground">
+									{requiresManager ? 'Select manager…' : 'Manager (optional)'}
+								</span>
+							{/if}
+						</Popover.Trigger>
+						<Popover.Content class="w-72 p-0" align="start">
+							<Command.Root>
+								<Command.Input
+									placeholder="Search managers…"
+									value={managerSearchValues[split.key] ?? ''}
+									oninput={(e) =>
+										handleManagerSearchInput(split.key, (e.target as HTMLInputElement).value)}
+								/>
+								<Command.List>
+									{#if managerSearchLoading[split.key]}
+										<div class="flex items-center justify-center py-4">
+											<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+										</div>
+									{:else if (managerSearchResults[split.key] ?? []).length === 0}
+										<Command.Empty>
+											{(managerSearchValues[split.key] ?? '').trim()
+												? 'No users found.'
+												: 'Type to search…'}
+										</Command.Empty>
+									{:else}
+										<Command.Group>
+											{#each managerSearchResults[split.key] ?? [] as user (user.id)}
+												<Command.Item
+													value={user.id}
+													onSelect={() => selectManager(split.key, user)}
+												>
+													<Avatar.Root class="h-5 w-5">
+														{#if user.photoURL}
+															<Avatar.Image src={user.photoURL} alt={user.displayName} />
+														{/if}
+														<Avatar.Fallback class="text-[10px]">
+															{getInitials(user.displayName ?? user.email)}
+														</Avatar.Fallback>
+													</Avatar.Root>
+													<div class="ml-2 min-w-0">
+														<div class="truncate text-sm font-medium">
+															{user.displayName ?? user.email}
+														</div>
+														<div class="truncate text-xs text-muted-foreground">{user.email}</div>
+													</div>
+												</Command.Item>
+											{/each}
+										</Command.Group>
+									{/if}
+								</Command.List>
+							</Command.Root>
+						</Popover.Content>
+					</Popover.Root>
+				</div>
+
+				<!-- Senior Manager picker -->
+				<div class="space-y-0.5">
+					<span class="text-[10px] font-medium text-muted-foreground">
+						Senior Manager{requiresManager ? ' *' : ''}
+					</span>
+					<Popover.Root
+						open={smPopoverOpen[split.key] ?? false}
+						onOpenChange={(v) => (smPopoverOpen[split.key] = v)}
+					>
+						<Popover.Trigger
+							{disabled}
+							class="flex h-8 w-full items-center justify-start gap-1.5 rounded-md border border-input bg-background px-2.5 text-left text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 {requiresManager &&
+							!split.seniorManagerEmail
+								? 'border-destructive/60'
+								: ''}"
+						>
+							{#if split.seniorManagerEmail}
+								<Avatar.Root class="h-4 w-4">
+									<Avatar.Fallback class="text-[8px]">
+										{getInitials(split.seniorManagerName ?? split.seniorManagerEmail)}
+									</Avatar.Fallback>
+								</Avatar.Root>
+								<span class="truncate">{split.seniorManagerName ?? split.seniorManagerEmail}</span>
+							{:else}
+								<UserRound class="h-3 w-3 text-muted-foreground" />
+								<span class="text-muted-foreground">
+									{requiresManager ? 'Select senior manager…' : 'Senior manager (optional)'}
+								</span>
+							{/if}
+						</Popover.Trigger>
+						<Popover.Content class="w-72 p-0" align="start">
+							<Command.Root>
+								<Command.Input
+									placeholder="Search senior managers…"
+									value={smSearchValues[split.key] ?? ''}
+									oninput={(e) =>
+										handleSmSearchInput(split.key, (e.target as HTMLInputElement).value)}
+								/>
+								<Command.List>
+									{#if smSearchLoading[split.key]}
+										<div class="flex items-center justify-center py-4">
+											<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+										</div>
+									{:else if (smSearchResults[split.key] ?? []).length === 0}
+										<Command.Empty>
+											{(smSearchValues[split.key] ?? '').trim()
+												? 'No users found.'
+												: 'Type to search…'}
+										</Command.Empty>
+									{:else}
+										<Command.Group>
+											{#each smSearchResults[split.key] ?? [] as user (user.id)}
+												<Command.Item
+													value={user.id}
+													onSelect={() => selectSeniorManager(split.key, user)}
+												>
+													<Avatar.Root class="h-5 w-5">
+														{#if user.photoURL}
+															<Avatar.Image src={user.photoURL} alt={user.displayName} />
+														{/if}
+														<Avatar.Fallback class="text-[10px]">
+															{getInitials(user.displayName ?? user.email)}
+														</Avatar.Fallback>
+													</Avatar.Root>
+													<div class="ml-2 min-w-0">
+														<div class="truncate text-sm font-medium">
+															{user.displayName ?? user.email}
+														</div>
+														<div class="truncate text-xs text-muted-foreground">{user.email}</div>
+													</div>
+												</Command.Item>
+											{/each}
+										</Command.Group>
+									{/if}
+								</Command.List>
+							</Command.Root>
+						</Popover.Content>
+					</Popover.Root>
+				</div>
 			</div>
 		</div>
 	{/each}

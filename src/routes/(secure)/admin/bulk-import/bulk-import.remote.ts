@@ -61,8 +61,6 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		closer_manager_email: z.string().optional().or(z.literal('')),
 		caller_senior_manager_email: z.string().optional().or(z.literal('')),
 		closer_senior_manager_email: z.string().optional().or(z.literal('')),
-		third_agent_manager_email: z.string().optional().or(z.literal('')),
-		third_agent_senior_manager_email: z.string().optional().or(z.literal('')),
 		commission_percentage: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
 		passback_amount: z.coerce.number().min(0).optional().or(z.literal(''))
 	});
@@ -84,6 +82,24 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		req(data.developer, 'developer', 'developer is required');
 		req(data.project, 'project', 'project is required');
 		req(data.sale_date, 'sale_date', 'sale_date is required');
+		req(data.caller_manager_email, 'caller_manager_email', 'caller_manager_email is required');
+		req(
+			data.caller_senior_manager_email,
+			'caller_senior_manager_email',
+			'caller_senior_manager_email is required'
+		);
+		if (data.closer_email && data.closer_email.trim() !== '') {
+			req(
+				data.closer_manager_email,
+				'closer_manager_email',
+				'closer_manager_email is required when closer_email is set'
+			);
+			req(
+				data.closer_senior_manager_email,
+				'closer_senior_manager_email',
+				'closer_senior_manager_email is required when closer_email is set'
+			);
+		}
 
 		if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
 			ctx.addIssue({ code: 'custom', path: ['email'], message: 'email must be valid' });
@@ -599,13 +615,12 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		// Ensure role documents exist for any manager emails provided
 		await Promise.all(
 			[
-				primary.caller_manager_email,
-				primary.closer_manager_email,
-				primary.caller_senior_manager_email,
-				primary.closer_senior_manager_email
-			]
-				.filter((e): e is string => !!e && typeof e === 'string' && e.trim() !== '')
-				.map((email) => resolveUserByEmail(email))
+				...new Set(
+					dealOwners
+						.flatMap((o) => [o.managerEmail, o.seniorManagerEmail])
+						.filter((e): e is string => !!e && e.trim() !== '')
+				)
+			].map((email) => resolveUserByEmail(email))
 		);
 
 		const saleRecord = {
@@ -689,14 +704,6 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 				['resident', 'non-resident'].includes(primary.resident_status) && {
 					residentStatus: primary.resident_status as 'resident' | 'non-resident'
 				}),
-			...(primary.caller_manager_email && { callerManagerEmail: primary.caller_manager_email }),
-			...(primary.closer_manager_email && { closerManagerEmail: primary.closer_manager_email }),
-			...(primary.caller_senior_manager_email && {
-				callerSeniorManagerEmail: primary.caller_senior_manager_email
-			}),
-			...(primary.closer_senior_manager_email && {
-				closerSeniorManagerEmail: primary.closer_senior_manager_email
-			}),
 			commnets: [],
 			createdByUid,
 			createdByEmail: callerUser?.email ?? '',
