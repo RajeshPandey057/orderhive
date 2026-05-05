@@ -212,7 +212,7 @@ declare global {
 			agentEmail?: string;
 			agentPhotoURL?: string;
 			percentage: number;
-			ownerRole: 'caller' | 'closer' | 'extra';
+			ownerRole: 'caller' | 'closer' | 'closer2' | 'closer3';
 			managerEmail?: string;
 			seniorManagerEmail?: string;
 		}[];

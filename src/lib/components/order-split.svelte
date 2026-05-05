@@ -415,7 +415,7 @@
 					<span class="text-sm text-muted-foreground">%</span>
 				</div>
 
-				<!-- Remove button (only for 'extra' rows) -->
+				<!-- Remove button (only for closer2/closer3 rows) -->
 				{#if !isLocked && !disabled}
 					<Button
 						type="button"

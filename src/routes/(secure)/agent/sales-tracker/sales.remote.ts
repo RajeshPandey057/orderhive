@@ -509,21 +509,19 @@ const updateSaleSchema = z
 					});
 				}
 				splits.forEach((s, i) => {
-					if (s.ownerRole === 'caller' || s.ownerRole === 'closer') {
-						if (!s.managerEmail || s.managerEmail.trim() === '') {
-							ctx.addIssue({
-								code: 'custom',
-								path: [i, 'managerEmail'],
-								message: `Manager email is required for the ${s.ownerRole}`
-							});
-						}
-						if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
-							ctx.addIssue({
-								code: 'custom',
-								path: [i, 'seniorManagerEmail'],
-								message: `Senior manager email is required for the ${s.ownerRole}`
-							});
-						}
+					if (!s.managerEmail || s.managerEmail.trim() === '') {
+						ctx.addIssue({
+							code: 'custom',
+							path: [i, 'managerEmail'],
+							message: `Manager email is required for the ${s.ownerRole}`
+						});
+					}
+					if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
+						ctx.addIssue({
+							code: 'custom',
+							path: [i, 'seniorManagerEmail'],
+							message: `Senior manager email is required for the ${s.ownerRole}`
+						});
 					}
 				});
 			}),

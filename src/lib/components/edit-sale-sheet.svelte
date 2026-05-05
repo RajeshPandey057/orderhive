@@ -152,7 +152,13 @@
 			agentName: owner.name,
 			agentEmail: owner.email,
 			agentPhotoURL: owner.photoURL ?? undefined,
-			ownerRole: (idx >= 2 ? 'extra' : owner.ownerRole) as 'caller' | 'closer' | 'extra',
+			ownerRole: (idx === 0
+				? 'caller'
+				: idx === 1
+					? 'closer'
+					: idx === 2
+						? 'closer2'
+						: 'closer3') as 'caller' | 'closer' | 'closer2' | 'closer3',
 			percentage: owner.split,
 			// Fallback from top-level fields for legacy records
 			managerEmail:
