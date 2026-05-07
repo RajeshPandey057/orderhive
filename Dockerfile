@@ -9,7 +9,7 @@ RUN apk add --no-cache libc6-compat chromium nss freetype harfbuzz ca-certificat
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 # enable corepack for pnpm
-RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.0.8 --activate
 
 COPY . /app
 WORKDIR /app
@@ -19,7 +19,7 @@ FROM base AS prod-deps
 ENV CI=true
 ENV NODE_BUILD=true
 # mount pnpm store as cache & fetch dependencies
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 
 FROM base AS build
