@@ -1,5 +1,5 @@
 #syntax=docker/dockerfile:1.4
-FROM node:22-alpine AS base
+FROM node:20-alpine AS base
 ARG DOTENV_PRIVATE_KEY_CI=privatekey
 ENV DOTENV_PRIVATE_KEY_CI=${DOTENV_PRIVATE_KEY_CI}
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -9,7 +9,7 @@ RUN apk add --no-cache libc6-compat chromium nss freetype harfbuzz ca-certificat
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 # enable corepack for pnpm
-RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.0.8 --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@10 --activate
 
 COPY . /app
 WORKDIR /app
@@ -19,7 +19,7 @@ FROM base AS prod-deps
 ENV CI=true
 ENV NODE_BUILD=true
 # mount pnpm store as cache & fetch dependencies
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN pnpm install --prod --frozen-lockfile
 
 
 FROM base AS build
