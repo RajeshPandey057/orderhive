@@ -110,6 +110,7 @@
 			"@firebase/util",
 			"esbuild",
 			"protobufjs",
+			"puppeteer",
 			"sharp"
 		]
 	}
