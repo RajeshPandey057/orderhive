@@ -190,27 +190,6 @@
 		},
 		{ column: 'tentative_eligibility_date', required: 'No', notes: 'DD/MM/YYYY format.' },
 		{
-			column: 'caller_manager_email',
-			required: 'Yes (primary)',
-			notes: 'Valid email. Required for caller in strict mode.'
-		},
-		{
-			column: 'closer_manager_email',
-			required: 'Yes (when closer_email set)',
-			notes: 'Valid email. Required when closer_email is provided in strict mode.'
-		},
-		{
-			column: 'caller_senior_manager_email',
-			required: 'Yes (primary)',
-			notes: "Email of the caller's senior manager. Required for caller in strict mode."
-		},
-		{
-			column: 'closer_senior_manager_email',
-			required: 'Yes (when closer_email set)',
-			notes:
-				"Email of the closer's senior manager. Required when closer_email is provided in strict mode."
-		},
-		{
 			column: 'commission_percentage',
 			required: 'No',
 			notes:
