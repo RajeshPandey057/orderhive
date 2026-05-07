@@ -41,3 +41,5 @@ scripts/exportDB.ts
 # ESLint
 .eslintcache
 src/routes/(secured)/chat/instructions.md
+
+.polygram/

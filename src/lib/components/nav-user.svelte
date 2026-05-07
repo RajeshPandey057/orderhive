@@ -3,12 +3,41 @@
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { getInitials } from '@/utils';
+	import { firekitAuth } from 'svelte-firekit';
+	import { toast } from 'svelte-sonner';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import LogOutIcon from '@lucide/svelte/icons/log-out';
 
 	let {
 		user
 	}: { user: { name: string; email: string; avatar: string | undefined; role: string } } = $props();
+
+	let loggingOut = $state(false);
+
+	async function handleLogout() {
+		loggingOut = true;
+		try {
+			await firekitAuth.signOut();
+			toast.success('Logged out successfully');
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : 'Failed to logout');
+			loggingOut = false;
+		}
+	}
 </script>
+
+<Sidebar.Menu>
+	<Sidebar.MenuItem>
+		<Sidebar.MenuButton
+			onclick={handleLogout}
+			disabled={loggingOut}
+			class="h-10 text-sm text-[#222626]"
+		>
+			<LogOutIcon class="size-4" />
+			<span>{loggingOut ? 'Logging out...' : 'Log Out'}</span>
+		</Sidebar.MenuButton>
+	</Sidebar.MenuItem>
+</Sidebar.Menu>
 
 <Sidebar.Menu>
 	<Sidebar.MenuItem>

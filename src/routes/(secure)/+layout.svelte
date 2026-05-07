@@ -10,7 +10,7 @@
 
 {#if dev}
 	<Sidebar.Provider>
-		<AppSidebar {data} />
+		<AppSidebar {data} collapsible="none" />
 		<Sidebar.Inset>
 			{@render children?.()}
 		</Sidebar.Inset>
@@ -19,7 +19,7 @@
 {:else}
 	<AuthGuard requireAuth={true} redirectTo="/">
 		<Sidebar.Provider>
-			<AppSidebar {data} />
+			<AppSidebar {data} collapsible="none" />
 			<Sidebar.Inset>
 				{@render children?.()}
 			</Sidebar.Inset>

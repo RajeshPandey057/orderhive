@@ -12,6 +12,8 @@
 	import LucideShield from '~icons/lucide/shield';
 	import LucideUserCog from '~icons/lucide/user-cog';
 	import LucideUsers from '~icons/lucide/users';
+	import LucideClock from '~icons/lucide/clock';
+	import LucideCalendarDays from '~icons/lucide/calendar-days';
 
 	// Icon mapping for menu items
 	const iconMap: Record<string, typeof LucideLayoutPanelTop> = {
@@ -23,15 +25,25 @@
 		'View Listings': LucideList,
 		'All Sales': LucideReceipt,
 		'Team Management': LucideUsers,
+		'Employee Management': LucideUsers,
 		'Pending Sales': LucideClipboardCheck,
 		'Approved Sales': LucideClipboardCheck,
 		"Next Month's Sales": LucideCalendarClock,
+		'Holiday Calendar': LucideCalendarDays,
+		'Holiday Management': LucideCalendarDays,
 		Invoices: LucideFileText,
 		'Agent Dashboard': LucideLayoutPanelTop,
 		'Compliance Dashboard': LucideLayoutPanelTop,
 		'Finance Dashboard': LucideLayoutPanelTop,
 		'User Management': LucideUserCog,
-		'Bulk Import': LucideUploadCloud
+		Profile: LucideUserCog,
+		'Bulk Import': LucideUploadCloud,
+		Attendance: LucideClock,
+		'Attendance Management': LucideClock,
+		'Attendance Record': LucideClock,
+		'My Attendance': LucideClock,
+		'Leave Management': LucideCalendarClock,
+		'My Leaves': LucideCalendarClock
 	};
 
 	function getIconForMenuItem(title: string): typeof LucideLayoutPanelTop {
@@ -73,6 +85,70 @@
 				}))
 			: []
 	);
+
+	const navSections = $derived.by(() => {
+		if (!data?.user?.role) return [];
+		if (data.user.role !== 'admin' && data.user.role !== 'super-admin') return [];
+
+		const navMap = new Map(
+			navItems.map((item) => [
+				item.url,
+				{
+					title: item.title,
+					url: item.url,
+					isActive: item.isActive,
+					icon: item.icon,
+					external: item.external
+				}
+			])
+		);
+
+		return [
+			{
+				title: 'Deals',
+				items: [
+					{
+						title: 'Sales Dashboard',
+						url: navMap.get('/admin/dashboard')?.url || '/admin/dashboard',
+						isActive: navMap.get('/admin/dashboard')?.isActive,
+						icon: navMap.get('/admin/dashboard')?.icon,
+						external: navMap.get('/admin/dashboard')?.external
+					},
+					{
+						title: 'All Sales/Deals',
+						url: navMap.get('/admin/all-sales')?.url || '/admin/all-sales',
+						isActive: navMap.get('/admin/all-sales')?.isActive,
+						icon: navMap.get('/admin/all-sales')?.icon,
+						external: navMap.get('/admin/all-sales')?.external
+					},
+					navMap.get('/admin/bulk-import')
+				]
+			},
+			{
+				title: 'Listing',
+				items: [navMap.get('/listings'), navMap.get('/listing/listing-management')].filter(Boolean)
+			},
+			{
+				title: 'Leave & Attendance',
+				items: [navMap.get('/attendance'), navMap.get('/my-attendance'), navMap.get('/leave')].filter(
+					Boolean
+				)
+			},
+			{
+				title: 'Employee Management',
+				items: [
+					{
+						title: 'Employees & Access Mgmt',
+						url: navMap.get('/hr/employees')?.url || '/hr/employees',
+						isActive: isMenuItemActive('/hr/employees', page.url.pathname),
+						icon: navMap.get('/hr/employees')?.icon,
+						external: navMap.get('/hr/employees')?.external
+					},
+					navMap.get('/holidays')
+				].filter(Boolean)
+			}
+		];
+	});
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
@@ -92,7 +168,7 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<NavMain items={navItems} />
+		<NavMain items={navItems} sections={navSections} />
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<NavUser
