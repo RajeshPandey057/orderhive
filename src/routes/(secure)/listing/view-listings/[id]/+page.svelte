@@ -49,7 +49,15 @@
 		];
 	}
 
-	const galleryImages = $derived(listing ? getPlaceholderGalleryImages(listing.id) : []);
+	const uploadedImageUrls = $derived((data.media?.images ?? []) as string[]);
+	const uploadedVideoUrls = $derived((data.media?.videos ?? []) as string[]);
+	const galleryImages = $derived(
+		listing
+			? uploadedImageUrls.length > 0
+				? uploadedImageUrls
+				: getPlaceholderGalleryImages(listing.id)
+			: []
+	);
 </script>
 
 <header
@@ -174,6 +182,19 @@
 					</div>
 				</div>
 			</section>
+
+			{#if uploadedVideoUrls.length > 0}
+				<section class="rounded-xl border border-border bg-card p-3">
+					<h3 class="mb-3 text-base font-semibold text-foreground">Videos</h3>
+					<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+						{#each uploadedVideoUrls as videoUrl (videoUrl)}
+							<video src={videoUrl} class="w-full rounded-lg border border-border" controls>
+								<track kind="captions" />
+							</video>
+						{/each}
+					</div>
+				</section>
+			{/if}
 
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<!-- Client Details -->

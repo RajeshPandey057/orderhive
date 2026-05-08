@@ -121,9 +121,9 @@ const listingSchema = z
 			.default([]),
 
 		// Pricing
-		buyingPrice: z.number().min(0, 'Buying price is required'),
-		liquidityInvested: z.number().min(0, 'Liquidity invested is required'),
-		sellingPrice: z.number().min(0, 'Selling price is required'),
+		buyingPrice: z.coerce.number().min(0, 'Buying price is required'),
+		liquidityInvested: z.coerce.number().min(0, 'Liquidity invested is required'),
+		sellingPrice: z.coerce.number().min(0, 'Selling price is required'),
 
 		// Listed by agents
 		listedByEmails: z.union([

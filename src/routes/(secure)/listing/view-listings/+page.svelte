@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -99,11 +100,11 @@
 	}
 
 	function getDetailUrl(listing: Listing): string {
-		return `/listing/view-listings/${listing.id.toLowerCase()}`;
+		return `/listing/${listing.id.toLowerCase()}`;
 	}
 
 	function getPortalUrl(listing: Listing): string {
-		return `/listings/${slugify(listing.project)}-${listing.id.toLowerCase()}`;
+		return resolve(`/listings/${slugify(listing.project)}-${listing.id.toLowerCase()}`);
 	}
 
 	const allListings = $derived((data.listings ?? []) as Listing[]);
