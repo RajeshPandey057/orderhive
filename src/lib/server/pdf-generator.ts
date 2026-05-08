@@ -1,3 +1,4 @@
+import type { Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
 
 export interface PDFGenerationOptions {
@@ -10,6 +11,32 @@ export interface PDFGenerationOptions {
 		bottom?: string;
 		left?: string;
 	};
+}
+
+async function waitForRenderStability(page: Page) {
+	// Avoid waiting on network idle because external CDNs can keep requests open.
+	await page.waitForFunction(
+		() => document.readyState === 'interactive' || document.readyState === 'complete',
+		{
+			timeout: 5000
+		}
+	);
+
+	await page
+		.evaluate(async () => {
+			if ('fonts' in document) {
+				try {
+					await document.fonts.ready;
+				} catch {
+					// Fall through; missing fonts should not block PDF generation.
+				}
+			}
+		})
+		.catch(() => {
+			// Non-fatal: some Chromium builds may not fully support document.fonts.
+		});
+
+	await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
 /**
@@ -35,13 +62,24 @@ export async function generatePDFFromHTML(options: PDFGenerationOptions): Promis
 
 		const page = await browser.newPage();
 
-		// Set content and wait for resources to load
-		await page.setContent(htmlContent, {
-			waitUntil: ['load', 'networkidle0']
+		// Block remote font hosts to prevent hangs from slow/unreachable font CDNs.
+		await page.setRequestInterception(true);
+		page.on('request', (request) => {
+			const url = request.url();
+			if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
+				request.abort();
+				return;
+			}
+			request.continue();
 		});
 
-		// Give extra time for Tailwind CSS to load from CDN
-		await new Promise((resolve) => setTimeout(resolve, 1000));
+		// Wait for DOM availability instead of strict network idle.
+		await page.setContent(htmlContent, {
+			waitUntil: 'domcontentloaded',
+			timeout: 15000
+		});
+
+		await waitForRenderStability(page);
 
 		// Generate PDF
 		const pdfBuffer = await page.pdf({
@@ -89,11 +127,22 @@ export async function generateMultiplePDFs(documents: PDFGenerationOptions[]): P
 
 			const page = await browser.newPage();
 
-			await page.setContent(htmlContent, {
-				waitUntil: ['load', 'networkidle0']
+			await page.setRequestInterception(true);
+			page.on('request', (request) => {
+				const url = request.url();
+				if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
+					request.abort();
+					return;
+				}
+				request.continue();
 			});
 
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			await page.setContent(htmlContent, {
+				waitUntil: 'domcontentloaded',
+				timeout: 15000
+			});
+
+			await waitForRenderStability(page);
 
 			const pdfBuffer = await page.pdf({
 				format,

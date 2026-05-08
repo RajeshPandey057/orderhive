@@ -10,7 +10,7 @@ node_modules
 /.svelte-kit
 /build
 /package
-
+.pnpm-store
 # OS
 .DS_Store
 Thumbs.db
