@@ -43,6 +43,8 @@ COPY --from=build --chown=sveltekit:nodejs /app/package.json ./package.json
 
 # For SvelteKit ENV resolution, see: https://kit.svelte.dev/docs/adapter-node
 ENV NODE_ENV=production
+# Allow up to 50 MB multipart uploads (file attachments in sales/listings forms)
+ENV BODY_SIZE_LIMIT=52428800
 ARG PORT=8080
 ENV HOST=0.0.0.0
 ENV PORT=${PORT}
