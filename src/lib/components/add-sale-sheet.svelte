@@ -1716,6 +1716,16 @@
 						/>
 						<input type="hidden" name="splits[{index}].ownerRole" value={split.ownerRole} />
 						<input type="hidden" name="n:splits[{index}].percentage" value={split.percentage} />
+						<input
+							type="hidden"
+							name="splits[{index}].managerEmail"
+							value={split.managerEmail ?? ''}
+						/>
+						<input
+							type="hidden"
+							name="splits[{index}].seniorManagerEmail"
+							value={split.seniorManagerEmail ?? ''}
+						/>
 					{/each}
 				</Field.Set>
 				<Field.Separator />

@@ -138,11 +138,12 @@
 		loading: Record<number, boolean>,
 		results: Record<number, UserResult[]>,
 		key: number,
-		term: string
+		term: string,
+		roleFilter?: 'manager' | 'senior-manager'
 	) {
 		loading[key] = true;
 		try {
-			results[key] = await searchUsersRemote({ q: term.trim() });
+			results[key] = await searchUsersRemote({ q: term.trim(), ...(roleFilter && { roleFilter }) });
 		} catch {
 			results[key] = [];
 		} finally {
@@ -163,7 +164,7 @@
 		managerSearchValues[key] = value;
 		if (managerDebounceTimers[key]) clearTimeout(managerDebounceTimers[key]);
 		managerDebounceTimers[key] = setTimeout(
-			() => doSearch(managerSearchLoading, managerSearchResults, key, value),
+			() => doSearch(managerSearchLoading, managerSearchResults, key, value, 'manager'),
 			300
 		);
 	}
@@ -172,7 +173,7 @@
 		smSearchValues[key] = value;
 		if (smDebounceTimers[key]) clearTimeout(smDebounceTimers[key]);
 		smDebounceTimers[key] = setTimeout(
-			() => doSearch(smSearchLoading, smSearchResults, key, value),
+			() => doSearch(smSearchLoading, smSearchResults, key, value, 'senior-manager'),
 			300
 		);
 	}
@@ -312,7 +313,7 @@
 
 	<!-- Split rows -->
 	{#each splits as split (split.key)}
-		{@const isLocked = split.ownerRole === 'caller' || split.ownerRole === 'closer'}
+		{@const isLocked = split.ownerRole === 'caller'}
 		{@const requiresManager =
 			split.ownerRole === 'caller' ||
 			split.ownerRole === 'closer' ||

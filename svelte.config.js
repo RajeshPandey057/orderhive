@@ -23,6 +23,10 @@ export default {
 		alias: {
 			'@': 'src/lib'
 		},
+		server: {
+			// Increase body size limit to support multi-file form submissions
+			bodySizeLimit: 10 * 1024 * 1024 // 10 MB
+		},
 		experimental: { remoteFunctions: true }
 	},
 	compilerOptions: {

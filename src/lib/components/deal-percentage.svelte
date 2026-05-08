@@ -18,7 +18,7 @@
 
 	const handleCustomChange = (e: Event) => {
 		const input = e.target as HTMLInputElement;
-		value = input.value ? Number(input.value) : 0;
+		value = Math.min(100, Math.max(0, Number(input.value) || 0));
 		onValueChange?.(value);
 	};
 
@@ -47,6 +47,8 @@
 
 	<Input
 		type="number"
+		min={0}
+		max={100}
 		placeholder="Custom Value"
 		value={isCustom ? value : ''}
 		onchange={handleCustomChange}

@@ -3,12 +3,13 @@ import { firestore } from '$lib/server/firebase';
 import { z } from 'zod';
 
 const searchSchema = z.object({
-	q: z.string().default('')
+	q: z.string().default(''),
+	// When set, restricts results to users with the given agentRole OR super-admins
+	roleFilter: z.enum(['manager', 'senior-manager']).optional()
 });
 
-export const searchUsers = query(searchSchema, async ({ q }) => {
+export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 	const term = q.trim().toLowerCase();
-	const usersRef = firestore.collection('users');
 	const rolesRef = firestore.collection('roles');
 
 	type UserResult = {
@@ -16,6 +17,7 @@ export const searchUsers = query(searchSchema, async ({ q }) => {
 		displayName: string | null;
 		email: string | null;
 		photoURL: string | null;
+		agentRole?: string | null;
 	};
 
 	const seen: Record<string, true> = {};
@@ -29,9 +31,33 @@ export const searchUsers = query(searchSchema, async ({ q }) => {
 			id: doc.id,
 			displayName: data.displayName ?? null,
 			email: data.email ?? null,
-			photoURL: data.photoURL ?? null
+			photoURL: data.photoURL ?? null,
+			agentRole: data.agentRole ?? null
 		});
 	}
+
+	// --- Role-filtered mode: only search roles collection for matching agentRole + super-admins ---
+	if (roleFilter) {
+		const [byRoleSnap, superAdminSnap] = await Promise.all([
+			rolesRef.where('agentRole', '==', roleFilter).limit(200).get(),
+			rolesRef.where('accessType', '==', 'super-admin').limit(200).get()
+		]);
+		for (const snap of [byRoleSnap, superAdminSnap]) {
+			for (const doc of snap.docs) addDoc(doc);
+		}
+
+		if (term) {
+			return results.filter((r) => {
+				const name = (r.displayName ?? '').toLowerCase();
+				const email = (r.email ?? '').toLowerCase();
+				return name.includes(term) || email.includes(term);
+			});
+		}
+		return results;
+	}
+
+	// --- Default mode: search all users + roles ---
+	const usersRef = firestore.collection('users');
 
 	if (term) {
 		const end = term + '\uf8ff';
