@@ -54,7 +54,8 @@
 	}
 
 	function getImageUrl(listing: Listing): string {
-		return `https://picsum.photos/seed/${listing.id}/560/380`;
+		const firstPhoto = listing.mediaAssets?.find((a) => a.type === 'photo' && a.url);
+		return firstPhoto?.url ?? `https://picsum.photos/seed/${listing.id}/560/380`;
 	}
 
 	function getBedroomLabel(type?: string): string {

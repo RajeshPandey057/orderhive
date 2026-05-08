@@ -171,15 +171,32 @@
 	function addMediaFiles(files: FileList | null) {
 		if (!files || files.length === 0) return;
 
-		const incoming = Array.from(files).map((file) => ({
-			id: nextAssetId++,
-			type: file.type.startsWith('video/') ? ('video' as const) : ('photo' as const),
-			file,
-			fileName: file.name,
-			previewUrl: URL.createObjectURL(file)
-		}));
+		const SUPPORTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg'];
+		const rejected: string[] = [];
 
-		mediaAssets = [...mediaAssets, ...incoming];
+		const incoming = Array.from(files)
+			.filter((file) => {
+				if (file.type.startsWith('video/') && !SUPPORTED_VIDEO_TYPES.includes(file.type)) {
+					rejected.push(file.name);
+					return false;
+				}
+				return true;
+			})
+			.map((file) => ({
+				id: nextAssetId++,
+				type: file.type.startsWith('video/') ? ('video' as const) : ('photo' as const),
+				file,
+				fileName: file.name,
+				previewUrl: URL.createObjectURL(file)
+			}));
+
+		if (rejected.length > 0) {
+			toast.error(`Unsupported video format: ${rejected.join(', ')}. Please use MP4 or WebM.`);
+		}
+
+		if (incoming.length > 0) {
+			mediaAssets = [...mediaAssets, ...incoming];
+		}
 	}
 
 	function onMediaInputChange(event: Event) {
@@ -1017,7 +1034,7 @@
 									id="property-media-input"
 									class="sr-only"
 									type="file"
-									accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+									accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm"
 									multiple
 									onchange={onMediaInputChange}
 								/>

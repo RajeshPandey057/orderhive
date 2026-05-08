@@ -54,7 +54,9 @@ export async function uploadFileWithLink(
 	await file.save(Buffer.from(imageData), {
 		contentType: imageFile.type || 'application/octet-stream',
 		metadata: {
-			firebaseStorageDownloadTokens: token
+			metadata: {
+				firebaseStorageDownloadTokens: token
+			}
 		}
 	});
 
