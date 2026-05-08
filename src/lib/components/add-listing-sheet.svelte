@@ -68,6 +68,23 @@
 			listedByEmails = [currentUserEmail];
 		}
 	});
+
+	// Keep hidden file inputs in sync with mediaAssets BEFORE the form submit event fires.
+	// The form() API captures FormData on submit, before the enhance callback runs,
+	// so DataTransfer assignment inside the callback would be too late.
+	$effect(() => {
+		if (!pictureInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of mediaAssets.filter((a) => a.type === 'photo')) dt.items.add(a.file);
+		pictureInputRef.files = dt.files;
+	});
+
+	$effect(() => {
+		if (!videoInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of mediaAssets.filter((a) => a.type === 'video')) dt.items.add(a.file);
+		videoInputRef.files = dt.files;
+	});
 	let mediaAssets = $state<
 		{ id: number; type: 'photo' | 'video'; file: File; fileName: string; previewUrl?: string }[]
 	>([]);
@@ -310,20 +327,6 @@
 				// Client-side pre-validation for instant UX feedback
 				if (!validate()) return;
 
-				// Populate hidden file inputs via DataTransfer for media assets
-				const photos = mediaAssets.filter((a) => a.type === 'photo').map((a) => a.file);
-				const videos = mediaAssets.filter((a) => a.type === 'video').map((a) => a.file);
-				if (photos.length && pictureInputRef) {
-					const dt = new DataTransfer();
-					photos.forEach((f) => dt.items.add(f));
-					pictureInputRef.files = dt.files;
-				}
-				if (videos.length && videoInputRef) {
-					const dt = new DataTransfer();
-					videos.forEach((f) => dt.items.add(f));
-					videoInputRef.files = dt.files;
-				}
-
 				saving = true;
 				try {
 					await submit();
@@ -352,7 +355,7 @@
 			{/each}
 			<input
 				type="file"
-				name="pictureFiles"
+				name="pictureFiles[]"
 				multiple
 				bind:this={pictureInputRef}
 				class="sr-only"
@@ -361,7 +364,7 @@
 			/>
 			<input
 				type="file"
-				name="videoFiles"
+				name="videoFiles[]"
 				multiple
 				bind:this={videoInputRef}
 				class="sr-only"

@@ -298,7 +298,7 @@ declare global {
 		id: string;
 		listingType: 'internal' | 'portal';
 		listedByEmails: string[];
-		mediaAssets: { type: 'photo' | 'video'; fileName: string }[];
+		mediaAssets: { type: 'photo' | 'video'; fileName: string; url?: string }[];
 		propertyAddress: {
 			addressLine1?: string;
 			addressLine2?: string;

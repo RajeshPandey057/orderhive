@@ -269,8 +269,12 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 	]);
 
 	const mediaAssets = [
-		...uploadedPictures.filter(Boolean).map((f) => ({ type: 'photo' as const, fileName: f!.name })),
-		...uploadedVideos.filter(Boolean).map((f) => ({ type: 'video' as const, fileName: f!.name }))
+		...uploadedPictures
+			.filter(Boolean)
+			.map((f) => ({ type: 'photo' as const, fileName: f!.name, url: f!.downloadURL })),
+		...uploadedVideos
+			.filter(Boolean)
+			.map((f) => ({ type: 'video' as const, fileName: f!.name, url: f!.downloadURL }))
 	];
 
 	const listingRecord = {
