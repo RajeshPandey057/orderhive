@@ -38,7 +38,8 @@ const buyerSchema = z.object({
 	}),
 	nationalIdFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
 		message: 'National ID upload is required'
-	})
+	}),
+	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional()
 });
 
 const splitSchema = z.object({
@@ -356,9 +357,10 @@ export const createSale = form(saleSchema, async (data) => {
 	// Upload joint buyer documents
 	const jointBuyers = await Promise.all(
 		data.jointBuyers.map(async (buyer, index) => {
-			const [passportFile, nationalIdFile] = await Promise.all([
+			const [passportFile, nationalIdFile, amlFormFile] = await Promise.all([
 				toUploadedFile(buyer.passportFile, `${basePath}/joint/${index}/passport`),
-				toUploadedFile(buyer.nationalIdFile, `${basePath}/joint/${index}/national-id`)
+				toUploadedFile(buyer.nationalIdFile, `${basePath}/joint/${index}/national-id`),
+				toUploadedFile(buyer.amlFormFile, `${basePath}/joint/${index}/aml-form`)
 			]);
 
 			return {
@@ -367,7 +369,8 @@ export const createSale = form(saleSchema, async (data) => {
 				email: buyer.email,
 				phone: buyer.phone,
 				passportFile,
-				nationalIdFile
+				nationalIdFile,
+				amlFormFile
 			};
 		})
 	);
@@ -464,6 +467,7 @@ export const createSale = form(saleSchema, async (data) => {
 		...(revenueAchieved !== undefined && { revenueAchieved }),
 		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
 		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
+		createdByUid,
 		createdByEmail,
 		createdAt: timestamp,
 		updatedAt: timestamp
@@ -476,7 +480,19 @@ export const createSale = form(saleSchema, async (data) => {
 		throw error(500, 'Unable to save sale right now. Please try again.');
 	}
 
-	redirect(303, '/agent/sales-tracker');
+	return {
+		success: true,
+		saleId,
+		sale: {
+			id: saleId,
+			clientDetails: saleRecord.clientDetails,
+			jointBuyers,
+			refferalAgreementFile,
+			project: data.project,
+			unitNo: data.unitNo,
+			saleDate: data.saleDate
+		}
+	};
 });
 
 const buyerUpdateSchema = z.object({
@@ -485,7 +501,8 @@ const buyerUpdateSchema = z.object({
 	email: z.email('Valid email is required'),
 	phone: z.string().min(10, 'Valid phone number is required'),
 	passportFile: z.custom<File>((file) => !file || file instanceof File).optional(),
-	nationalIdFile: z.custom<File>((file) => !file || file instanceof File).optional()
+	nationalIdFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional()
 });
 
 const updateSaleSchema = z
@@ -747,7 +764,7 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	const jointBuyers = await Promise.all(
 		data.jointBuyers.map(async (buyer, index) => {
 			const existingBuyer = existingJoint[index] ?? {};
-			const [passportFile, nationalIdFile] = await Promise.all([
+			const [passportFile, nationalIdFile, amlFormFile] = await Promise.all([
 				resolveUploadedFile(
 					buyer.passportFile,
 					`${basePath}/joint/${index}/passport`,
@@ -757,6 +774,11 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 					buyer.nationalIdFile,
 					`${basePath}/joint/${index}/national-id`,
 					existingBuyer.nationalIdFile as UploadedDoc
+				),
+				resolveUploadedFile(
+					buyer.amlFormFile,
+					`${basePath}/joint/${index}/aml-form`,
+					existingBuyer.amlFormFile as UploadedDoc
 				)
 			]);
 
@@ -766,7 +788,8 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 				email: buyer.email,
 				phone: buyer.phone,
 				passportFile,
-				nationalIdFile
+				nationalIdFile,
+				amlFormFile
 			};
 		})
 	);

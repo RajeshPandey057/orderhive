@@ -10,22 +10,48 @@
 	import Loader2 from '~icons/lucide/loader-2';
 	import { submitAMLForm } from '../../routes/(secure)/agent/sales-tracker/aml.remote';
 
+	type AMLTarget =
+		| { buyerType: 'primary'; jointBuyerIndex?: undefined }
+		| { buyerType: 'joint'; jointBuyerIndex: number };
+
 	let {
 		open = $bindable(false),
-		buyerData
+		buyerData,
+		saleId,
+		target = { buyerType: 'primary' },
+		onGenerated
 	}: {
 		open?: boolean;
 		buyerData?: { firstName?: string; lastName?: string; email?: string; phone?: string };
+		saleId?: string;
+		target?: AMLTarget;
+		onGenerated?: (document: SaleDocumentFile) => void;
 	} = $props();
 
 	// Pre-fill form data from buyer if available
 	$effect(() => {
 		if (buyerData && open) {
-			submitAMLForm.fields.fullName.set(
-				`${buyerData.firstName || ''} ${buyerData.lastName || ''}`.trim()
-			);
+			const fullName = `${buyerData.firstName || ''} ${buyerData.lastName || ''}`.trim();
+			submitAMLForm.fields.fullName.set(fullName);
 			submitAMLForm.fields.emailAddress.set(buyerData.email || '');
 			submitAMLForm.fields.contactNo.set(buyerData.phone || '');
+			submitAMLForm.fields.customerName.set(fullName);
+			submitAMLForm.fields.financialCustomerName.set(fullName);
+		}
+
+		if (open) {
+			const today = new Date().toLocaleDateString('en-GB', {
+				day: '2-digit',
+				month: 'long',
+				year: 'numeric'
+			});
+			submitAMLForm.fields.date.set(today);
+			submitAMLForm.fields.saleId.set(saleId ?? '');
+			submitAMLForm.fields.referenceNo.set(saleId ?? '');
+			submitAMLForm.fields.buyerType.set(target.buyerType);
+			if (target.buyerType === 'joint') {
+				submitAMLForm.fields.jointBuyerIndex.set(target.jointBuyerIndex);
+			}
 		}
 	});
 </script>
@@ -42,7 +68,12 @@
 		<form
 			class="flex flex-col gap-6 py-6"
 			{...submitAMLForm.enhance(async ({ submit }) => {
-				await submit();
+				try {
+					await submit();
+				} catch {
+					toast.error('Failed to generate AML form. Please try again.');
+					return;
+				}
 
 				const issues = submitAMLForm.fields.allIssues();
 				if (issues && issues.length > 0) {
@@ -50,10 +81,24 @@
 					return;
 				}
 
+				if (submitAMLForm.result?.success === false) {
+					toast.error(submitAMLForm.result.message);
+					return;
+				}
+
+				if (submitAMLForm.result?.success && submitAMLForm.result.document) {
+					onGenerated?.(submitAMLForm.result.document as SaleDocumentFile);
+				}
+
 				toast.success('AML form sent successfully via email.');
 				open = false;
 			})}
 		>
+			<input class="sr-only" {...submitAMLForm.fields.saleId.as('text')} />
+			<input class="sr-only" {...submitAMLForm.fields.buyerType.as('text')} />
+			{#if target.buyerType === 'joint'}
+				<input class="sr-only" {...submitAMLForm.fields.jointBuyerIndex.as('number')} />
+			{/if}
 			<!-- Date and Reference -->
 			<Field.Set>
 				<Field.Legend class="text-base font-semibold">Date and Reference</Field.Legend>
@@ -67,7 +112,11 @@
 					</Field.Field>
 					<Field.Field>
 						<Field.Label>Reference No.</Field.Label>
-						<Input {...submitAMLForm.fields.referenceNo.as('text')} placeholder="REF-001" />
+						<Input
+							{...submitAMLForm.fields.referenceNo.as('text')}
+							placeholder="Saved sale ID"
+							readonly
+						/>
 						{#each submitAMLForm.fields.referenceNo.issues() as issue, i (i)}
 							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 						{/each}
@@ -389,34 +438,12 @@
 							{/each}
 						</Field.Field>
 						<Field.Field>
-							<Field.Label>Customer Signature</Field.Label>
-							<Input
-								{...submitAMLForm.fields.customerSignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitAMLForm.fields.customerSignature.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<Field.Field>
 							<Field.Label>Sales Agent Name</Field.Label>
 							<Input
 								{...submitAMLForm.fields.salesAgentName.as('text')}
 								placeholder="Sales agent name"
 							/>
 							{#each submitAMLForm.fields.salesAgentName.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>Sales Agent Signature</Field.Label>
-							<Input
-								{...submitAMLForm.fields.salesAgentSignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitAMLForm.fields.salesAgentSignature.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
 						</Field.Field>

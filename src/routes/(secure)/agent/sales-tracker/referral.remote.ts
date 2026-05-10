@@ -1,9 +1,14 @@
 import { form } from '$app/server';
 import { createEnvelopeFromPDF } from '$lib/server/docusign';
+import { firestore } from '$lib/server/firebase';
+import { createDocusignDocumentRecord } from '$lib/server/sale-documents';
 import { generateReferralAgreementPDF } from '$lib/server/template-renderer';
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
 const referralAgreementSchema = z.object({
+	saleId: z.string().min(1, 'Sale ID is required'),
+
 	// Agreement Header
 	srNo: z.string().min(1, 'Serial number is required'),
 	agencyName: z.string().min(1, 'Real estate agency name is required'),
@@ -22,16 +27,33 @@ const referralAgreementSchema = z.object({
 
 	// First Party (IND Global)
 	firstPartyName: z.string().min(1, 'First party name is required'),
-	firstPartySignature: z.string().min(1, 'First party signature is required'),
 	firstPartyDate: z.string().min(1, 'First party date is required'),
 
 	// Second Party (Referrer)
 	secondPartyName: z.string().min(1, 'Second party name is required'),
-	secondPartySignature: z.string().min(1, 'Second party signature is required'),
 	secondPartyDate: z.string().min(1, 'Second party date is required')
 });
 
 export const submitReferralAgreement = form(referralAgreementSchema, async (data) => {
+	const saleRef = firestore.collection('sales').doc(data.saleId);
+	const saleSnap = await saleRef.get();
+
+	if (!saleSnap.exists) {
+		return {
+			success: false,
+			message: 'Sale not found. Save the sale before generating the referral agreement.'
+		};
+	}
+
+	const sale = saleSnap.data() as Record<string, unknown>;
+
+	if (sale.refferalAgreementFile) {
+		return {
+			success: false,
+			message: 'Referral agreement already exists for this sale.'
+		};
+	}
+
 	const pdfBuffer = await generateReferralAgreementPDF({
 		srNo: data.srNo,
 		referrerName: data.referrerName,
@@ -53,10 +75,25 @@ export const submitReferralAgreement = form(referralAgreementSchema, async (data
 		emailBlurb: `Dear ${data.referrerName}, please review and sign this referral agreement for ${data.propertyName}.`
 	});
 
+	const document = createDocusignDocumentRecord({
+		documentName: `Referral Agreement - ${data.propertyName}`,
+		pdfBuffer,
+		envelope,
+		referenceNo: data.srNo,
+		recipientEmail: data.referrerEmail,
+		recipientName: data.referrerName
+	});
+
+	await saleRef.update({
+		refferalAgreementFile: document,
+		updatedAt: FieldValue.serverTimestamp()
+	});
+
 	return {
 		success: true,
 		envelopeId: envelope.envelopeId,
 		status: envelope.status,
+		document,
 		message: 'Referral agreement sent successfully via DocuSign'
 	};
 });

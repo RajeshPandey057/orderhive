@@ -22,7 +22,6 @@
 	import { firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
-	import CheckCircled from '~icons/lucide/check-circle-2';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
 	import Upload from '~icons/lucide/cloud-upload';
 	import ExternalLink from '~icons/lucide/external-link';
@@ -37,6 +36,32 @@
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
 	import { createSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
+
+	type SavedSaleSummary = {
+		id: string;
+		clientDetails: {
+			firstName: string;
+			lastName: string;
+			email: string;
+			phone: string;
+			amlFormFile: SaleDocumentFile | null;
+		};
+		jointBuyers: {
+			firstName: string;
+			lastName: string;
+			email: string;
+			phone: string;
+			amlFormFile: SaleDocumentFile | null;
+		}[];
+		refferalAgreementFile: SaleDocumentFile | null;
+		project: string;
+		unitNo: string;
+		saleDate: string;
+	};
+
+	type AMLTarget =
+		| { buyerType: 'primary'; jointBuyerIndex?: undefined }
+		| { buyerType: 'joint'; jointBuyerIndex: number };
 
 	let {
 		userRole
@@ -58,6 +83,7 @@
 	);
 
 	let sheetOpen = $state(false);
+	let savedSale = $state<SavedSaleSummary | null>(null);
 	let jointBuyers = $state<{ key: number }[]>([]);
 	let nextJointKey = 0;
 	let tentativeEligibilityDate = $state<DateValue | undefined>(undefined);
@@ -111,7 +137,7 @@
 	let communityPopoverOpen = $state(false);
 	let communitySearchValue = $state('');
 
-	let dealSplits = $state<SplitEntry[]>([
+	const getDefaultSplits = (): SplitEntry[] => [
 		{
 			key: 0,
 			agentId: firekitUser.uid ?? '',
@@ -121,7 +147,9 @@
 			ownerRole: 'caller',
 			percentage: 100
 		}
-	]);
+	];
+
+	let dealSplits = $state<SplitEntry[]>(getDefaultSplits());
 
 	const syncSplits = (splits: SplitEntry[]) => {
 		createSale.fields.splits.set(
@@ -146,7 +174,7 @@
 	const splitRemaining = $derived(100 - splitTotal);
 
 	// Track uploaded files
-	let uploadedFiles = $state<Record<string, File | null>>({
+	const getEmptyUploadedFiles = (): Record<string, File | null> => ({
 		passportFile: null,
 		nationalIdFile: null,
 		amlFormFile: null,
@@ -154,6 +182,8 @@
 		paymentReceiptFile: null,
 		refferalAgreementFile: null
 	});
+
+	let uploadedFiles = $state<Record<string, File | null>>(getEmptyUploadedFiles());
 
 	// Track uploaded files for joint buyers
 	let jointBuyerFiles = $state<
@@ -169,26 +199,39 @@
 	let clientPhoneCountry = $state<string>('AE');
 	let clientPhoneValue = $state<string>('');
 
-	// Track AML generation state
-	let amlGenerating = $state<Record<string, boolean>>({
-		primary: false
-	});
-
-	// Track generated AML envelope IDs
-	let amlEnvelopes = $state<Record<string, { envelopeId: string; recipientEmail: string } | null>>({
-		primary: null
-	});
-
-	// Track referral agreement generation state
-	let referralGenerating = $state(false);
-	let referralEnvelope = $state<{ envelopeId: string; recipientEmail: string } | null>(null);
-
 	// Track inline form sheets
 	let showAMLForm = $state(false);
 	let showReferralForm = $state(false);
+	let currentAMLTarget = $state<AMLTarget>({ buyerType: 'primary' });
 	let currentBuyerData = $state<
 		{ firstName?: string; lastName?: string; email?: string; phone?: string } | undefined
 	>(undefined);
+
+	const resetDraftState = () => {
+		jointBuyers = [];
+		nextJointKey = 0;
+		tentativeEligibilityDate = undefined;
+		saleDateValue = undefined;
+		saleDatePickerOpen = false;
+		popoverOpen = false;
+		developerPopoverOpen = false;
+		developerSearchValue = '';
+		communityPopoverOpen = false;
+		communitySearchValue = '';
+		dealSplits = getDefaultSplits();
+		firstHalfChecked = false;
+		secondHalfChecked = false;
+		fullChecked = false;
+		notEligibleChecked = false;
+		uploadedFiles = getEmptyUploadedFiles();
+		jointBuyerFiles = {};
+		jointBuyerPhoneCountries = {};
+		jointBuyerPhoneValues = {};
+		clientPhoneCountry = 'AE';
+		clientPhoneValue = '';
+		currentBuyerData = undefined;
+		currentAMLTarget = { buyerType: 'primary' };
+	};
 
 	const handleFileUpload = (fieldName: string, event: Event) => {
 		const input = event.target as HTMLInputElement;
@@ -215,7 +258,6 @@
 		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 		jointBuyerPhoneCountries[newKey] = 'AE';
 		jointBuyerPhoneValues[newKey] = '';
-		amlGenerating[`joint-${newKey}`] = false;
 	};
 
 	const removeJointBuyer = (key: number) => {
@@ -234,6 +276,61 @@
 			return '';
 		}
 	}
+
+	const getBuyerName = (buyer: { firstName?: string; lastName?: string }) =>
+		`${buyer.firstName ?? ''} ${buyer.lastName ?? ''}`.trim() || 'Buyer';
+
+	const getDocumentStatus = (document: SaleDocumentFile | null | undefined) => {
+		if (!document) return 'Missing';
+		return document.docusign?.status ?? document.complianceStatus ?? 'generated';
+	};
+
+	const openPrimaryAMLForm = () => {
+		if (!savedSale || savedSale.clientDetails.amlFormFile) return;
+		currentAMLTarget = { buyerType: 'primary' };
+		currentBuyerData = savedSale.clientDetails;
+		showAMLForm = true;
+	};
+
+	const openJointAMLForm = (buyer: SavedSaleSummary['jointBuyers'][number], index: number) => {
+		if (!savedSale || buyer.amlFormFile) return;
+		currentAMLTarget = { buyerType: 'joint', jointBuyerIndex: index };
+		currentBuyerData = buyer;
+		showAMLForm = true;
+	};
+
+	const openReferralAgreementForm = () => {
+		if (!savedSale || savedSale.refferalAgreementFile) return;
+		currentBuyerData = savedSale.clientDetails;
+		showReferralForm = true;
+	};
+
+	const handleAMLGenerated = (document: SaleDocumentFile) => {
+		if (!savedSale) return;
+
+		if (currentAMLTarget.buyerType === 'joint') {
+			const jointBuyersCopy = [...savedSale.jointBuyers];
+			jointBuyersCopy[currentAMLTarget.jointBuyerIndex] = {
+				...jointBuyersCopy[currentAMLTarget.jointBuyerIndex],
+				amlFormFile: document
+			};
+			savedSale = { ...savedSale, jointBuyers: jointBuyersCopy };
+			return;
+		}
+
+		savedSale = {
+			...savedSale,
+			clientDetails: {
+				...savedSale.clientDetails,
+				amlFormFile: document
+			}
+		};
+	};
+
+	const handleReferralGenerated = (document: SaleDocumentFile) => {
+		if (!savedSale) return;
+		savedSale = { ...savedSale, refferalAgreementFile: document };
+	};
 
 	const handleJointBuyerFileUpload = (
 		buyerKey: number,
@@ -399,6 +496,136 @@
 		</Sheet.Trigger>
 	{/if}
 	<Sheet.Content side="right" class="w-200 max-w-200 overflow-y-auto sm:w-200 sm:max-w-200">
+		{#if savedSale}
+			<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
+				<div>
+					<Sheet.Title class="text-2xl font-medium">Sale Saved</Sheet.Title>
+					<p class="font-mono text-sm text-muted-foreground">{savedSale.id}</p>
+				</div>
+				<div class="flex gap-2">
+					<Button type="button" variant="outline" size="sm" onclick={() => (savedSale = null)}>
+						Add Another
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						onclick={() => {
+							savedSale = null;
+							sheetOpen = false;
+						}}
+					>
+						Done
+					</Button>
+				</div>
+			</div>
+
+			<div class="flex flex-col gap-6 p-6">
+				<div class="rounded-lg border bg-muted/20 p-4">
+					<div class="grid grid-cols-2 gap-4 text-sm">
+						<div>
+							<p class="text-muted-foreground">Client</p>
+							<p class="font-medium">{getBuyerName(savedSale.clientDetails)}</p>
+						</div>
+						<div>
+							<p class="text-muted-foreground">Project</p>
+							<p class="font-medium">{savedSale.project}</p>
+						</div>
+						<div>
+							<p class="text-muted-foreground">Unit</p>
+							<p class="font-medium">{savedSale.unitNo}</p>
+						</div>
+						<div>
+							<p class="text-muted-foreground">Sale Date</p>
+							<p class="font-medium">{savedSale.saleDate}</p>
+						</div>
+					</div>
+				</div>
+
+				<Field.Set>
+					<Field.Legend class="text-lg font-medium">AML Forms</Field.Legend>
+					<Field.Group class="space-y-4">
+						<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+							<div>
+								<p class="text-sm font-medium">{getBuyerName(savedSale.clientDetails)}</p>
+								<p class="text-xs text-muted-foreground">
+									Status: {getDocumentStatus(savedSale.clientDetails.amlFormFile)}
+								</p>
+							</div>
+							{#if savedSale.clientDetails.amlFormFile}
+								<a
+									href={savedSale.clientDetails.amlFormFile.downloadURL}
+									target="_blank"
+									class={buttonVariants({ variant: 'outline', size: 'sm' })}
+								>
+									<ExternalLink class="h-4 w-4" />
+									Open AML
+								</a>
+							{:else}
+								<Button type="button" size="sm" onclick={openPrimaryAMLForm}>
+									<PlusRound class="h-4 w-4" />
+									Generate AML
+								</Button>
+							{/if}
+						</div>
+
+						{#each savedSale.jointBuyers as buyer, index (index)}
+							<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+								<div>
+									<p class="text-sm font-medium">{getBuyerName(buyer)}</p>
+									<p class="text-xs text-muted-foreground">
+										Status: {getDocumentStatus(buyer.amlFormFile)}
+									</p>
+								</div>
+								{#if buyer.amlFormFile}
+									<a
+										href={buyer.amlFormFile.downloadURL}
+										target="_blank"
+										class={buttonVariants({ variant: 'outline', size: 'sm' })}
+									>
+										<ExternalLink class="h-4 w-4" />
+										Open AML
+									</a>
+								{:else}
+									<Button type="button" size="sm" onclick={() => openJointAMLForm(buyer, index)}>
+										<PlusRound class="h-4 w-4" />
+										Generate AML
+									</Button>
+								{/if}
+							</div>
+						{/each}
+					</Field.Group>
+				</Field.Set>
+
+				<Field.Set>
+					<Field.Legend class="text-lg font-medium">Referral Agreement</Field.Legend>
+					<Field.Group>
+						<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+							<div>
+								<p class="text-sm font-medium">Referral Agreement</p>
+								<p class="text-xs text-muted-foreground">
+									Status: {getDocumentStatus(savedSale.refferalAgreementFile)}
+								</p>
+							</div>
+							{#if savedSale.refferalAgreementFile}
+								<a
+									href={savedSale.refferalAgreementFile.downloadURL}
+									target="_blank"
+									class={buttonVariants({ variant: 'outline', size: 'sm' })}
+								>
+									<ExternalLink class="h-4 w-4" />
+									Open Agreement
+								</a>
+							{:else}
+								<Button type="button" size="sm" onclick={openReferralAgreementForm}>
+									<PlusRound class="h-4 w-4" />
+									Generate Referral
+								</Button>
+							{/if}
+						</div>
+					</Field.Group>
+				</Field.Set>
+			</div>
+		{:else}
 		<form
 			enctype="multipart/form-data"
 			{...createSale.enhance(async ({ form, submit }) => {
@@ -407,10 +634,11 @@
 
 					// Only reset and close if submission was successful (no validation errors)
 					const issues = createSale.fields.allIssues();
-					if (!issues?.length) {
+					if (!issues?.length && createSale.result?.success) {
+						savedSale = createSale.result.sale as SavedSaleSummary;
 						form.reset();
-						sheetOpen = false;
-						toast.success('Sale created successfully!');
+						resetDraftState();
+						toast.success(`Sale ${createSale.result.saleId} created successfully!`);
 					}
 				} catch {
 					toast.error('Failed to create sale');
@@ -729,72 +957,21 @@
 											</button>
 										</div>
 									{:else}
-										<div class="flex w-full flex-row gap-2">
-											<Button
-												variant="outline"
-												type="button"
-												class="flex-1 bg-orange-50/40"
-												disabled={amlGenerating.primary}
-												onclick={() => {
-													const firstName = createSale.fields.firstName.value();
-													const lastName = createSale.fields.lastName.value();
-													const email = createSale.fields.email.value();
-													const phone = getE164number(clientPhoneValue, clientPhoneCountry);
-
-													if (!firstName || !lastName || !email) {
-														toast.error(
-															'Please fill in all client details before generating AML form'
-														);
-														return;
-													}
-
-													// Open the inline form with buyer data
-													currentBuyerData = { firstName, lastName, email, phone };
-													showAMLForm = true;
-												}}
+										{#if canUploadManually}
+											<label
+												for="amlFormFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
 											>
-												{#if amlGenerating.primary}
-													<Loader2 class="h-4 w-4 animate-spin" />
-													Generating...
-												{:else if amlEnvelopes.primary}
-													<CheckCircled class="h-4 w-4 text-green-600" />
-													AML form sent
-												{:else}
-													<PlusRound class="h-4 w-4" />
-													Generate Now
-												{/if}
-											</Button>
-											{#if amlEnvelopes.primary}
-												<Button
-													variant="outline"
-													type="button"
-													class="flex-1"
-													onclick={() => {
-														const envelopeId = amlEnvelopes.primary?.envelopeId;
-														if (envelopeId) {
-															window.open(
-																`/api/get-docusign-document?envelopeId=${envelopeId}`,
-																'_blank'
-															);
-														}
-													}}
-												>
-													<ExternalLink class="h-4 w-4" />
-													Open Generated AML
-												</Button>
-											{/if}
-											{#if canUploadManually && !amlEnvelopes.primary}
-												<span class="self-center text-center text-xs text-muted-foreground">or</span
-												>
-												<label
-													for="amlFormFile"
-													class=" flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-												>
-													<Upload class="h-5 w-5 text-gray-600" />
-													<span class="text-sm font-medium">Upload manually</span>
-												</label>
-											{/if}
-										</div>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload AML manually</span>
+											</label>
+										{:else}
+											<div
+												class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+											>
+												AML can be generated after the sale is saved
+											</div>
+										{/if}
 									{/if}
 									<Input
 										id="amlFormFile"
@@ -1474,69 +1651,21 @@
 								</button>
 							</div>
 						{:else}
-							<div class="flex w-full flex-row gap-2">
-								<Button
-									variant="outline"
-									type="button"
-									class="flex-1 bg-orange-50/40"
-									disabled={referralGenerating}
-									onclick={() => {
-										const firstName = createSale.fields.firstName.value();
-										const lastName = createSale.fields.lastName.value();
-										const email = createSale.fields.email.value();
-
-										if (!firstName || !lastName || !email) {
-											toast.error(
-												'Please fill in client details before generating referral agreement'
-											);
-											return;
-										}
-
-										// Open the inline form with buyer data
-										currentBuyerData = { firstName, lastName, email };
-										showReferralForm = true;
-									}}
+							{#if canUploadManually}
+								<label
+									for="refferalAgreementFile"
+									class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
 								>
-									{#if referralGenerating}
-										<Loader2 class="h-4 w-4 animate-spin" />
-										Generating...
-									{:else if referralEnvelope}
-										<CheckCircled class="h-4 w-4 text-green-600" />
-										Referral agreement sent
-									{:else}
-										<PlusRound class="h-4 w-4" />
-										Generate Referral Agreement
-									{/if}
-								</Button>
-								{#if referralEnvelope}
-									<Button
-										variant="outline"
-										type="button"
-										class="flex-1"
-										onclick={() => {
-											if (referralEnvelope?.envelopeId) {
-												window.open(
-													`/api/get-docusign-document?envelopeId=${referralEnvelope.envelopeId}`,
-													'_blank'
-												);
-											}
-										}}
-									>
-										<ExternalLink class="h-4 w-4" />
-										Open Generated Agreement
-									</Button>
-								{/if}
-								{#if canUploadManually && !referralEnvelope}
-									<span class="self-center text-center text-xs text-muted-foreground">or</span>
-									<label
-										for="refferalAgreementFile"
-										class="flex w-full flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-									>
-										<Upload class="h-5 w-5 text-gray-600" />
-										<span class="text-sm font-medium">Upload manually</span>
-									</label>
-								{/if}
-							</div>
+									<Upload class="h-5 w-5 text-gray-600" />
+									<span class="text-sm font-medium">Upload referral agreement manually</span>
+								</label>
+							{:else}
+								<div
+									class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+								>
+									Referral agreement can be generated after the sale is saved
+								</div>
+							{/if}
 						{/if}
 						<Input
 							id="refferalAgreementFile"
@@ -1940,85 +2069,21 @@
 													</button>
 												</div>
 											{:else}
-												<div class="flex w-full flex-col gap-2">
-													<Button
-														variant="outline"
-														type="button"
-														class="w-full bg-orange-50/40"
-														disabled={amlGenerating[`joint-${buyer.key}`]}
-														onclick={() => {
-															// Get joint buyer data from form fields
-															const firstNameInput = document.getElementById(
-																`joint-firstName-${buyer.key}`
-															) as HTMLInputElement;
-															const lastNameInput = document.getElementById(
-																`joint-lastName-${buyer.key}`
-															) as HTMLInputElement;
-															const emailInput = document.getElementById(
-																`joint-email-${buyer.key}`
-															) as HTMLInputElement;
-
-															const firstName = firstNameInput?.value;
-															const lastName = lastNameInput?.value;
-															const email = emailInput?.value;
-															const phone = getE164number(
-																jointBuyerPhoneValues[buyer.key] || '',
-																jointBuyerPhoneCountries[buyer.key] || 'AE'
-															);
-
-															if (!firstName || !lastName || !email) {
-																toast.error(
-																	'Please fill in joint buyer name and email before generating AML form'
-																);
-																return;
-															}
-
-															// Open the inline form with buyer data
-															currentBuyerData = { firstName, lastName, email, phone };
-															showAMLForm = true;
-														}}
+												{#if canUploadManually}
+													<label
+														for={`joint-amlFormFile-${buyer.key}`}
+														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
 													>
-														{#if amlGenerating[`joint-${buyer.key}`]}
-															<Loader2 class="h-4 w-4 animate-spin" />
-															Generating...
-														{:else if amlEnvelopes[`joint-${buyer.key}`]}
-															<CheckCircled class="h-4 w-4 text-green-600" />
-															AML form sent
-														{:else}
-															<PlusRound class="h-4 w-4" />
-															Generate Now
-														{/if}
-													</Button>
-													{#if amlEnvelopes[`joint-${buyer.key}`]}
-														<Button
-															variant="outline"
-															type="button"
-															class="w-full"
-															onclick={() => {
-																const envelopeId = amlEnvelopes[`joint-${buyer.key}`]?.envelopeId;
-																if (envelopeId) {
-																	window.open(
-																		`/api/get-docusign-document?envelopeId=${envelopeId}`,
-																		'_blank'
-																	);
-																}
-															}}
-														>
-															<ExternalLink class="h-4 w-4" />
-															Open Generated AML
-														</Button>
-													{/if}
-													{#if canUploadManually && !amlEnvelopes[`joint-${buyer.key}`]}
-														<span class="text-center text-xs text-muted-foreground">or</span>
-														<label
-															for={`joint-amlFormFile-${buyer.key}`}
-															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-														>
-															<Upload class="h-5 w-5 text-gray-600" />
-															<span class="text-sm font-medium">Upload manually</span>
-														</label>
-													{/if}
-												</div>
+														<Upload class="h-5 w-5 text-gray-600" />
+														<span class="text-sm font-medium">Upload AML manually</span>
+													</label>
+												{:else}
+													<div
+														class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+													>
+														AML can be generated after the sale is saved
+													</div>
+												{/if}
 											{/if}
 											<Input
 												id={`joint-amlFormFile-${buyer.key}`}
@@ -2059,11 +2124,24 @@
 				</div>
 			</div>
 		{/if}
+		{/if}
 	</Sheet.Content>
 </Sheet.Root>
 
 <!-- AML Form Inline Sheet -->
-<AMLFormInline bind:open={showAMLForm} buyerData={currentBuyerData} />
+<AMLFormInline
+	bind:open={showAMLForm}
+	buyerData={currentBuyerData}
+	saleId={savedSale?.id}
+	target={currentAMLTarget}
+	onGenerated={handleAMLGenerated}
+/>
 
 <!-- Referral Form Inline Sheet -->
-<ReferralFormInline bind:open={showReferralForm} buyerData={currentBuyerData} />
+<ReferralFormInline
+	bind:open={showReferralForm}
+	buyerData={currentBuyerData}
+	saleId={savedSale?.id}
+	propertyName={savedSale?.project}
+	onGenerated={handleReferralGenerated}
+/>

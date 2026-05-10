@@ -38,6 +38,16 @@
 	import X from '~icons/lucide/x';
 	import { updateSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
+	type AMLTarget =
+		| { buyerType: 'primary'; jointBuyerIndex?: undefined }
+		| { buyerType: 'joint'; jointBuyerIndex: number };
+	type DisplayFile = File & {
+		downloadURL?: string;
+		docusignStatus?: string;
+		referenceNo?: string;
+		source?: string;
+	};
+
 	let {
 		userRole,
 		sale
@@ -198,7 +208,7 @@
 	const splitRemaining = $derived(100 - splitTotal);
 
 	// Track uploaded files
-	let uploadedFiles = $state<Record<string, File | null>>({
+	let uploadedFiles = $state<Record<string, DisplayFile | null>>({
 		passportFile: null,
 		nationalIdFile: null,
 		amlFormFile: null,
@@ -211,7 +221,11 @@
 	let jointBuyerFiles = $state<
 		Record<
 			number,
-			{ passportFile: File | null; nationalIdFile: File | null; amlFormFile: File | null }
+			{
+				passportFile: DisplayFile | null;
+				nationalIdFile: DisplayFile | null;
+				amlFormFile: DisplayFile | null;
+			}
 		>
 	>({});
 
@@ -256,6 +270,7 @@
 	// Track inline form sheets
 	let showAMLForm = $state(false);
 	let showReferralForm = $state(false);
+	let currentAMLTarget = $state<AMLTarget>({ buyerType: 'primary' });
 	let currentBuyerData = $state<
 		{ firstName?: string; lastName?: string; email?: string; phone?: string } | undefined
 	>(undefined);
@@ -460,16 +475,53 @@
 			?.label ?? 'Commercial Type'
 	);
 
-	const toDisplayFile = (fileData: unknown): File | null => {
+	const toDisplayFile = (fileData: unknown): DisplayFile | null => {
 		if (!fileData || typeof fileData !== 'object') return null;
 		const data = fileData as {
 			original?: { name?: string; size?: number };
+			name?: string;
+			size?: number;
 			path?: string;
+			downloadURL?: string;
+			source?: string;
+			referenceNo?: string;
+			docusign?: { status?: string };
 		};
-		const originalName = data.original?.name;
-		const originalSize = data.original?.size ?? 0;
+		const originalName = data.original?.name ?? data.name;
+		const originalSize = data.original?.size ?? data.size ?? 0;
 		const fallbackName = data.path?.split('/').pop() ?? 'uploaded-file';
-		return { name: originalName ?? fallbackName, size: originalSize } as File;
+		return {
+			name: originalName ?? fallbackName,
+			size: originalSize,
+			downloadURL: data.downloadURL,
+			source: data.source,
+			referenceNo: data.referenceNo,
+			docusignStatus: data.docusign?.status
+		} as DisplayFile;
+	};
+
+	const handleAMLGenerated = (document: SaleDocumentFile) => {
+		const displayFile = toDisplayFile(document);
+		if (currentAMLTarget.buyerType === 'joint') {
+			const buyerKey = jointBuyers[currentAMLTarget.jointBuyerIndex]?.key;
+			if (buyerKey !== undefined) {
+				if (!jointBuyerFiles[buyerKey]) {
+					jointBuyerFiles[buyerKey] = {
+						passportFile: null,
+						nationalIdFile: null,
+						amlFormFile: null
+					};
+				}
+				jointBuyerFiles[buyerKey].amlFormFile = displayFile;
+			}
+			return;
+		}
+
+		uploadedFiles.amlFormFile = displayFile;
+	};
+
+	const handleReferralGenerated = (document: SaleDocumentFile) => {
+		uploadedFiles.refferalAgreementFile = toDisplayFile(document);
 	};
 
 	let prefillingSaleId = $state<string | null>(null);
@@ -909,15 +961,34 @@
 												<span class="text-xs text-muted-foreground"
 													>{formatFileSize(uploadedFiles.amlFormFile.size)}</span
 												>
+												{#if uploadedFiles.amlFormFile.docusignStatus}
+													<span class="text-xs text-muted-foreground">
+														DocuSign {uploadedFiles.amlFormFile.docusignStatus}
+														{uploadedFiles.amlFormFile.referenceNo
+															? ` - Ref ${uploadedFiles.amlFormFile.referenceNo}`
+															: ''}
+													</span>
+												{/if}
 											</div>
 										</div>
-										<button
-											type="button"
-											onclick={() => removeFile('amlFormFile')}
-											class="text-destructive hover:text-destructive/80"
-										>
-											<Trash2 class="h-5 w-5" />
-										</button>
+										<div class="flex items-center gap-2">
+											{#if uploadedFiles.amlFormFile.downloadURL}
+												<a
+													href={uploadedFiles.amlFormFile.downloadURL}
+													target="_blank"
+													class="text-sm font-medium text-primary hover:underline"
+												>
+													Open
+												</a>
+											{/if}
+											<button
+												type="button"
+												onclick={() => removeFile('amlFormFile')}
+												class="text-destructive hover:text-destructive/80"
+											>
+												<Trash2 class="h-5 w-5" />
+											</button>
+										</div>
 									</div>
 								{:else}
 									<div class="flex w-full flex-row gap-2">
@@ -940,6 +1011,7 @@
 												}
 
 												// Open the inline form with buyer data
+												currentAMLTarget = { buyerType: 'primary' };
 												currentBuyerData = { firstName, lastName, email, phone };
 												showAMLForm = true;
 											}}
@@ -1659,15 +1731,34 @@
 									<span class="text-xs text-muted-foreground"
 										>{formatFileSize(uploadedFiles.refferalAgreementFile.size)}</span
 									>
+									{#if uploadedFiles.refferalAgreementFile.docusignStatus}
+										<span class="text-xs text-muted-foreground">
+											DocuSign {uploadedFiles.refferalAgreementFile.docusignStatus}
+											{uploadedFiles.refferalAgreementFile.referenceNo
+												? ` - Ref ${uploadedFiles.refferalAgreementFile.referenceNo}`
+												: ''}
+										</span>
+									{/if}
 								</div>
 							</div>
-							<button
-								type="button"
-								onclick={() => removeFile('refferalAgreementFile')}
-								class="text-destructive hover:text-destructive/80"
-							>
-								<Trash2 class="h-5 w-5" />
-							</button>
+							<div class="flex items-center gap-2">
+								{#if uploadedFiles.refferalAgreementFile.downloadURL}
+									<a
+										href={uploadedFiles.refferalAgreementFile.downloadURL}
+										target="_blank"
+										class="text-sm font-medium text-primary hover:underline"
+									>
+										Open
+									</a>
+								{/if}
+								<button
+									type="button"
+									onclick={() => removeFile('refferalAgreementFile')}
+									class="text-destructive hover:text-destructive/80"
+								>
+									<Trash2 class="h-5 w-5" />
+								</button>
+							</div>
 						</div>
 					{:else}
 						<div class="flex w-full flex-row gap-2">
@@ -2120,15 +2211,35 @@
 																? formatFileSize(jointBuyerFiles[buyer.key]?.amlFormFile?.size ?? 0)
 																: ''}</span
 														>
+														{#if jointBuyerFiles[buyer.key]?.amlFormFile?.docusignStatus}
+															<span class="text-xs text-muted-foreground">
+																DocuSign {jointBuyerFiles[buyer.key]?.amlFormFile
+																	?.docusignStatus}
+																{jointBuyerFiles[buyer.key]?.amlFormFile?.referenceNo
+																	? ` - Ref ${jointBuyerFiles[buyer.key]?.amlFormFile?.referenceNo}`
+																	: ''}
+															</span>
+														{/if}
 													</div>
 												</div>
-												<button
-													type="button"
-													onclick={() => removeJointBuyerFile(buyer.key, 'amlFormFile')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
+												<div class="flex items-center gap-2">
+													{#if jointBuyerFiles[buyer.key]?.amlFormFile?.downloadURL}
+														<a
+															href={jointBuyerFiles[buyer.key]?.amlFormFile?.downloadURL}
+															target="_blank"
+															class="text-sm font-medium text-primary hover:underline"
+														>
+															Open
+														</a>
+													{/if}
+													<button
+														type="button"
+														onclick={() => removeJointBuyerFile(buyer.key, 'amlFormFile')}
+														class="text-destructive hover:text-destructive/80"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
 											</div>
 										{:else}
 											<div class="flex w-full flex-col gap-2">
@@ -2165,6 +2276,7 @@
 														}
 
 														// Open the inline form with buyer data
+														currentAMLTarget = { buyerType: 'joint', jointBuyerIndex: index };
 														currentBuyerData = { firstName, lastName, email, phone };
 														showAMLForm = true;
 													}}
@@ -2253,7 +2365,19 @@
 </div>
 
 <!-- AML Form Inline Sheet -->
-<AMLFormInline bind:open={showAMLForm} buyerData={currentBuyerData} />
+<AMLFormInline
+	bind:open={showAMLForm}
+	buyerData={currentBuyerData}
+	saleId={sale?.id}
+	target={currentAMLTarget}
+	onGenerated={handleAMLGenerated}
+/>
 
 <!-- Referral Form Inline Sheet -->
-<ReferralFormInline bind:open={showReferralForm} buyerData={currentBuyerData} />
+<ReferralFormInline
+	bind:open={showReferralForm}
+	buyerData={currentBuyerData}
+	saleId={sale?.id}
+	propertyName={sale?.project}
+	onGenerated={handleReferralGenerated}
+/>

@@ -83,7 +83,12 @@
 
 	let nextKey = $state(splits.length > 0 ? Math.max(...splits.map((s) => s.key)) + 1 : 0);
 
-	type UserResult = { id: string; email: string; displayName?: string; photoURL?: string };
+	type UserResult = {
+		id: string;
+		email: string | null;
+		displayName?: string | null;
+		photoURL?: string | null;
+	};
 
 	// --- Agent search state ---
 	let agentPopoverOpen = $state<Record<number, boolean>>({});
@@ -179,13 +184,15 @@
 	}
 
 	function selectAgent(key: number, agent: UserResult) {
+		const email = agent.email ?? '';
+		const name = agent.displayName ?? email;
 		splits = splits.map((s) =>
 			s.key === key
 				? {
 						...s,
 						agentId: agent.id,
-						agentEmail: agent.email,
-						agentName: agent.displayName ?? agent.email,
+						agentEmail: email,
+						agentName: name,
 						agentPhotoURL: agent.photoURL ?? undefined
 					}
 				: s
@@ -195,12 +202,13 @@
 	}
 
 	function selectManager(key: number, user: UserResult) {
+		const email = user.email ?? '';
 		splits = splits.map((s) =>
 			s.key === key
 				? {
 						...s,
-						managerEmail: user.email,
-						managerName: user.displayName ?? user.email
+						managerEmail: email,
+						managerName: user.displayName ?? email
 					}
 				: s
 		);
@@ -209,12 +217,13 @@
 	}
 
 	function selectSeniorManager(key: number, user: UserResult) {
+		const email = user.email ?? '';
 		splits = splits.map((s) =>
 			s.key === key
 				? {
 						...s,
-						seniorManagerEmail: user.email,
-						seniorManagerName: user.displayName ?? user.email
+						seniorManagerEmail: email,
+						seniorManagerName: user.displayName ?? email
 					}
 				: s
 		);
@@ -382,12 +391,12 @@
 														<Avatar.Image src={agent.photoURL} alt={agent.displayName} />
 													{/if}
 													<Avatar.Fallback class="text-[10px]">
-														{getInitials(agent.displayName ?? agent.email)}
+														{getInitials(agent.displayName ?? agent.email ?? 'User')}
 													</Avatar.Fallback>
 												</Avatar.Root>
 												<div class="ml-2 min-w-0">
 													<div class="truncate text-sm font-medium">
-														{agent.displayName ?? agent.email}
+														{agent.displayName ?? agent.email ?? 'User'}
 													</div>
 													<div class="truncate text-xs text-muted-foreground">{agent.email}</div>
 												</div>
@@ -495,12 +504,12 @@
 															<Avatar.Image src={user.photoURL} alt={user.displayName} />
 														{/if}
 														<Avatar.Fallback class="text-[10px]">
-															{getInitials(user.displayName ?? user.email)}
+															{getInitials(user.displayName ?? user.email ?? 'User')}
 														</Avatar.Fallback>
 													</Avatar.Root>
 													<div class="ml-2 min-w-0">
 														<div class="truncate text-sm font-medium">
-															{user.displayName ?? user.email}
+															{user.displayName ?? user.email ?? 'User'}
 														</div>
 														<div class="truncate text-xs text-muted-foreground">{user.email}</div>
 													</div>
@@ -575,12 +584,12 @@
 															<Avatar.Image src={user.photoURL} alt={user.displayName} />
 														{/if}
 														<Avatar.Fallback class="text-[10px]">
-															{getInitials(user.displayName ?? user.email)}
+															{getInitials(user.displayName ?? user.email ?? 'User')}
 														</Avatar.Fallback>
 													</Avatar.Root>
 													<div class="ml-2 min-w-0">
 														<div class="truncate text-sm font-medium">
-															{user.displayName ?? user.email}
+															{user.displayName ?? user.email ?? 'User'}
 														</div>
 														<div class="truncate text-xs text-muted-foreground">{user.email}</div>
 													</div>

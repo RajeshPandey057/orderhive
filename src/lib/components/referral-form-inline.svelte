@@ -9,19 +9,27 @@
 
 	let {
 		open = $bindable(false),
-		buyerData
+		buyerData,
+		saleId,
+		propertyName,
+		onGenerated
 	}: {
 		open?: boolean;
 		buyerData?: { firstName?: string; lastName?: string; email?: string };
+		saleId?: string;
+		propertyName?: string;
+		onGenerated?: (document: SaleDocumentFile) => void;
 	} = $props();
 
 	// Pre-fill form data with defaults
 	$effect(() => {
 		if (open) {
-			submitReferralAgreement.fields.agencyName.set('I N D GLOBAL REAL ESTATE L.L.C');
+			submitReferralAgreement.fields.agencyName.set('IND GLOBAL REAL ESTATE L.L.C');
 			submitReferralAgreement.fields.tradeLicense.set('1232144');
-			submitReferralAgreement.fields.firstPartyName.set('I N D GLOBAL REAL ESTATE L.LC');
-			submitReferralAgreement.fields.firstPartySignature.set('Meet Shah');
+			submitReferralAgreement.fields.firstPartyName.set('IND GLOBAL REAL ESTATE L.LC');
+			submitReferralAgreement.fields.saleId.set(saleId ?? '');
+			submitReferralAgreement.fields.srNo.set(saleId ?? '');
+			submitReferralAgreement.fields.propertyName.set(propertyName ?? '');
 
 			// Pre-fill buyer data if available
 			if (buyerData) {
@@ -57,7 +65,12 @@
 		<form
 			class="flex flex-col gap-6 py-6"
 			{...submitReferralAgreement.enhance(async ({ submit }) => {
-				await submit();
+				try {
+					await submit();
+				} catch {
+					toast.error('Failed to generate referral agreement. Please try again.');
+					return;
+				}
 
 				const issues = submitReferralAgreement.fields.allIssues();
 				if (issues && issues.length > 0) {
@@ -65,10 +78,20 @@
 					return;
 				}
 
+				if (submitReferralAgreement.result?.success === false) {
+					toast.error(submitReferralAgreement.result.message);
+					return;
+				}
+
+				if (submitReferralAgreement.result?.success && submitReferralAgreement.result.document) {
+					onGenerated?.(submitReferralAgreement.result.document as SaleDocumentFile);
+				}
+
 				toast.success('Referral agreement submitted successfully!');
 				open = false;
 			})}
 		>
+			<input class="sr-only" {...submitReferralAgreement.fields.saleId.as('text')} />
 			<!-- Agreement Header -->
 			<Field.Set>
 				<Field.Legend class="text-base font-semibold">Agreement Information</Field.Legend>
@@ -76,7 +99,11 @@
 					<div class="grid grid-cols-2 gap-4">
 						<Field.Field>
 							<Field.Label>Serial Number</Field.Label>
-							<Input {...submitReferralAgreement.fields.srNo.as('text')} placeholder="e.g., 619" />
+							<Input
+								{...submitReferralAgreement.fields.srNo.as('text')}
+								placeholder="Saved sale ID"
+								readonly
+							/>
 							{#each submitReferralAgreement.fields.srNo.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -197,28 +224,16 @@
 							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 						{/each}
 					</Field.Field>
-					<div class="grid grid-cols-2 gap-4">
-						<Field.Field>
-							<Field.Label>First Party Signature</Field.Label>
-							<Input
-								{...submitReferralAgreement.fields.firstPartySignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitReferralAgreement.fields.firstPartySignature.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>First Party Date</Field.Label>
-							<Input
-								{...submitReferralAgreement.fields.firstPartyDate.as('text')}
-								placeholder="19 Feb 2026"
-							/>
-							{#each submitReferralAgreement.fields.firstPartyDate.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-					</div>
+					<Field.Field>
+						<Field.Label>First Party Date</Field.Label>
+						<Input
+							{...submitReferralAgreement.fields.firstPartyDate.as('text')}
+							placeholder="19 Feb 2026"
+						/>
+						{#each submitReferralAgreement.fields.firstPartyDate.issues() as issue, i (i)}
+							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+						{/each}
+					</Field.Field>
 				</Field.Group>
 			</Field.Set>
 
@@ -236,28 +251,16 @@
 							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 						{/each}
 					</Field.Field>
-					<div class="grid grid-cols-2 gap-4">
-						<Field.Field>
-							<Field.Label>Second Party Signature</Field.Label>
-							<Input
-								{...submitReferralAgreement.fields.secondPartySignature.as('text')}
-								placeholder="Type name for signature"
-							/>
-							{#each submitReferralAgreement.fields.secondPartySignature.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-						<Field.Field>
-							<Field.Label>Second Party Date</Field.Label>
-							<Input
-								{...submitReferralAgreement.fields.secondPartyDate.as('text')}
-								placeholder="19 Feb 2026"
-							/>
-							{#each submitReferralAgreement.fields.secondPartyDate.issues() as issue, i (i)}
-								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-							{/each}
-						</Field.Field>
-					</div>
+					<Field.Field>
+						<Field.Label>Second Party Date</Field.Label>
+						<Input
+							{...submitReferralAgreement.fields.secondPartyDate.as('text')}
+							placeholder="19 Feb 2026"
+						/>
+						{#each submitReferralAgreement.fields.secondPartyDate.issues() as issue, i (i)}
+							<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+						{/each}
+					</Field.Field>
 				</Field.Group>
 			</Field.Set>
 

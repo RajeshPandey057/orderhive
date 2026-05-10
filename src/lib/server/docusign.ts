@@ -15,6 +15,7 @@ const TOKEN_EXPIRATION_SECONDS = 3600; // 1 hour
 let cachedAccessToken: string | null = null;
 let tokenExpirationTime: number | null = null;
 let cachedAccountId: string | null = null;
+let cachedAccountBasePath: string | null = null;
 
 /**
  * Get DocuSign API client with JWT authentication
@@ -26,6 +27,9 @@ async function getApiClient(): Promise<docusign.ApiClient> {
 	// Check if we have a valid cached token
 	if (cachedAccessToken && tokenExpirationTime && Date.now() < tokenExpirationTime) {
 		apiClient.addDefaultHeader('Authorization', `Bearer ${cachedAccessToken}`);
+		if (cachedAccountBasePath) {
+			apiClient.setBasePath(cachedAccountBasePath);
+		}
 		return apiClient;
 	}
 
@@ -68,7 +72,8 @@ async function getApiClient(): Promise<docusign.ApiClient> {
 
 		// Update base path to use the account's base URI
 		if (account.baseUri) {
-			apiClient.setBasePath(account.baseUri + '/restapi');
+			cachedAccountBasePath = account.baseUri + '/restapi';
+			apiClient.setBasePath(cachedAccountBasePath);
 		}
 
 		console.log('✅ DocuSign JWT authentication successful');

@@ -1,9 +1,20 @@
 import { form } from '$app/server';
 import { createEnvelopeFromPDF } from '$lib/server/docusign';
+import { firestore } from '$lib/server/firebase';
+import { createDocusignDocumentRecord } from '$lib/server/sale-documents';
 import { generateAMLFormPDF } from '$lib/server/template-renderer';
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
+const jointBuyerIndexSchema = z
+	.union([z.number().int().min(0), z.string().regex(/^\d+$/).transform(Number)])
+	.optional();
+
 const amlFormSchema = z.object({
+	saleId: z.string().min(1, 'Sale ID is required'),
+	buyerType: z.enum(['primary', 'joint']).default('primary'),
+	jointBuyerIndex: jointBuyerIndexSchema,
+
 	// Date and Reference
 	date: z.string().min(1, 'Date is required'),
 	referenceNo: z.string().min(1, 'Reference number is required'),
@@ -48,12 +59,47 @@ const amlFormSchema = z.object({
 
 	// Declaration
 	customerName: z.string().min(1, 'Customer name is required'),
-	customerSignature: z.string().min(1, 'Customer signature is required'),
-	salesAgentName: z.string().min(1, 'Sales agent name is required'),
-	salesAgentSignature: z.string().min(1, 'Sales agent signature is required')
+	salesAgentName: z.string().min(1, 'Sales agent name is required')
 });
 
 export const submitAMLForm = form(amlFormSchema, async (data) => {
+	const saleRef = firestore.collection('sales').doc(data.saleId);
+	const saleSnap = await saleRef.get();
+
+	if (!saleSnap.exists) {
+		return {
+			success: false,
+			message: 'Sale not found. Save the sale before generating AML.'
+		};
+	}
+
+	const sale = saleSnap.data() as Record<string, unknown>;
+	const clientDetails = (sale.clientDetails as Record<string, unknown> | undefined) ?? {};
+	const jointBuyers = (sale.jointBuyers as Array<Record<string, unknown>> | undefined) ?? [];
+
+	if (data.buyerType === 'primary' && clientDetails.amlFormFile) {
+		return {
+			success: false,
+			message: 'AML form already exists for the primary buyer.'
+		};
+	}
+
+	if (data.buyerType === 'joint') {
+		if (data.jointBuyerIndex === undefined || !jointBuyers[data.jointBuyerIndex]) {
+			return {
+				success: false,
+				message: 'Joint buyer not found for this sale.'
+			};
+		}
+
+		if (jointBuyers[data.jointBuyerIndex].amlFormFile) {
+			return {
+				success: false,
+				message: 'AML form already exists for this joint buyer.'
+			};
+		}
+	}
+
 	const nameParts = data.fullName.trim().split(/\s+/).filter(Boolean);
 	const firstName = nameParts[0];
 	const lastName = nameParts.slice(1).join(' ') || '-';
@@ -89,9 +135,7 @@ export const submitAMLForm = form(amlFormSchema, async (data) => {
 		thirdPartyDetails: data.thirdPartyDetails,
 		pepRelated: data.pepRelated,
 		customerName: data.customerName,
-		customerSignature: data.customerSignature,
-		salesAgentName: data.salesAgentName,
-		salesAgentSignature: data.salesAgentSignature
+		salesAgentName: data.salesAgentName
 	});
 
 	console.log('✅ PDF generated:', `${Math.round(pdfBuffer.length / 1024)}KB`);
@@ -105,10 +149,38 @@ export const submitAMLForm = form(amlFormSchema, async (data) => {
 		emailBlurb: `Dear ${firstName}, please review and sign this AML (Anti-Money Laundering) and KYC (Know Your Customer) form as part of your property purchase process.`
 	});
 
+	const document = createDocusignDocumentRecord({
+		documentName: `AML Form - ${data.fullName}`,
+		pdfBuffer,
+		envelope,
+		referenceNo: data.referenceNo,
+		recipientEmail: data.emailAddress,
+		recipientName: data.fullName
+	});
+
+	if (data.buyerType === 'joint') {
+		const updatedJointBuyers = [...jointBuyers];
+		updatedJointBuyers[data.jointBuyerIndex!] = {
+			...updatedJointBuyers[data.jointBuyerIndex!],
+			amlFormFile: document
+		};
+
+		await saleRef.update({
+			jointBuyers: updatedJointBuyers,
+			updatedAt: FieldValue.serverTimestamp()
+		});
+	} else {
+		await saleRef.update({
+			'clientDetails.amlFormFile': document,
+			updatedAt: FieldValue.serverTimestamp()
+		});
+	}
+
 	return {
 		success: true,
 		envelopeId: envelope.envelopeId,
 		status: envelope.status,
+		document,
 		message: 'AML form sent successfully via DocuSign'
 	};
 });

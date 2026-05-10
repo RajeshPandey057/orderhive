@@ -32,9 +32,7 @@ export interface BuyerData {
 	thirdPartyDetails?: string;
 	pepRelated?: string;
 	customerName?: string;
-	customerSignature?: string;
 	salesAgentName?: string;
-	salesAgentSignature?: string;
 }
 
 export interface ReferralAgreementData {
@@ -182,9 +180,7 @@ export async function fillAMLTemplate(buyerData: BuyerData): Promise<string> {
 
 	// Declaration
 	html = setInputValue(html, 'customer_name', buyerData.customerName || fullName);
-	html = setInputValue(html, 'customer_signature', buyerData.customerSignature || '');
 	html = setInputValue(html, 'sales_agent_name', buyerData.salesAgentName || '');
-	html = setInputValue(html, 'sales_agent_signature', buyerData.salesAgentSignature || '');
 
 	return html;
 }
@@ -206,10 +202,8 @@ export async function fillReferralAgreementTemplate(data: ReferralAgreementData)
 	html = setInputValue(html, 'referral_fee_pct', data.referralFeePercentage);
 	html = setInputValue(html, 'property_name', data.propertyName);
 	html = setInputValue(html, 'first_party_name', 'I N D GLOBAL REAL ESTATE L.LC');
-	html = setInputValue(html, 'first_party_signature', 'Meet Shah');
 	html = setInputValue(html, 'first_party_date', data.firstPartyDate);
 	html = setInputValue(html, 'second_party_name', data.referrerName);
-	html = setInputValue(html, 'second_party_signature', ''); // To be signed by referrer
 	html = setInputValue(html, 'second_party_date', data.secondPartyDate);
 
 	return html;

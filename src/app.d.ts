@@ -25,6 +25,36 @@ declare global {
 			| 'senior-manager';
 		managedTeamIds?: string[];
 	};
+	type SaleDocumentStatus = 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
+	type SaleDocumentFile = {
+		financeStatus: SaleDocumentStatus;
+		complianceStatus: SaleDocumentStatus;
+		original?: {
+			name: string;
+			size: number;
+			type: string;
+			lastModified: number;
+		};
+		path?: string;
+		downloadURL?: string;
+		token?: string;
+		contentType?: string;
+		size?: number;
+		name?: string;
+		lastModified?: number;
+		source?: 'upload' | 'docusign';
+		referenceNo?: string;
+		generatedAt?: string;
+		docusign?: {
+			envelopeId: string;
+			status: string;
+			statusDateTime?: string;
+			uri?: string;
+			recipientEmail?: string;
+			recipientName?: string;
+			documentId?: string;
+		};
+	};
 	type Sale = {
 		id: string;
 		commnets: {
@@ -47,162 +77,32 @@ declare global {
 		status: 'pending' | 'approved' | 'rejected';
 		financeStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
 		complianceStatus: 'pending' | 'approved' | 'not-eligible' | 'rejected';
-		invoiceFile: {
-			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			original:
-				| {
-						name: string;
-						size: number;
-						type: string;
-						lastModified: number;
-				  }
-				| undefined;
-			path: string | undefined;
-			downloadURL: string | undefined;
-			token: string | undefined;
-			contentType: string | undefined;
-			size: number | undefined;
-			name: string | undefined;
-			lastModified: number | undefined;
-		} | null;
+		invoiceFile: SaleDocumentFile | null;
 		clientDetails: {
 			firstName: string;
 			lastName: string;
 			email: string;
 			phone: string;
-			passportFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
-			amlFormFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
-			nationalIdFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
+			passportFile: SaleDocumentFile | null;
+			amlFormFile: SaleDocumentFile | null;
+			nationalIdFile: SaleDocumentFile | null;
 		};
-		refferalAgreementFile: {
-			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			original: {
-				name: string;
-				size: number;
-				type: string;
-				lastModified: number;
-			};
-			path: string;
-			downloadURL: string;
-			token: string;
-			contentType: string;
-			size: number;
-			name: string;
-			lastModified: number;
-		} | null;
+		refferalAgreementFile: SaleDocumentFile | null;
 		jointBuyers: {
 			firstName: string;
 			lastName: string;
 			email: string;
 			phone: string;
-			amlFormFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
-			passportFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
-			nationalIdFile: {
-				financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-				original: {
-					name: string;
-					size: number;
-					type: string;
-					lastModified: number;
-				};
-				path: string;
-				downloadURL: string;
-				token: string;
-				contentType: string;
-				size: number;
-				name: string;
-				lastModified: number;
-			} | null;
+			amlFormFile: SaleDocumentFile | null;
+			passportFile: SaleDocumentFile | null;
+			nationalIdFile: SaleDocumentFile | null;
 		}[];
 		dealOwners: {
 			userId: string;
 			email: string;
 			name: string;
 			photoURL: string;
-			ownerRole: 'caller' | 'closer';
+			ownerRole: 'caller' | 'closer' | 'closer2' | 'closer3';
 			split: number;
 		}[];
 		dealOwnerIds: string[];
@@ -219,40 +119,8 @@ declare global {
 		splitAgentIds?: string[];
 		dealStage: 'eoi' | 'booking';
 		paymentValue: number;
-		bookingFormFile: {
-			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			original: {
-				name: string;
-				size: number;
-				type: string;
-				lastModified: number;
-			};
-			path: string;
-			downloadURL: string;
-			token: string;
-			contentType: string;
-			size: number;
-			name: string;
-			lastModified: number;
-		} | null;
-		paymentReceiptFile: {
-			financeStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			complianceStatus: 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
-			original: {
-				name: string;
-				size: number;
-				type: string;
-				lastModified: number;
-			};
-			path: string;
-			downloadURL: string;
-			token: string;
-			contentType: string;
-			size: number;
-			name: string;
-			lastModified: number;
-		} | null;
+		bookingFormFile: SaleDocumentFile | null;
+		paymentReceiptFile: SaleDocumentFile | null;
 
 		saleType: 'off-plan' | 'secondary';
 		developer: string;
@@ -288,6 +156,10 @@ declare global {
 		saleDate?: string;
 		nationality?: string;
 		residentStatus?: 'resident' | 'non-resident';
+		callerManagerEmail?: string;
+		closerManagerEmail?: string;
+		callerSeniorManagerEmail?: string;
+		closerSeniorManagerEmail?: string;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

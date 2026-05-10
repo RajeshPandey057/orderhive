@@ -51,6 +51,13 @@
 		return (bytes / (1024 * 1024)).toFixed(1) + 'mb';
 	};
 
+	const getDocumentMeta = (document: SaleDocumentFile | null | undefined): string | null => {
+		if (!document?.docusign) return null;
+		const parts = [`DocuSign ${document.docusign.status}`];
+		if (document.referenceNo) parts.push(`Ref ${document.referenceNo}`);
+		return parts.join(' - ');
+	};
+
 	const getInitials = (name: string): string => {
 		return name
 			.split(' ')
@@ -890,6 +897,11 @@
 										<span class="text-xs text-muted-foreground"
 											>{formatFileSize(sale.clientDetails.amlFormFile.size)}</span
 										>
+										{#if getDocumentMeta(sale.clientDetails.amlFormFile)}
+											<span class="text-xs text-muted-foreground"
+												>{getDocumentMeta(sale.clientDetails.amlFormFile)}</span
+											>
+										{/if}
 									</div>
 								</div>
 								<a
@@ -1330,6 +1342,11 @@
 									<span class="text-xs text-muted-foreground"
 										>{formatFileSize(sale.refferalAgreementFile.size)}</span
 									>
+									{#if getDocumentMeta(sale.refferalAgreementFile)}
+										<span class="text-xs text-muted-foreground"
+											>{getDocumentMeta(sale.refferalAgreementFile)}</span
+										>
+									{/if}
 								</div>
 							</div>
 							<a
@@ -1907,6 +1924,11 @@
 														<span class="text-xs text-muted-foreground"
 															>{formatFileSize(buyer.amlFormFile.size)}</span
 														>
+														{#if getDocumentMeta(buyer.amlFormFile)}
+															<span class="text-xs text-muted-foreground"
+																>{getDocumentMeta(buyer.amlFormFile)}</span
+															>
+														{/if}
 													</div>
 												</div>
 												<a
