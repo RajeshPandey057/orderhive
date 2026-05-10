@@ -40,7 +40,9 @@ export async function load({ params }) {
 			liquidityInvested: d.liquidityInvested ?? 0,
 			sellingPrice: d.sellingPrice ?? 0,
 			listedByEmails: d.listedByEmails ?? [],
-			createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString()
+			createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
+			createdByUid: d.createdByUid ?? '',
+			createdByEmail: d.createdByEmail ?? ''
 		};
 
 		const media = normalizeListingMedia(d);

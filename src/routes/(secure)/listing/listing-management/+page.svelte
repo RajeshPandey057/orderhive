@@ -3,8 +3,41 @@
 	import ListingTable from '$lib/components/listing-table.svelte';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { toast } from 'svelte-sonner';
+	import EditListingSheet from './edit-listing-sheet.svelte';
+	import ListingDeleteDialog from './listing-delete-dialog.svelte';
 
 	let { data } = $props();
+
+	let editSheetOpen = $state(false);
+	let deleteDialogOpen = $state(false);
+	let selectedListing = $state<Listing | null>(null);
+
+	const currentUserUid = $derived(data?.user?.uid ?? '');
+	const currentUserRole = $derived(data?.user?.role ?? '');
+	const isAdmin = $derived(currentUserRole === 'admin' || currentUserRole === 'super-admin');
+
+	function canManage(listing: Listing): boolean {
+		return isAdmin || listing.createdByUid === currentUserUid;
+	}
+
+	function handleEdit(listing: Listing) {
+		if (!canManage(listing)) {
+			toast.error('You do not have permission to edit this listing.');
+			return;
+		}
+		selectedListing = listing;
+		editSheetOpen = true;
+	}
+
+	function handleDelete(listing: Listing) {
+		if (!canManage(listing)) {
+			toast.error('You do not have permission to delete this listing.');
+			return;
+		}
+		selectedListing = listing;
+		deleteDialogOpen = true;
+	}
 </script>
 
 <header
@@ -24,5 +57,10 @@
 </header>
 
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-	<ListingTable listings={data.listings ?? []} />
+	<ListingTable listings={data.listings ?? []} onEdit={handleEdit} onDelete={handleDelete} />
 </div>
+
+{#if selectedListing}
+	<EditListingSheet listing={selectedListing} bind:open={editSheetOpen} />
+	<ListingDeleteDialog listing={selectedListing} bind:open={deleteDialogOpen} />
+{/if}

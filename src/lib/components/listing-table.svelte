@@ -2,9 +2,21 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+	import Pencil from '~icons/lucide/pencil';
 	import Search from '~icons/lucide/search';
+	import Trash2 from '~icons/lucide/trash-2';
 
-	let { listings = [] }: { listings: Listing[] } = $props();
+	let {
+		listings = [],
+		onEdit,
+		onDelete
+	}: {
+		listings: Listing[];
+		onEdit?: (listing: Listing) => void;
+		onDelete?: (listing: Listing) => void;
+	} = $props();
+
+	const hasActions = $derived(!!onEdit || !!onDelete);
 
 	let searchQuery = $state('');
 	let selectedDeveloper = $state('all');
@@ -135,12 +147,15 @@
 				<Table.Head class="text-right">Buying Price</Table.Head>
 				<Table.Head class="text-right">Selling Price</Table.Head>
 				<Table.Head>Listing Type</Table.Head>
+				{#if hasActions}
+					<Table.Head class="w-24 text-right">Actions</Table.Head>
+				{/if}
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
 			{#if filteredListings.length === 0}
 				<Table.Row>
-					<Table.Cell colspan={7} class="py-12">
+					<Table.Cell colspan={hasActions ? 8 : 7} class="py-12">
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -180,6 +195,32 @@
 								{listing.listingType === 'portal' ? 'Portal' : 'Internal'}
 							</span>
 						</Table.Cell>
+						{#if hasActions}
+							<Table.Cell class="text-right">
+								<div class="flex items-center justify-end gap-1">
+									{#if onEdit}
+										<button
+											type="button"
+											class="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+											onclick={() => onEdit!(listing)}
+											aria-label="Edit listing"
+										>
+											<Pencil class="h-4 w-4" />
+										</button>
+									{/if}
+									{#if onDelete}
+										<button
+											type="button"
+											class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+											onclick={() => onDelete!(listing)}
+											aria-label="Delete listing"
+										>
+											<Trash2 class="h-4 w-4" />
+										</button>
+									{/if}
+								</div>
+							</Table.Cell>
+						{/if}
 					</Table.Row>
 				{/each}
 			{/if}

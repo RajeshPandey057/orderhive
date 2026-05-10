@@ -364,6 +364,8 @@ declare global {
 		liquidityInvested: number;
 		sellingPrice: number;
 		createdAt: string;
+		createdByUid: string;
+		createdByEmail: string;
 	};
 	namespace Superforms {
 		type Message = { type: 'error' | 'success' | 'warning'; text: string };
