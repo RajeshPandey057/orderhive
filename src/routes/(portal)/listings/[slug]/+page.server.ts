@@ -1,4 +1,5 @@
 import { firestore } from '$lib/server/firebase';
+import { normalizeListingMedia } from '$lib/server/listing-media';
 
 export async function load({ params }) {
 	const slug = params.slug;
@@ -42,7 +43,12 @@ export async function load({ params }) {
 			createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString()
 		};
 
-		return { firestoreListing: listing };
+		const media = normalizeListingMedia(d);
+
+		return {
+			firestoreListing: listing,
+			media
+		};
 	} catch {
 		return { firestoreListing: null };
 	}

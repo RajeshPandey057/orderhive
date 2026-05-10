@@ -1,4 +1,5 @@
 import { firestore } from '$lib/server/firebase';
+import { normalizeListingMedia } from '$lib/server/listing-media';
 
 export async function load({ params }) {
 	const listingId = params.id.toUpperCase();
@@ -37,24 +38,12 @@ export async function load({ params }) {
 			createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString()
 		};
 
-		const pictureUrls = Array.isArray(d.attachments?.pictures)
-			? d.attachments.pictures
-					.map((file: { downloadURL?: string }) => file?.downloadURL)
-					.filter((url: string | undefined): url is string => Boolean(url))
-			: [];
 
-		const videoUrls = Array.isArray(d.attachments?.videos)
-			? d.attachments.videos
-					.map((file: { downloadURL?: string }) => file?.downloadURL)
-					.filter((url: string | undefined): url is string => Boolean(url))
-			: [];
+		const media = normalizeListingMedia(d);
 
 		return {
 			listing,
-			media: {
-				images: pictureUrls,
-				videos: videoUrls
-			}
+			media
 		};
 	} catch {
 		return { listing: null };

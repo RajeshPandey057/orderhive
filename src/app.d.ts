@@ -294,6 +294,24 @@ declare global {
 		updatedAt: FieldValue;
 	};
 	type APIResponse<T = object> = { success: false; error: string } | { success: true; data: T };
+	type ListingMediaItem =
+		| {
+				id: string;
+				type: 'photo';
+				url: string;
+				thumbnailURL?: string;
+				width?: number;
+				height?: number;
+		  }
+		| {
+				id: string;
+				type: 'video';
+				url: string;
+				thumbnailURL?: string;
+				posterURL?: string;
+				width?: number;
+				height?: number;
+		  };
 	type Listing = {
 		id: string;
 		listingType: 'internal' | 'portal';

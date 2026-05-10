@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ListingMediaGallery from '$lib/components/listing-media-gallery.svelte';
 	import FullLogo from '$lib/svg/full-logo.svelte';
 	import ArrowLeftIcon from '~icons/lucide/arrow-left';
 	import Building2Icon from '~icons/lucide/building-2';
@@ -8,16 +9,6 @@
 
 	function formatPrice(value?: number): string {
 		return new Intl.NumberFormat('en-AE').format(value ?? 0);
-	}
-
-	function getPlaceholderGalleryImages(listingId: string): string[] {
-		return [
-			`https://picsum.photos/seed/${listingId}-gallery-1/1200/800`,
-			`https://picsum.photos/seed/${listingId}-gallery-2/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-3/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-4/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-5/600/400`
-		];
 	}
 
 	let { data } = $props();
@@ -34,7 +25,7 @@
 			: 'N/A'
 	);
 
-	const galleryImages = $derived(listing ? getPlaceholderGalleryImages(listing.id) : []);
+	const mediaItems = $derived((data.media?.items ?? []) as ListingMediaItem[]);
 </script>
 
 <div class="min-h-screen bg-background font-[Inter_Variable,sans-serif]">
@@ -102,28 +93,11 @@
 				</section>
 
 				<section class="rounded-xl border border-border bg-card p-3 sm:p-4">
-					<div class="grid grid-cols-1 gap-2 md:grid-cols-12">
-						<div class="overflow-hidden rounded-lg md:col-span-8">
-							<img
-								src={galleryImages[0]}
-								alt={`${listing.project} gallery image 1`}
-								class="h-64 w-full object-cover sm:h-80"
-								loading="lazy"
-							/>
-						</div>
-						<div class="grid grid-cols-2 gap-2 md:col-span-4 md:grid-cols-1">
-							{#each galleryImages.slice(1) as image, index (image)}
-								<div class="overflow-hidden rounded-lg">
-									<img
-										src={image}
-										alt={`${listing.project} gallery image ${index + 2}`}
-										class="h-28 w-full object-cover sm:h-23"
-										loading="lazy"
-									/>
-								</div>
-							{/each}
-						</div>
-					</div>
+					<ListingMediaGallery
+						mediaItems={mediaItems}
+						listingId={listing.id}
+						listingTitle={listing.project}
+					/>
 				</section>
 
 				<section class="grid grid-cols-1 gap-6 lg:grid-cols-2">

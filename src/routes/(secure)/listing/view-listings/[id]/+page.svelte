@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ListingMediaGallery from '$lib/components/listing-media-gallery.svelte';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ArrowLeftIcon from '~icons/lucide/arrow-left';
@@ -39,25 +40,7 @@
 			: 'N/A'
 	);
 
-	function getPlaceholderGalleryImages(listingId: string): string[] {
-		return [
-			`https://picsum.photos/seed/${listingId}-gallery-1/1200/800`,
-			`https://picsum.photos/seed/${listingId}-gallery-2/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-3/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-4/600/400`,
-			`https://picsum.photos/seed/${listingId}-gallery-5/600/400`
-		];
-	}
-
-	const uploadedImageUrls = $derived((data.media?.images ?? []) as string[]);
-	const uploadedVideoUrls = $derived((data.media?.videos ?? []) as string[]);
-	const galleryImages = $derived(
-		listing
-			? uploadedImageUrls.length > 0
-				? uploadedImageUrls
-				: getPlaceholderGalleryImages(listing.id)
-			: []
-	);
+	const mediaItems = $derived((data.media?.items ?? []) as ListingMediaItem[]);
 </script>
 
 <header
@@ -159,42 +142,12 @@
 
 			<!-- Gallery -->
 			<section class="rounded-xl border border-border bg-card p-3">
-				<div class="grid grid-cols-1 gap-2 md:grid-cols-12">
-					<div class="overflow-hidden rounded-lg md:col-span-8">
-						<img
-							src={galleryImages[0]}
-							alt={`${listing.project} main image`}
-							class="h-56 w-full object-cover sm:h-72"
-							loading="lazy"
-						/>
-					</div>
-					<div class="grid grid-cols-2 gap-2 md:col-span-4 md:grid-cols-1">
-						{#each galleryImages.slice(1) as image, index (image)}
-							<div class="overflow-hidden rounded-lg">
-								<img
-									src={image}
-									alt={`${listing.project} image ${index + 2}`}
-									class="h-24 w-full object-cover sm:h-[calc((72*4px+24px)/4)]"
-									loading="lazy"
-								/>
-							</div>
-						{/each}
-					</div>
-				</div>
+				<ListingMediaGallery
+					mediaItems={mediaItems}
+					listingId={listing.id}
+					listingTitle={listing.project}
+				/>
 			</section>
-
-			{#if uploadedVideoUrls.length > 0}
-				<section class="rounded-xl border border-border bg-card p-3">
-					<h3 class="mb-3 text-base font-semibold text-foreground">Videos</h3>
-					<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-						{#each uploadedVideoUrls as videoUrl (videoUrl)}
-							<video src={videoUrl} class="w-full rounded-lg border border-border" controls>
-								<track kind="captions" />
-							</video>
-						{/each}
-					</div>
-				</section>
-			{/if}
 
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<!-- Client Details -->

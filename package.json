@@ -103,6 +103,7 @@
 		"docusign-esign": "^8.6.0",
 		"firebase-admin": "^13.6.0",
 		"papaparse": "^5.5.3",
+		"photoswipe": "^5.4.4",
 		"puppeteer": "^24.37.5"
 	},
 	"pnpm": {
