@@ -30,7 +30,6 @@
 	import Hammer from '~icons/lucide/hammer';
 	import Home from '~icons/lucide/home';
 	import Loader2 from '~icons/lucide/loader-2';
-	import Pencil from '~icons/lucide/pencil';
 	import Plus from '~icons/lucide/plus';
 	import Save from '~icons/lucide/save';
 	import PriceTag from '~icons/lucide/tag';
@@ -421,9 +420,6 @@
 			<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 				<Sheet.Title class="text-2xl font-medium">Add Sale</Sheet.Title>
 				<div class="flex flex-row gap-2">
-					<Sheet.Close class={buttonVariants({ variant: 'outline', size: 'sm' })}>
-						<Pencil class="mr-2 h-4 w-4" /> Save as Draft
-					</Sheet.Close>
 					<Button
 						type="submit"
 						size="sm"

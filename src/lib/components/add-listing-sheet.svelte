@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -15,7 +14,6 @@
 	import Hammer from '~icons/lucide/hammer';
 	import Home from '~icons/lucide/home';
 	import Loader2 from '~icons/lucide/loader-2';
-	import Pencil from '~icons/lucide/pencil';
 	import Save from '~icons/lucide/save';
 	import Trash2 from '~icons/lucide/trash-2';
 	import Upload from '~icons/lucide/upload';
@@ -392,9 +390,6 @@
 			<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 				<Sheet.Title class="text-2xl font-medium">Add Property Listing</Sheet.Title>
 				<div class="flex flex-row gap-2">
-					<Sheet.Close class={buttonVariants({ variant: 'outline', size: 'sm' })}>
-						<Pencil class="mr-2 h-4 w-4" /> Save as Draft
-					</Sheet.Close>
 					<Button type="submit" size="sm" disabled={saving}>
 						{#if saving}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
