@@ -26,7 +26,7 @@
 	}
 
 	const items = $derived(mediaItems.length > 0 ? mediaItems : getFallbackMedia(listingId));
-	const previewLimit = 5;
+	const previewLimit = 7;
 	const previewItems = $derived(items.length > previewLimit ? items.slice(0, previewLimit) : items);
 	const hiddenCount = $derived(Math.max(items.length - previewLimit, 0));
 
@@ -114,7 +114,11 @@
 			return 'lg:col-span-5 lg:row-span-2';
 		}
 
-		if (index === 1 || index === 2) {
+		if (index === 1) {
+			return 'lg:col-span-4';
+		}
+
+		if (index === 2) {
 			return 'lg:col-span-3';
 		}
 
@@ -126,12 +130,8 @@
 			return 'lg:col-span-3 lg:row-span-2';
 		}
 
-		if (index === 5) {
+		if (index === 5 || index === 6) {
 			return 'lg:col-span-4';
-		}
-
-		if (index === 6) {
-			return 'lg:col-span-3';
 		}
 
 		return 'lg:col-span-3';
