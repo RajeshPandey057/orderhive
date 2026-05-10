@@ -79,6 +79,9 @@
 	let mediaAssets = $state<
 		{ id: number; type: 'photo' | 'video'; file: File; fileName: string; previewUrl?: string }[]
 	>([]);
+	let existingMediaAssets = $state<{ type: 'photo' | 'video'; fileName: string; url: string }[]>(
+		[]
+	);
 	let nextAssetId = $state(1);
 	let errors = $state<Record<string, string>>({});
 	let saving = $state(false);
@@ -147,6 +150,10 @@
 		titleDeedReplaced = false;
 		passportReplaced = false;
 		emiratesIdReplaced = false;
+		existingMediaAssets = (l.mediaAssets ?? []).filter(
+			(asset): asset is { type: 'photo' | 'video'; fileName: string; url: string } =>
+				!!asset?.url && !!asset?.fileName && (asset.type === 'photo' || asset.type === 'video')
+		);
 		mediaAssets = [];
 		activeTab = 'property-details';
 		errors = {};
@@ -184,6 +191,8 @@
 	const developerLabel = $derived(
 		developers.find((item) => item.value === developer)?.label ?? (developer || 'Developer')
 	);
+	const sanitizedListedByEmails = $derived(listedByEmails.map((e) => e.trim()).filter(Boolean));
+	const retainedMediaUrls = $derived(existingMediaAssets.map((asset) => asset.url));
 	const filteredDevelopers = $derived(
 		developers.filter((item) =>
 			item.label.toLowerCase().includes(developerSearchValue.toLowerCase())
@@ -277,6 +286,10 @@
 		mediaAssets = mediaAssets.filter((asset) => asset.id !== id);
 	}
 
+	function removeExistingMediaAsset(url: string) {
+		existingMediaAssets = existingMediaAssets.filter((asset) => asset.url !== url);
+	}
+
 	function addListedByEmail() {
 		listedByEmails = [...listedByEmails, ''];
 	}
@@ -368,9 +381,8 @@
 			<input type="hidden" name="listingId" value={listing.id} />
 			<input type="hidden" name="listingType" value={listingType} />
 			<input type="hidden" name="developer" value={developer} />
-			{#each listedByEmails.map((e) => e.trim()).filter(Boolean) as email (email)}
-				<input type="hidden" name="listedByEmails" value={email} />
-			{/each}
+			<input type="hidden" name="listedByEmails" value={JSON.stringify(sanitizedListedByEmails)} />
+			<input type="hidden" name="retainedMediaUrls" value={JSON.stringify(retainedMediaUrls)} />
 			<input
 				type="file"
 				name="pictureFiles[]"
@@ -890,13 +902,13 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Photo/Videos</Field.Legend>
 						<Field.Group>
-							{#if listing.mediaAssets?.length}
+							{#if existingMediaAssets.length}
 								<p class="text-sm text-muted-foreground">
-									{listing.mediaAssets.length} existing media file(s). New uploads below will be added
-									to them.
+									{existingMediaAssets.length} existing media file(s). Remove any item to exclude it,
+									then save.
 								</p>
 								<div class="grid grid-cols-2 gap-3">
-									{#each listing.mediaAssets as asset, i (i)}
+									{#each existingMediaAssets as asset (asset.url)}
 										<div class="rounded-lg border border-border/60 bg-muted/30 p-2">
 											{#if asset.url && asset.type === 'photo'}
 												<img
@@ -909,7 +921,16 @@
 													<track kind="captions" />
 												</video>
 											{/if}
-											<p class="mt-1 truncate text-xs text-muted-foreground">{asset.fileName}</p>
+											<div class="mt-2 flex items-center justify-between gap-2">
+												<p class="truncate text-xs text-muted-foreground">{asset.fileName}</p>
+												<button
+													type="button"
+													class="text-destructive hover:text-destructive/80"
+													onclick={() => removeExistingMediaAsset(asset.url)}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
 										</div>
 									{/each}
 								</div>

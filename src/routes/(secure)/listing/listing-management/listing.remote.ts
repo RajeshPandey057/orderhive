@@ -120,19 +120,50 @@ const listingShape = {
 		.optional()
 		.default([]),
 
+	// Existing media URLs that should be kept on update
+	retainedMediaUrls: z.preprocess(
+		(v) => {
+			if (Array.isArray(v)) return v;
+			if (typeof v !== 'string') return v;
+			const s = v.trim();
+			if (!s) return [];
+			if (s.startsWith('[')) {
+				try {
+					const parsed = JSON.parse(s);
+					if (Array.isArray(parsed)) return parsed;
+				} catch {
+					return [];
+				}
+			}
+			return [s];
+		},
+		z.array(z.string().min(1)).optional().default([])
+	),
+
 	// Pricing
 	buyingPrice: z.coerce.number().min(0, 'Buying price is required'),
 	liquidityInvested: z.coerce.number().min(0, 'Liquidity invested is required'),
 	sellingPrice: z.coerce.number().min(0, 'Selling price is required'),
 
 	// Listed by agents
-	listedByEmails: z.union([
-		z
-			.string()
-			.min(1)
-			.transform((s): string[] => [s]),
+	listedByEmails: z.preprocess(
+		(v) => {
+			if (Array.isArray(v)) return v;
+			if (typeof v !== 'string') return v;
+			const s = v.trim();
+			if (!s) return [];
+			if (s.startsWith('[')) {
+				try {
+					const parsed = JSON.parse(s);
+					if (Array.isArray(parsed)) return parsed;
+				} catch {
+					return [s];
+				}
+			}
+			return [s];
+		},
 		z.array(z.string().min(1)).min(1, 'At least one agent is required')
-	])
+	)
 };
 
 const listingSchema = z
@@ -418,7 +449,23 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 			.map((f) => ({ type: 'video' as const, fileName: f!.name, url: f!.downloadURL }))
 	];
 
-	const mergedMediaAssets = [...(existing.mediaAssets ?? []), ...newMediaAssets];
+	const retainedMediaUrlSet = new Set(data.retainedMediaUrls ?? []);
+
+	const retainedExistingMediaAssets = (existing.mediaAssets ?? []).filter(
+		(asset: { url?: string }) => !!asset?.url && retainedMediaUrlSet.has(asset.url)
+	);
+
+	const mergedMediaAssets = [...retainedExistingMediaAssets, ...newMediaAssets];
+
+	const retainedPictureAttachments = (existing.attachments?.pictures ?? []).filter(
+		(file: { downloadURL?: string }) =>
+			!!file?.downloadURL && retainedMediaUrlSet.has(file.downloadURL)
+	);
+
+	const retainedVideoAttachments = (existing.attachments?.videos ?? []).filter(
+		(file: { downloadURL?: string }) =>
+			!!file?.downloadURL && retainedMediaUrlSet.has(file.downloadURL)
+	);
 
 	const updateRecord = {
 		listingType: data.listingType,
@@ -461,8 +508,8 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 			titleDeed: finalTitleDeed,
 			passport: finalPassport,
 			emiratesId: finalEmiratesId,
-			pictures: [...(existing.attachments?.pictures ?? []), ...uploadedPictures.filter(Boolean)],
-			videos: [...(existing.attachments?.videos ?? []), ...uploadedVideos.filter(Boolean)]
+			pictures: [...retainedPictureAttachments, ...uploadedPictures.filter(Boolean)],
+			videos: [...retainedVideoAttachments, ...uploadedVideos.filter(Boolean)]
 		},
 		updatedAt: timestamp,
 		updatedByUid: userUid,
