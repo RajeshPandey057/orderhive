@@ -369,6 +369,7 @@ declare global {
 		buyingPrice: number;
 		liquidityInvested: number;
 		sellingPrice: number;
+		dxbPrice?: number;
 		createdAt: string;
 		createdByUid: string;
 		createdByEmail: string;

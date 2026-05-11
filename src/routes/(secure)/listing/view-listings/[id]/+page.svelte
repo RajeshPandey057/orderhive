@@ -113,6 +113,9 @@
 						<p class="mt-1 text-sm text-muted-foreground">
 							ID: <span class="font-mono text-xs">{listing.id}</span>
 						</p>
+						<p class="mt-1 text-sm text-muted-foreground">
+							Created by: {listing.createdByEmail || 'N/A'}
+						</p>
 					</div>
 					<p class="text-2xl font-bold text-foreground">
 						AED {formatPrice(listing.sellingPrice)}
@@ -246,6 +249,12 @@
 							<span class="font-semibold text-foreground"
 								>AED {formatPrice(listing.sellingPrice)}</span
 							>
+						</div>
+						<div class="flex justify-between gap-4">
+							<span class="text-muted-foreground">DxB Price</span>
+							<span class="font-medium">
+								{listing.dxbPrice == null ? 'N/A' : `AED ${formatPrice(listing.dxbPrice)}`}
+							</span>
 						</div>
 					</div>
 				</section>

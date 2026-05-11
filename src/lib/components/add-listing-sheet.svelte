@@ -60,6 +60,7 @@
 	let buyingPrice = $state<number | ''>('');
 	let liquidityInvested = $state<number | ''>('');
 	let sellingPrice = $state<number | ''>('');
+	let dxbPrice = $state<number | ''>('');
 	let listedByEmails = $state<string[]>(['']);
 	$effect(() => {
 		if (currentUserEmail && listedByEmails[0] === '') {
@@ -245,6 +246,7 @@
 		buyingPrice = '';
 		liquidityInvested = '';
 		sellingPrice = '';
+		dxbPrice = '';
 		listedByEmails = [currentUserEmail || ''];
 		for (const asset of mediaAssets) {
 			revokePreviewUrl(asset.previewUrl);
@@ -268,6 +270,8 @@
 		if (!liquidityInvested && liquidityInvested !== 0)
 			nextErrors.liquidityInvested = 'Liquidity invested is required';
 		if (!sellingPrice && sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required';
+		if (dxbPrice !== '' && Number(dxbPrice) < 0)
+			nextErrors.dxbPrice = 'DxB price must be 0 or greater';
 		const validListedBy = listedByEmails.map((value) => value.trim()).filter(Boolean);
 		if (!validListedBy.length) {
 			nextErrors.listedByEmails = 'At least one listed by email is required';
@@ -296,8 +300,6 @@
 				nextErrors.titleDeedFileName = 'Title deed/Qood is required for portal listing';
 			if (!passportFileName)
 				nextErrors.passportFileName = 'Passport is required for portal listing';
-			if (!emiratesIdFileName)
-				nextErrors.emiratesIdFileName = 'Emirates ID is required for portal listing';
 		}
 
 		errors = nextErrors;
@@ -812,9 +814,7 @@
 											type="file"
 											onchange={(event) => onFileSelect(event, 'titleDeed')}
 										/>
-										{#if listingType === 'portal'}
-											<p class="text-xs text-muted-foreground">Required for portal listing</p>
-										{/if}
+										<p class="text-xs text-muted-foreground">Optional</p>
 										{#if errors.titleDeedFileName}<Field.Error class="text-sm text-destructive"
 												>{errors.titleDeedFileName}</Field.Error
 											>{/if}
@@ -927,7 +927,7 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Financial Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-3 gap-4">
+							<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
 								<Field.Field>
 									<Field.Label>Buying Price</Field.Label>
 									<Input
@@ -962,6 +962,18 @@
 									/>
 									{#if errors.sellingPrice}<Field.Error class="text-sm text-destructive"
 											>{errors.sellingPrice}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label>
+									<Input
+										name="dxbPrice"
+										type="number"
+										bind:value={dxbPrice}
+										placeholder="DxB Price"
+									/>
+									{#if errors.dxbPrice}<Field.Error class="text-sm text-destructive"
+											>{errors.dxbPrice}</Field.Error
 										>{/if}
 								</Field.Field>
 							</div>

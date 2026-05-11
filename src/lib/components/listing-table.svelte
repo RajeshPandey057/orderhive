@@ -108,7 +108,7 @@
 		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
 		bind:value={selectedDeveloper}
 	>
-		{#each developerOptions as option}
+		{#each developerOptions as option (option)}
 			<option value={option}>
 				{option === 'all' ? 'All Developers' : option}
 			</option>
@@ -118,7 +118,7 @@
 		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
 		bind:value={selectedAgent}
 	>
-		{#each agentOptions as option}
+		{#each agentOptions as option (option)}
 			<option value={option}>
 				{option === 'all' ? 'All Agents' : option}
 			</option>
@@ -128,7 +128,7 @@
 		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
 		bind:value={selectedPropertyType}
 	>
-		{#each propertyTypeOptions as option}
+		{#each propertyTypeOptions as option (option)}
 			<option value={option}>
 				{option === 'all' ? 'All Property Types' : toTitleCase(option)}
 			</option>
@@ -141,11 +141,14 @@
 		<Table.Header>
 			<Table.Row class="border-b bg-gray-200/40">
 				<Table.Head>Client Name</Table.Head>
+				<Table.Head>Listing ID</Table.Head>
 				<Table.Head>Property</Table.Head>
 				<Table.Head>Property Type</Table.Head>
 				<Table.Head>Bedrooms / Size</Table.Head>
 				<Table.Head class="text-right">Buying Price</Table.Head>
 				<Table.Head class="text-right">Selling Price</Table.Head>
+				<Table.Head class="text-right">DxB Price</Table.Head>
+				<Table.Head>Created By</Table.Head>
 				<Table.Head>Listing Type</Table.Head>
 				{#if hasActions}
 					<Table.Head class="w-24 text-right">Actions</Table.Head>
@@ -155,7 +158,7 @@
 		<Table.Body>
 			{#if filteredListings.length === 0}
 				<Table.Row>
-					<Table.Cell colspan={hasActions ? 8 : 7} class="py-12">
+					<Table.Cell colspan={hasActions ? 11 : 10} class="py-12">
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -177,6 +180,7 @@
 				{#each filteredListings as listing (listing.id)}
 					<Table.Row class="border-b last:border-b-0">
 						<Table.Cell class="font-medium">{listing.clientName}</Table.Cell>
+						<Table.Cell class="font-mono text-xs font-medium">{listing.id}</Table.Cell>
 						<Table.Cell>
 							<div class="font-medium">{listing.project}</div>
 							<div class="text-sm text-muted-foreground">{listing.developer}</div>
@@ -185,6 +189,12 @@
 						<Table.Cell>{getBedroomOrSize(listing)}</Table.Cell>
 						<Table.Cell class="text-right">{formatMoney(listing.buyingPrice)}</Table.Cell>
 						<Table.Cell class="text-right">{formatMoney(listing.sellingPrice)}</Table.Cell>
+						<Table.Cell class="text-right">
+							{listing.dxbPrice == null ? '-' : formatMoney(listing.dxbPrice)}
+						</Table.Cell>
+						<Table.Cell class="max-w-48 truncate text-sm text-muted-foreground">
+							{listing.createdByEmail || '-'}
+						</Table.Cell>
 						<Table.Cell>
 							<span
 								class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {listing.listingType ===

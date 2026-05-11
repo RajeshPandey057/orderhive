@@ -69,6 +69,7 @@
 	let buyingPrice = $state<number | ''>(0);
 	let liquidityInvested = $state<number | ''>(0);
 	let sellingPrice = $state<number | ''>(0);
+	let dxbPrice = $state<number | ''>('');
 	let listedByEmails = $state<string[]>(['']);
 
 	// Track whether a new file was picked for each attachment (so we can clear the existing display)
@@ -146,6 +147,7 @@
 		buyingPrice = l.buyingPrice;
 		liquidityInvested = l.liquidityInvested;
 		sellingPrice = l.sellingPrice;
+		dxbPrice = l.dxbPrice ?? '';
 		listedByEmails = l.listedByEmails?.length ? [...l.listedByEmails] : [''];
 		titleDeedReplaced = false;
 		passportReplaced = false;
@@ -319,6 +321,8 @@
 		if (!liquidityInvested && liquidityInvested !== 0)
 			nextErrors.liquidityInvested = 'Liquidity invested is required';
 		if (!sellingPrice && sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required';
+		if (dxbPrice !== '' && Number(dxbPrice) < 0)
+			nextErrors.dxbPrice = 'DxB price must be 0 or greater';
 		const validListedBy = listedByEmails.map((v) => v.trim()).filter(Boolean);
 		if (!validListedBy.length)
 			nextErrors.listedByEmails = 'At least one listed by email is required';
@@ -341,8 +345,6 @@
 				nextErrors.titleDeedFileName = 'Title deed/Qood is required for portal listing';
 			if (!passportFileName)
 				nextErrors.passportFileName = 'Passport is required for portal listing';
-			if (!emiratesIdFileName)
-				nextErrors.emiratesIdFileName = 'Emirates ID is required for portal listing';
 		}
 		errors = nextErrors;
 		return Object.keys(nextErrors).length === 0;
@@ -805,9 +807,9 @@
 												type="file"
 												onchange={(event) => onFileSelect(event, doc.key)}
 											/>
-											{#if listingType === 'portal'}<p class="text-xs text-muted-foreground">
-													Required for portal listing
-												</p>{/if}
+											<p class="text-xs text-muted-foreground">
+												{doc.key === 'emiratesId' ? 'Optional' : listingType === 'portal' ? 'Required for portal listing' : 'Optional'}
+											</p>
 											{#if errors[doc.errorKey]}<Field.Error class="text-sm text-destructive"
 													>{errors[doc.errorKey]}</Field.Error
 												>{/if}
@@ -822,7 +824,7 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Financial Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-3 gap-4">
+							<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
 								<Field.Field>
 									<Field.Label>Buying Price</Field.Label>
 									<Input
@@ -857,6 +859,18 @@
 									/>
 									{#if errors.sellingPrice}<Field.Error class="text-sm text-destructive"
 											>{errors.sellingPrice}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label>
+									<Input
+										name="dxbPrice"
+										type="number"
+										bind:value={dxbPrice}
+										placeholder="DxB Price"
+									/>
+									{#if errors.dxbPrice}<Field.Error class="text-sm text-destructive"
+											>{errors.dxbPrice}</Field.Error
 										>{/if}
 								</Field.Field>
 							</div>

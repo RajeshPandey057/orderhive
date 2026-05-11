@@ -80,6 +80,9 @@
 							<p class="mt-1 text-xs text-muted-foreground">
 								ID: <span class="font-mono">{listing.id}</span>
 							</p>
+							<p class="mt-1 text-xs text-muted-foreground">
+								Created by: {listing.createdByEmail || 'N/A'}
+							</p>
 						</div>
 						<p class="text-2xl font-bold text-foreground sm:text-3xl">
 							AED {formatPrice(listing.sellingPrice)}
@@ -208,6 +211,12 @@
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Selling Price</span><span
 									class="text-right font-medium">AED {formatPrice(listing.sellingPrice)}</span
+								>
+							</div>
+							<div class="flex justify-between gap-4">
+								<span class="text-muted-foreground">DxB Price</span><span
+									class="text-right font-medium"
+									>{listing.dxbPrice == null ? 'N/A' : `AED ${formatPrice(listing.dxbPrice)}`}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">

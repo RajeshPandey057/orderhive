@@ -33,6 +33,7 @@ export async function load() {
 					buyingPrice: d.buyingPrice ?? 0,
 					liquidityInvested: d.liquidityInvested ?? 0,
 					sellingPrice: d.sellingPrice ?? 0,
+					dxbPrice: d.dxbPrice ?? undefined,
 					listedByEmails: d.listedByEmails ?? [],
 					createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
 					createdByUid: d.createdByUid ?? '',

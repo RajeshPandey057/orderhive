@@ -240,6 +240,16 @@
 		}
 	};
 
+	function preventEnterSubmit(event: KeyboardEvent) {
+		if (event.key !== 'Enter') return;
+		const target = event.target;
+		if (!(target instanceof HTMLInputElement)) return;
+		if (['button', 'checkbox', 'file', 'hidden', 'radio', 'reset', 'submit'].includes(target.type)) {
+			return;
+		}
+		event.preventDefault();
+	}
+
 	const removeFile = (fieldName: string) => {
 		uploadedFiles[fieldName] = null;
 		const input = document.getElementById(fieldName) as HTMLInputElement;
@@ -628,6 +638,7 @@
 		{:else}
 		<form
 			enctype="multipart/form-data"
+			onkeydown={preventEnterSubmit}
 			{...createSale.enhance(async ({ form, submit }) => {
 				try {
 					await submit();

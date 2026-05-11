@@ -24,6 +24,7 @@
 	let priceMin = $state('');
 	let priceMax = $state('');
 	let areaMin = $state('');
+	let distressOnly = $state(false);
 	let savedListings = $state<Set<string>>(new Set());
 
 	const bedroomLabels: Record<string, string> = {
@@ -145,7 +146,19 @@
 			const matchArea =
 				!areaMin || (l.builtUpArea ?? l.propertySize ?? l.plotArea ?? 0) >= Number(areaMin);
 
-			return matchSearch && matchType && matchListingType && matchBeds && matchPrice && matchArea;
+			const matchDistress =
+				!distressOnly ||
+				(typeof l.dxbPrice === 'number' && l.dxbPrice > 0 && l.sellingPrice < l.dxbPrice);
+
+			return (
+				matchSearch &&
+				matchType &&
+				matchListingType &&
+				matchBeds &&
+				matchPrice &&
+				matchArea &&
+				matchDistress
+			);
 		})
 	);
 
@@ -157,6 +170,7 @@
 		priceMin = '';
 		priceMax = '';
 		areaMin = '';
+		distressOnly = false;
 	}
 </script>
 
@@ -254,6 +268,15 @@
 				>
 					<SlidersHorizontalIcon class="h-4 w-4" />
 					<span>More Filters</span>
+				</button>
+				<button
+					onclick={() => (distressOnly = !distressOnly)}
+					class="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 text-sm transition-colors hover:bg-accent xl:w-auto"
+					class:bg-primary={distressOnly}
+					class:text-primary-foreground={distressOnly}
+					class:border-primary={distressOnly}
+				>
+					Distress
 				</button>
 			</div>
 		</div>
@@ -384,7 +407,13 @@
 							<p class="text-lg font-bold text-foreground">
 								AED {formatPrice(listing.sellingPrice)}
 							</p>
+							{#if listing.dxbPrice != null}
+								<p class="text-xs text-muted-foreground">
+									DxB AED {formatPrice(listing.dxbPrice)}
+								</p>
+							{/if}
 							<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+								<span class="font-mono text-[11px]">{listing.id}</span>
 								<span
 									class="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground"
 								>
@@ -412,6 +441,9 @@
 							</p>
 							<p class="text-xs text-muted-foreground">
 								Client: {listing.clientName}
+							</p>
+							<p class="truncate text-xs text-muted-foreground">
+								Created by: {listing.createdByEmail || 'N/A'}
 							</p>
 						</div>
 						<div class="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">

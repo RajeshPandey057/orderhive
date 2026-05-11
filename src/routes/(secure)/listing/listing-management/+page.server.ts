@@ -1,7 +1,18 @@
 import { firestore } from '$lib/server/firebase';
 
-export async function load() {
-	const snap = await firestore.collection('listings').orderBy('createdAt', 'desc').get();
+export async function load({ locals }) {
+	const isAdmin = locals.user?.role === 'admin' || locals.user?.role === 'super-admin';
+	if (!isAdmin && !locals.user?.uid) return { listings: [] };
+
+	let query: FirebaseFirestore.Query = firestore
+		.collection('listings')
+		.orderBy('createdAt', 'desc');
+
+	if (!isAdmin && locals.user?.uid) {
+		query = query.where('createdByUid', '==', locals.user.uid);
+	}
+
+	const snap = await query.get();
 
 	const listings: Listing[] = snap.docs
 		.filter((doc) => !doc.data().isDeleted)
@@ -32,6 +43,7 @@ export async function load() {
 				buyingPrice: d.buyingPrice ?? 0,
 				liquidityInvested: d.liquidityInvested ?? 0,
 				sellingPrice: d.sellingPrice ?? 0,
+				dxbPrice: d.dxbPrice ?? undefined,
 				listedByEmails: d.listedByEmails ?? [],
 				createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
 				createdByUid: d.createdByUid ?? '',

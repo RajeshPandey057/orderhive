@@ -26,9 +26,7 @@ const toUploadedFile = async (file: File | null | undefined, path: string) => {
 };
 
 async function generateListingId(): Promise<string> {
-	const today = new Date();
-	const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-	const counterDocRef = firestore.collection('counters').doc(`listing-${dateStr}`);
+	const counterDocRef = firestore.collection('counters').doc('listing-ind');
 
 	return await firestore.runTransaction(async (transaction) => {
 		const counterDoc = await transaction.get(counterDocRef);
@@ -44,9 +42,15 @@ async function generateListingId(): Promise<string> {
 			{ merge: true }
 		);
 
-		return `LST-${dateStr}-${String(nextNumber).padStart(4, '0')}`;
+		return `IND-${String(nextNumber).padStart(7, '0')}`;
 	});
 }
+
+const optionalMoney = z.preprocess((value) => {
+	if (value === null || value === undefined) return undefined;
+	if (typeof value === 'string' && value.trim() === '') return undefined;
+	return value;
+}, z.coerce.number().min(0, 'DxB price must be 0 or greater').optional());
 
 // Shared shape (all fields except createdByUid/createdByEmail)
 // Extracted so both listingSchema and updateListingSchema can be built without .omit()
@@ -144,6 +148,7 @@ const listingShape = {
 	buyingPrice: z.coerce.number().min(0, 'Buying price is required'),
 	liquidityInvested: z.coerce.number().min(0, 'Liquidity invested is required'),
 	sellingPrice: z.coerce.number().min(0, 'Selling price is required'),
+	dxbPrice: optionalMoney,
 
 	// Listed by agents
 	listedByEmails: z.preprocess(
@@ -263,13 +268,6 @@ const listingSchema = z
 					message: 'Passport is required for portal listings'
 				});
 			}
-			if (!data.emiratesIdFile || (data.emiratesIdFile as File).size <= 0) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['emiratesIdFile'],
-					message: 'Emirates ID is required for portal listings'
-				});
-			}
 		}
 	});
 
@@ -284,9 +282,13 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 	}
 	const data = result.data;
 
+	const { locals } = getRequestEvent();
+	if (!locals.user) throw error(401, 'Unauthorized');
+	const { uid: createdByUid, email: createdByEmail } = locals.user;
+
 	const timestamp = FieldValue.serverTimestamp();
 	const listingId = await generateListingId();
-	const basePath = `listings/${data.createdByUid}/${listingId}`;
+	const basePath = `listings/${createdByUid}/${listingId}`;
 
 	// Upload single file attachments in parallel
 	const [titleDeedFile, passportFile, emiratesIdFile] = await Promise.all([
@@ -351,6 +353,7 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		buyingPrice: data.buyingPrice,
 		liquidityInvested: data.liquidityInvested,
 		sellingPrice: data.sellingPrice,
+		dxbPrice: data.dxbPrice ?? null,
 		listedByEmails: Array.isArray(data.listedByEmails)
 			? data.listedByEmails
 			: [data.listedByEmails],
@@ -362,8 +365,8 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 			pictures: uploadedPictures.filter(Boolean),
 			videos: uploadedVideos.filter(Boolean)
 		},
-		createdByUid: data.createdByUid,
-		createdByEmail: data.createdByEmail,
+		createdByUid,
+		createdByEmail,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};
@@ -436,7 +439,6 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 	if (data.listingType === 'portal') {
 		if (!finalTitleDeed) issue.titleDeedFile = 'Title deed / Qood is required for portal listings';
 		if (!finalPassport) issue.passportFile = 'Passport is required for portal listings';
-		if (!finalEmiratesId) issue.emiratesIdFile = 'Emirates ID is required for portal listings';
 		if (Object.keys(issue).length > 0) return;
 	}
 
@@ -501,6 +503,7 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 		buyingPrice: data.buyingPrice,
 		liquidityInvested: data.liquidityInvested,
 		sellingPrice: data.sellingPrice,
+		dxbPrice: data.dxbPrice ?? null,
 		listedByEmails: Array.isArray(data.listedByEmails)
 			? data.listedByEmails
 			: [data.listedByEmails],
