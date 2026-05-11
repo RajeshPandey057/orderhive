@@ -2,6 +2,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { isActiveSale } from '$lib/sales';
 	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
 	import SalesTable from '@/components/sales-table.svelte';
 	import { firekitCollection } from 'svelte-firekit';
@@ -16,12 +17,13 @@
 	// Filter sales based on user role
 	const filteredSales = $derived.by(() => {
 		if (!salesCollection.data) return [];
+		const activeSales = salesCollection.data.filter(isActiveSale);
 
 		const userRole = data?.user?.role;
 		const userUid = data?.user?.uid;
 
 		if (userRole === 'agent' && userUid) {
-			return salesCollection.data.filter(
+			return activeSales.filter(
 				(sale) =>
 					(sale.splitAgentIds ?? []).includes(userUid) ||
 					(sale.dealOwnerIds ?? []).includes(userUid)
@@ -31,7 +33,7 @@
 		if ((userRole === 'manager' || userRole === 'senior-manager') && userUid) {
 			const teamIds: string[] = data?.user?.managedTeamIds ?? [];
 			const ids = [userUid, ...teamIds];
-			return salesCollection.data.filter((sale) =>
+			return activeSales.filter((sale) =>
 				ids.some(
 					(id) => (sale.splitAgentIds ?? []).includes(id) || (sale.dealOwnerIds ?? []).includes(id)
 				)
@@ -39,7 +41,7 @@
 		}
 
 		// admin, super-admin, finance, compliance: show all
-		return salesCollection.data;
+		return activeSales;
 	});
 
 	// Check if filtered results are empty

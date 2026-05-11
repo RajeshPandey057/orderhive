@@ -160,6 +160,10 @@ declare global {
 		closerManagerEmail?: string;
 		callerSeniorManagerEmail?: string;
 		closerSeniorManagerEmail?: string;
+		isDeleted?: boolean;
+		deletedAt?: FieldValue | null;
+		deletedByUid?: string | null;
+		deletedByEmail?: string | null;
 		createdByUid: string;
 		createdByEmail: string;
 		createdAt: FieldValue;

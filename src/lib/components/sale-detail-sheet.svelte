@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -17,6 +18,8 @@
 	import Upload from '~icons/lucide/cloud-upload';
 	import FileText from '~icons/lucide/file-text';
 	import Pencil from '~icons/lucide/pencil';
+	import Trash2 from '~icons/lucide/trash-2';
+	import { deleteSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	interface Props {
 		open?: boolean;
@@ -101,6 +104,8 @@
 
 	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
 	const canEdit = $derived(role === 'admin' || role === 'super-admin');
+	let deleteDialogOpen = $state(false);
+	let isDeletingSale = $state(false);
 
 	// Edit passback dialog state
 	let editPassbackOpen = $state(false);
@@ -112,6 +117,24 @@
 		onOpenChange?.(false);
 		open = false;
 		goto(resolve(`/agent/sales-tracker/edit/${sale.id}`));
+	};
+
+	const handleDeleteSale = async () => {
+		if (!sale?.id) return;
+		isDeletingSale = true;
+		try {
+			await deleteSale({ saleId: sale.id });
+			toast.success('Sale deleted successfully');
+			deleteDialogOpen = false;
+			onOpenChange?.(false);
+			open = false;
+			sale = null;
+			await invalidateAll();
+		} catch {
+			toast.error('Failed to delete sale. Please try again.');
+		} finally {
+			isDeletingSale = false;
+		}
 	};
 
 	const savePassback = async () => {
@@ -568,6 +591,14 @@
 				{#if canEdit}
 					<Button variant="outline" size="sm" onclick={openEditSale}>
 						<Pencil class="mr-2 h-4 w-4" /> Edit
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						class="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+						onclick={() => (deleteDialogOpen = true)}
+					>
+						<Trash2 class="mr-2 h-4 w-4" /> Delete
 					</Button>
 				{/if}
 			</div>
@@ -1959,6 +1990,34 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<AlertDialog.Root bind:open={deleteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Sale</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete sale
+				<span class="font-semibold">{sale?.id ?? ''}</span>
+				for
+				<span class="font-semibold">
+					{sale?.clientDetails.firstName ?? ''} {sale?.clientDetails.lastName ?? ''}
+				</span>
+				? This will hide the sale from normal sales views, but keep its documents and audit
+				history.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isDeletingSale}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+				disabled={isDeletingSale}
+				onclick={handleDeleteSale}
+			>
+				{isDeletingSale ? 'Deleting...' : 'Delete'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 <!-- Reject Document Dialog -->
 <Dialog.Root bind:open={rejectDialogOpen}>

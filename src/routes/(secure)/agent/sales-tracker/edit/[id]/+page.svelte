@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import EditSaleSheet from '$lib/components/edit-sale-sheet.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import { isActiveSale } from '$lib/sales';
 	import { firekitCollection } from 'svelte-firekit';
 	import AlertCircle from '~icons/lucide/alert-circle';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
@@ -11,7 +12,7 @@
 
 	const salesCollection = firekitCollection<Sale>('sales');
 	const selectedSale = $derived(
-		salesCollection.data?.find((sale) => sale.id === data.saleId) ?? null
+		salesCollection.data?.find((sale) => sale.id === data.saleId && isActiveSale(sale)) ?? null
 	);
 </script>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import AMLFormInline from '$lib/components/aml-form-inline.svelte';
 	import DealPercentage from '$lib/components/deal-percentage.svelte';
@@ -7,6 +7,7 @@
 	import OrderSplit from '$lib/components/order-split.svelte';
 	import PhoneInput from '$lib/components/phone-input.svelte';
 	import ReferralFormInline from '$lib/components/referral-form-inline.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
@@ -36,7 +37,7 @@
 	import Traffic from '~icons/lucide/traffic-cone';
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
-	import { updateSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
+	import { deleteSale, updateSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	type AMLTarget =
 		| { buyerType: 'primary'; jointBuyerIndex?: undefined }
@@ -65,8 +66,24 @@
 
 	const canEditSale = $derived(userRole === 'admin' || userRole === 'super-admin');
 	const isFinanceRole = $derived(userRole === 'finance');
-	const isComplianceRole = $derived(userRole === 'compliance');
-	const isReadOnly = $derived(!canEditSale && !isFinanceRole && !isComplianceRole);
+	let deleteDialogOpen = $state(false);
+	let isDeletingSale = $state(false);
+
+	const handleDeleteSale = async () => {
+		if (!sale?.id) return;
+		isDeletingSale = true;
+		try {
+			await deleteSale({ saleId: sale.id });
+			toast.success('Sale deleted successfully');
+			deleteDialogOpen = false;
+			await invalidateAll();
+			goto(resolve('/agent/sales-tracker'));
+		} catch {
+			toast.error('Failed to delete sale. Please try again.');
+		} finally {
+			isDeletingSale = false;
+		}
+	};
 
 	const canUploadManually = $derived(
 		userRole === 'admin' || userRole === 'compliance' || userRole === 'super-admin'
@@ -179,11 +196,7 @@
 		}));
 	}
 
-	let dealSplits = $state<SplitEntry[]>([]);
-
-	$effect(() => {
-		dealSplits = initSplitsFromSale(sale);
-	});
+	let dealSplits = $derived(initSplitsFromSale(sale));
 
 	const syncSplits = (splits: SplitEntry[]) => {
 		updateSale.fields.splits.set(
@@ -640,6 +653,18 @@
 		<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 			<h1 class="text-2xl font-medium">Edit Sale</h1>
 			<div class="flex flex-row gap-2">
+				{#if canEditSale}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						class="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+						onclick={() => (deleteDialogOpen = true)}
+					>
+						<Trash2 class="mr-2 h-4 w-4" />
+						Delete
+					</Button>
+				{/if}
 				<Button
 					type="button"
 					variant="outline"
@@ -703,6 +728,9 @@
 								{/each}
 							</Field.Field>
 						</div>
+						<input type="hidden" name="firstName" value={clientFirstName} />
+						<input type="hidden" name="lastName" value={clientLastName} />
+						<input type="hidden" name="email" value={clientEmail} />
 						<Field.Field>
 							<PhoneInput
 								bind:value={clientPhoneValue}
@@ -1983,7 +2011,7 @@
 				{/if}
 
 				{#each updateSale.fields.invoiceStage.value() ?? [] as stage (stage)}
-					<input type="hidden" name="invoiceStage" value={stage} />
+					<input type="hidden" name="invoiceStage[]" value={stage} />
 				{/each}
 			</Field.Set>
 			<Field.Separator />
@@ -1996,6 +2024,28 @@
 					disabled={!canEditSale}
 					onsplitschange={(s) => syncSplits(s)}
 				/>
+				{#each dealSplits as split, index (split.key)}
+					<input type="hidden" name="splits[{index}].agentId" value={split.agentId} />
+					<input type="hidden" name="splits[{index}].agentEmail" value={split.agentEmail} />
+					<input type="hidden" name="splits[{index}].agentName" value={split.agentName} />
+					<input
+						type="hidden"
+						name="splits[{index}].agentPhotoURL"
+						value={split.agentPhotoURL ?? ''}
+					/>
+					<input type="hidden" name="splits[{index}].ownerRole" value={split.ownerRole} />
+					<input type="hidden" name="n:splits[{index}].percentage" value={split.percentage} />
+					<input
+						type="hidden"
+						name="splits[{index}].managerEmail"
+						value={split.managerEmail ?? ''}
+					/>
+					<input
+						type="hidden"
+						name="splits[{index}].seniorManagerEmail"
+						value={split.seniorManagerEmail ?? ''}
+					/>
+				{/each}
 			</Field.Set>
 			<Field.Separator />
 
@@ -2213,8 +2263,7 @@
 														>
 														{#if jointBuyerFiles[buyer.key]?.amlFormFile?.docusignStatus}
 															<span class="text-xs text-muted-foreground">
-																DocuSign {jointBuyerFiles[buyer.key]?.amlFormFile
-																	?.docusignStatus}
+																DocuSign {jointBuyerFiles[buyer.key]?.amlFormFile?.docusignStatus}
 																{jointBuyerFiles[buyer.key]?.amlFormFile?.referenceNo
 																	? ` - Ref ${jointBuyerFiles[buyer.key]?.amlFormFile?.referenceNo}`
 																	: ''}
@@ -2381,3 +2430,31 @@
 	propertyName={sale?.project}
 	onGenerated={handleReferralGenerated}
 />
+
+<AlertDialog.Root bind:open={deleteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Sale</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete sale
+				<span class="font-semibold">{sale?.id ?? ''}</span>
+				for
+				<span class="font-semibold">
+					{sale?.clientDetails.firstName ?? ''}
+					{sale?.clientDetails.lastName ?? ''}
+				</span>
+				? This will hide the sale from normal sales views, but keep its documents and audit history.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isDeletingSale}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+				disabled={isDeletingSale}
+				onclick={handleDeleteSale}
+			>
+				{isDeletingSale ? 'Deleting...' : 'Delete'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

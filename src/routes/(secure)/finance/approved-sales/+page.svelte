@@ -2,6 +2,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { isActiveSale } from '$lib/sales';
 	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
 	import SalesTable from '@/components/sales-table.svelte';
 	import { firekitCollection } from 'svelte-firekit';
@@ -12,6 +13,7 @@
 	let { data } = $props();
 	// Fetch sales data from Firestore
 	const salesCollection = firekitCollection<Sale>('sales');
+	const activeSales = $derived(salesCollection.data?.filter(isActiveSale) ?? []);
 </script>
 
 <header
@@ -52,7 +54,7 @@
 				</Empty.Header>
 			</Empty.Root>
 		</div>
-	{:else if salesCollection.empty}
+	{:else if activeSales.length === 0}
 		<div class="flex min-h-100 items-center justify-center rounded-xl bg-muted/50">
 			<Empty.Root>
 				<Empty.Header>
@@ -71,7 +73,7 @@
 		</div>
 	{:else}
 		<SalesTable
-			data={salesCollection.data.filter((sale) => sale.financeStatus === 'approved')}
+			data={activeSales.filter((sale) => sale.financeStatus === 'approved')}
 			role={data?.user?.role}
 		/>
 	{/if}

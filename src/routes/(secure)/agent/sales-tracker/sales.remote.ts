@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { command, form, getRequestEvent } from '$app/server';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -25,6 +25,18 @@ async function ensureRoleExists(email: string): Promise<void> {
 			{ email: normalised, accessType: 'agent', createdAt: now, updatedAt: now },
 			{ merge: true }
 		);
+}
+
+function assertCanManageSales() {
+	const { locals } = getRequestEvent();
+	if (!locals.user) throw error(401, 'Unauthorized');
+
+	const { role } = locals.user;
+	if (role !== 'admin' && role !== 'super-admin') {
+		throw error(403, 'You do not have permission to manage sales');
+	}
+
+	return locals.user;
 }
 
 // Define the schema for the sale form using Zod
@@ -713,6 +725,8 @@ const resolveUploadedFile = async (
 };
 
 export const updateSale = form(updateSaleSchema, async (data) => {
+	assertCanManageSales();
+
 	const timestamp = FieldValue.serverTimestamp();
 	const saleRef = firestore.collection('sales').doc(data.id);
 	const existingSnap = await saleRef.get();
@@ -722,6 +736,10 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	}
 
 	const existingSale = existingSnap.data() as Record<string, unknown>;
+	if (existingSale.isDeleted) {
+		throw error(404, 'Sale not found');
+	}
+
 	const createdByUid =
 		(existingSale?.createdByUid as string | undefined) ?? data.splits[0]?.agentId ?? 'unknown';
 	const basePath = `sales/${createdByUid}/${data.id}`;
@@ -885,6 +903,10 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		createdByUid: existingSale.createdByUid ?? createdByUid,
 		createdByEmail: existingSale.createdByEmail ?? data.splits[0]?.agentEmail ?? null,
 		createdAt: existingSale.createdAt ?? timestamp,
+		isDeleted: existingSale.isDeleted ?? false,
+		deletedAt: existingSale.deletedAt ?? null,
+		deletedByUid: existingSale.deletedByUid ?? null,
+		deletedByEmail: existingSale.deletedByEmail ?? null,
 		updatedAt: timestamp
 	};
 
@@ -896,4 +918,39 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	}
 
 	redirect(303, '/agent/sales-tracker');
+});
+
+const deleteSaleSchema = z.object({
+	saleId: z.string().min(1, 'Sale ID is required')
+});
+
+export const deleteSale = command(deleteSaleSchema, async (data) => {
+	const user = assertCanManageSales();
+	const timestamp = FieldValue.serverTimestamp();
+	const saleRef = firestore.collection('sales').doc(data.saleId);
+	const existingSnap = await saleRef.get();
+
+	if (!existingSnap.exists) {
+		throw error(404, 'Sale not found');
+	}
+
+	const existingSale = existingSnap.data() as Record<string, unknown>;
+	if (existingSale.isDeleted) {
+		throw error(404, 'Sale not found');
+	}
+
+	try {
+		await saleRef.update({
+			isDeleted: true,
+			deletedAt: timestamp,
+			deletedByUid: user.uid,
+			deletedByEmail: user.email,
+			updatedAt: timestamp
+		});
+	} catch (err) {
+		console.error('Failed to soft-delete sale', err);
+		throw error(500, 'Unable to delete sale right now. Please try again.');
+	}
+
+	return { success: true };
 });
