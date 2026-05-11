@@ -25,6 +25,136 @@ declare global {
 			| 'senior-manager';
 		managedTeamIds?: string[];
 	};
+	type EmployeeStatus = 'active' | 'inactive' | 'archived';
+	type EmployeeAccessStatus = 'enabled' | 'disabled' | 'missing';
+	type EmployeeDocumentKind =
+		| 'offerLetter'
+		| 'passport'
+		| 'visitOrResidenceVisa'
+		| 'nationalId'
+		| 'educationalCertificates'
+		| 'passportSizePhoto'
+		| 'lastThreeMonthsSalarySlips'
+		| 'relievingLetter'
+		| 'experienceLetter'
+		| 'signedNdaFile';
+	type EmployeeStoredFile = {
+		path: string;
+		downloadURL: string;
+		token: string;
+		contentType: string;
+		size: number;
+		name: string;
+		lastModified: number;
+		original?: {
+			name: string;
+			size: number;
+			type: string;
+			lastModified: number;
+		};
+		uploadedAt?: string;
+		uploadedByEmail?: string;
+	};
+	type Employee = {
+		id: string;
+		email: string;
+		name: string;
+		code: string;
+		department: string;
+		designation: string;
+		location: string;
+		status: EmployeeStatus;
+		reportingManagerEmail?: string;
+		seniorManagerEmail?: string;
+		doj?: string;
+		probationEndingDate?: string;
+		lastWorkingDay?: string;
+		compensationAED?: number;
+		compensationINR?: number;
+		mobileNumber?: string;
+		countryCode?: string;
+		personalEmail?: string;
+		maritalStatus?: string;
+		spouseName?: string;
+		fatherName?: string;
+		motherName?: string;
+		addressUAE?: string;
+		homeCountryAddress?: string;
+		emergencyContactName?: string;
+		emergencyContactNumber?: string;
+		emergencyRelationship?: string;
+		nationality?: string;
+		gender?: string;
+		dateOfBirth?: string;
+		visaType?: string;
+		visaEndingDate?: string;
+		fresherOrExperienced?: string;
+		documents?: Partial<Record<EmployeeDocumentKind, EmployeeStoredFile>>;
+		accessType?: Role['accessType'];
+		agentRole?: string;
+		agentLevel?: string;
+		managedTeamIds?: string[];
+		accessStatus: EmployeeAccessStatus;
+		createdAt?: string;
+		updatedAt?: string;
+		createdByEmail?: string;
+		updatedByEmail?: string;
+		archivedAt?: string;
+		archivedByEmail?: string;
+	};
+	type Holiday = {
+		id: string;
+		name: string;
+		date: string;
+		type: 'mandatory' | 'optional';
+		year: number;
+		createdAt?: string;
+		createdByEmail?: string;
+	};
+	type LeaveStatus = 'pending' | 'approved' | 'rejected';
+	type LeaveRequest = {
+		id: string;
+		employeeEmail: string;
+		employeeName: string;
+		type: string;
+		startDate: string;
+		endDate: string;
+		reason: string;
+		status: LeaveStatus;
+		days: number;
+		reviewerEmail?: string;
+		reviewedAt?: string;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	type AttendanceStatus = 'present' | 'late' | 'absent' | 'on-leave' | 'holiday';
+	type AttendanceLog = {
+		id: string;
+		employeeEmail: string;
+		employeeName: string;
+		employeeCode?: string;
+		date: string;
+		branch?: string;
+		punchIn?: string;
+		punchOut?: string;
+		workingMinutes?: number;
+		overtimeMinutes?: number;
+		shortByMinutes?: number;
+		status: AttendanceStatus;
+		source?: 'manual' | 'import' | 'biometric';
+		corrected?: boolean;
+		updatedAt?: string;
+	};
+	type AttendanceCorrection = {
+		id: string;
+		attendanceLogId: string;
+		employeeEmail: string;
+		correctedPunchIn?: string;
+		correctedPunchOut?: string;
+		reason: string;
+		createdAt?: string;
+		createdByEmail: string;
+	};
 	type SaleDocumentStatus = 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 	type SaleDocumentFile = {
 		financeStatus: SaleDocumentStatus;

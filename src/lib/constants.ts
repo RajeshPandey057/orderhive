@@ -23,12 +23,38 @@ interface MenuItem {
 
 // Route prefixes allowed for each role
 export const ROLE_ROUTES: Record<AccessType, string[]> = {
-	admin: ['/admin', '/listing', '/dashboard', '/profile'],
-	agent: ['/agent', '/listing', '/dashboard', '/profile'],
-	manager: ['/agent', '/listing', '/dashboard', '/profile'],
-	'senior-manager': ['/agent', '/listing', '/dashboard', '/profile'],
-	compliance: ['/compliance', '/dashboard', '/profile'],
-	finance: ['/finance', '/dashboard', '/profile'],
+	admin: [
+		'/admin',
+		'/listing',
+		'/dashboard',
+		'/profile',
+		'/hr',
+		'/attendance',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
+	],
+	agent: ['/agent', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
+	manager: [
+		'/agent',
+		'/listing',
+		'/dashboard',
+		'/profile',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
+	],
+	'senior-manager': [
+		'/agent',
+		'/listing',
+		'/dashboard',
+		'/profile',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
+	],
+	compliance: ['/compliance', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
+	finance: ['/finance', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
 	'super-admin': [
 		'/admin',
 		'/agent',
@@ -36,7 +62,12 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/compliance',
 		'/finance',
 		'/dashboard',
-		'/profile'
+		'/profile',
+		'/hr',
+		'/attendance',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
 	]
 };
 
@@ -44,11 +75,15 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	admin: [
 		{ title: 'Dashboard', url: '/admin/dashboard' },
-		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
-		{ title: 'Team Management', url: '/admin/team-management' },
+		// { title: 'Team Management', url: '/admin/team-management' },
+		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Attendance Record', url: '/attendance' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Management', url: '/holidays' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' }
 	],
 	agent: [
@@ -56,6 +91,9 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	manager: [
@@ -63,6 +101,9 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	'senior-manager': [
@@ -70,6 +111,9 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' },
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	compliance: [
@@ -77,27 +121,37 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Pending Sales', url: '/compliance/pending-sales' },
 		{ title: 'Approved Sales', url: '/compliance/approved-sales' },
 		{ title: 'Invoices', url: '/compliance/invoices' },
-		{ title: "Next Month's Sales", url: '/compliance/next-months-sales' }
+		{ title: "Next Month's Sales", url: '/compliance/next-months-sales' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' }
 	],
 	finance: [
 		{ title: 'Finance Dashboard', url: '/finance/dashboard' },
 		{ title: 'Pending Sales', url: '/finance/pending-sales' },
 		{ title: 'Approved Sales', url: '/finance/approved-sales' },
 		{ title: 'Invoices', url: '/finance/invoices' },
-		{ title: "Next Month's Sales", url: '/finance/next-months-sales' }
+		{ title: "Next Month's Sales", url: '/finance/next-months-sales' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' }
 	],
 	'super-admin': [
 		{ title: 'Dashboard', url: '/admin/dashboard' },
-		{ title: 'Access Management', url: '/admin/access-management' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
-		{ title: 'Team Management', url: '/admin/team-management' },
+		// { title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Bulk Import', url: '/admin/bulk-import' },
 		{ title: 'Agent Dashboard', url: '/agent/dashboard' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
 		{ title: 'Compliance Dashboard', url: '/compliance/dashboard' },
-		{ title: 'Finance Dashboard', url: '/finance/dashboard' }
+		{ title: 'Finance Dashboard', url: '/finance/dashboard' },
+		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Attendance Record', url: '/attendance' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Management', url: '/holidays' }
 	]
 };
 

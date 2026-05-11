@@ -1,0 +1,120 @@
+<script lang="ts">
+	import * as Select from '$lib/components/ui/select';
+	import {
+		Table,
+		TableBody,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '$lib/components/ui/table';
+
+	let { data } = $props<{ data: { rows: AttendanceLog[]; holidayCount: number } }>();
+
+	let period = $state('this-month');
+	const rows: AttendanceLog[] = $derived(data.rows ?? []);
+	const presentRows = $derived(
+		rows.filter((row) => row.status === 'present' || row.status === 'late')
+	);
+	const onTimeRows = $derived(rows.filter((row) => row.status === 'present'));
+	const leaveRows = $derived(rows.filter((row) => row.status === 'on-leave'));
+	const workingDays = $derived(rows.filter((row) => row.status !== 'holiday').length);
+	const onTimeRate = $derived(
+		presentRows.length ? Math.round((onTimeRows.length / presentRows.length) * 100) : 0
+	);
+
+	function minutesToDuration(minutes?: number) {
+		const safe = Math.max(0, Number(minutes ?? 0));
+		const hours = Math.floor(safe / 60);
+		const mins = safe % 60;
+		return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+	}
+</script>
+
+<div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
+	<div class="rounded-md border border-[#EBEEEE] bg-white p-6">
+		<div class="mb-4 flex items-center justify-between gap-3">
+			<h1 class="text-2xl leading-8 font-medium text-[#222626]">Attendance</h1>
+			<Select.Root type="single" bind:value={period}>
+				<Select.Trigger
+					class="h-8 w-[140px] border border-[#D4D9D9] bg-white text-[13px] text-[#222626]"
+				>
+					{period === 'this-week'
+						? 'This week'
+						: period === 'last-week'
+							? 'Last week'
+							: 'This month'}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="this-week">This week</Select.Item>
+					<Select.Item value="last-week">Last week</Select.Item>
+					<Select.Item value="this-month">This month</Select.Item>
+				</Select.Content>
+			</Select.Root>
+		</div>
+
+		<div class="grid grid-cols-2 gap-2 md:grid-cols-6">
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">On time rate</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{onTimeRate}%</div>
+			</div>
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">Working days</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{workingDays}</div>
+			</div>
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">Weekly Off</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">0</div>
+			</div>
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">Present</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{presentRows.length}</div>
+			</div>
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">Leaves</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{leaveRows.length}</div>
+			</div>
+			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
+				<p class="text-[13px] text-[#687976]">Holidays</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{data.holidayCount}</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="overflow-hidden rounded-md border border-[#EBEEEE] bg-white">
+		<Table>
+			<TableHeader>
+				<TableRow class="bg-[#FBF9F8]">
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Sr.</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Date</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Punch In time</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Punch out time</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Total Hours</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Overtime</TableHead>
+					<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Short by</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				{#if rows.length === 0}
+					<TableRow
+						><TableCell colspan={7} class="h-24 text-center text-[13px] text-[#687976]"
+							>No attendance records found.</TableCell
+						></TableRow
+					>
+				{:else}
+					{#each rows as row, index (row.id)}
+						<TableRow class="h-13">
+							<TableCell class="text-[13px]">{index + 1}</TableCell>
+							<TableCell class="text-[13px]">{row.date}</TableCell>
+							<TableCell class="text-[13px]">{row.punchIn || '-'}</TableCell>
+							<TableCell class="text-[13px]">{row.punchOut || '-'}</TableCell>
+							<TableCell class="text-[13px]">{minutesToDuration(row.workingMinutes)}</TableCell>
+							<TableCell class="text-[13px]">{minutesToDuration(row.overtimeMinutes)}</TableCell>
+							<TableCell class="text-[13px]">{minutesToDuration(row.shortByMinutes)}</TableCell>
+						</TableRow>
+					{/each}
+				{/if}
+			</TableBody>
+		</Table>
+	</div>
+</div>
