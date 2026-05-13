@@ -323,6 +323,7 @@ declare global {
 		listingType: 'internal' | 'portal';
 		listedByEmails: string[];
 		mediaAssets: { type: 'photo' | 'video'; fileName: string; url?: string }[];
+		floorPlanAssets?: { fileName: string; url?: string }[];
 		propertyAddress: {
 			addressLine1?: string;
 			addressLine2?: string;
@@ -337,39 +338,43 @@ declare global {
 		clientName: string;
 		clientPhone: string;
 		clientEmail: string;
-		developer: string;
-		community?: string;
-		project: string;
+		availableFor: 'Sell' | 'Rent' | 'Both' | string;
+		furnishing: 'Furnished' | 'Unfurnished' | 'Semi-Furnished' | string;
+		city: string;
+		location: string;
+		agentEmail: string;
+		agentMobile: string;
+		reportingManager: string;
+		seniorManager: string;
+		developerName: string;
+		projectName: string;
 		unitNo: string;
-		propertyType: 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
-		bedroomType?:
-			| 'studio'
-			| '1bed'
-			| '2bed'
-			| '2bed+maid'
-			| '3bed'
-			| '3bed+maid'
-			| '4bed'
-			| '5bed'
-			| '6-7bed'
-			| 'duplex'
-			| 'penthouse'
-			| 'podium-townhouse';
-		commercialSubType?: 'office' | 'warehouse';
-		propertySize?: number;
-		plotArea?: number;
+		projectType: 'Off-Plan Property' | 'Ready Property' | string;
+		unitType: string;
+		unitTypeOther?: string;
+		bedrooms?: string;
+		unitArea: number;
+		internalArea?: number;
+		balconyArea?: number;
+		plotSize?: number;
 		builtUpArea?: number;
-		grossFloorArea?: number;
+		unitStatus?: 'Off-Plan' | 'Rented' | 'Vacant' | string;
+		paymentType: 'Cash' | 'Finance (Cash + Mortgage)' | string;
+		rentAmount?: number | null;
+		vacantDate?: string | null;
+		handoverYear?: string;
+		handoverQuarter?: string;
+		paymentPlan?: string;
+		originalPrice?: number | null;
+		purchasePrice?: number | null;
+		amountPaid?: number | null;
 		titleDeedFileName?: string;
 		passportFileName?: string;
 		emiratesIdFileName?: string;
 		videoFileName?: string;
 		picturesFileName?: string;
 		floorPlansFileName?: string;
-		buyingPrice: number;
-		liquidityInvested: number;
-		sellingPrice: number;
-		dxbPrice?: number;
+		price: number;
 		createdAt: string;
 		createdByUid: string;
 		createdByEmail: string;

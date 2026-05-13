@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -7,6 +8,17 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import {
+		BEDROOM_OPTIONS,
+		DUBAI_COMMUNITIES,
+		HANDOVER_QUARTERS,
+		HANDOVER_YEARS,
+		LISTING_CITIES,
+		LISTING_DEVELOPERS,
+		PAYMENT_PLANS,
+		UNIT_TYPES
+	} from '$lib/listing-options';
+	import { getInitials } from '$lib/utils.js';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import PlusRound from '~icons/lucide/circle-fading-plus';
@@ -17,11 +29,11 @@
 	import Save from '~icons/lucide/save';
 	import Trash2 from '~icons/lucide/trash-2';
 	import Upload from '~icons/lucide/upload';
+	import UserRound from '~icons/lucide/user-round';
 	import { createListing } from '../../routes/(secure)/listing/listing-management/listing.remote';
+	import { searchUsers as searchUsersRemote } from '../../routes/(secure)/users.remote';
 
-	type PropertyType = Listing['propertyType'];
 	type ListingType = Listing['listingType'];
-	type CommercialSubType = NonNullable<Listing['commercialSubType']>;
 
 	let {
 		currentUserEmail = '',
@@ -30,21 +42,32 @@
 
 	let open = $state(false);
 	let listingType = $state<ListingType>('internal');
+	let availableFor = $state('');
+	let furnishing = $state('');
 	let firstName = $state('');
 	let lastName = $state('');
 	let clientPhone = $state('');
 	let clientEmail = $state('');
-	let developer = $state('');
+	let agentEmail = $state('');
+	let agentMobile = $state('');
+	let reportingManager = $state('');
+	let reportingManagerName = $state('');
+	let seniorManager = $state('');
+	let seniorManagerName = $state('');
+	let developerName = $state('');
 	let community = $state('');
-	let project = $state('');
+	let customCommunity = $state('');
+	let projectName = $state('');
 	let unitNo = $state('');
-	let propertyType = $state<PropertyType>('apartment');
-	let commercialSubType = $state<CommercialSubType>('office');
-	let bedroomType = $state<NonNullable<Listing['bedroomType']>>('studio');
-	let propertySize = $state<number | ''>('');
-	let plotArea = $state<number | ''>('');
+	let projectType = $state('');
+	let unitType = $state('');
+	let unitTypeOther = $state('');
+	let bedrooms = $state('');
+	let unitArea = $state<number | ''>('');
+	let internalArea = $state<number | ''>('');
+	let balconyArea = $state<number | ''>('');
+	let plotSize = $state<number | ''>('');
 	let builtUpArea = $state<number | ''>('');
-	let grossFloorArea = $state<number | ''>('');
 	let addressLine1 = $state('');
 	let addressLine2 = $state('');
 	let buildingName = $state('');
@@ -57,15 +80,24 @@
 	let titleDeedFileName = $state('');
 	let passportFileName = $state('');
 	let emiratesIdFileName = $state('');
-	let buyingPrice = $state<number | ''>('');
-	let liquidityInvested = $state<number | ''>('');
-	let sellingPrice = $state<number | ''>('');
-	let dxbPrice = $state<number | ''>('');
+	let unitStatus = $state('');
+	let paymentType = $state('');
+	let rentAmount = $state<number | ''>('');
+	let vacantDate = $state('');
+	let handoverYear = $state('');
+	let handoverQuarter = $state('');
+	let paymentPlan = $state('');
+	let paymentPlanOther = $state('');
+	let originalPrice = $state<number | ''>('');
+	let purchasePrice = $state<number | ''>('');
+	let amountPaid = $state<number | ''>('');
+	let price = $state<number | ''>('');
 	let listedByEmails = $state<string[]>(['']);
 	$effect(() => {
 		if (currentUserEmail && listedByEmails[0] === '') {
 			listedByEmails = [currentUserEmail];
 		}
+		if (currentUserEmail && !agentEmail) agentEmail = currentUserEmail;
 	});
 
 	// Keep hidden file inputs in sync with mediaAssets BEFORE the form submit event fires.
@@ -84,52 +116,64 @@
 		for (const a of mediaAssets.filter((a) => a.type === 'video')) dt.items.add(a.file);
 		videoInputRef.files = dt.files;
 	});
+	$effect(() => {
+		if (!floorPlanInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of floorPlanAssets) dt.items.add(a.file);
+		floorPlanInputRef.files = dt.files;
+	});
 	let mediaAssets = $state<
 		{ id: number; type: 'photo' | 'video'; file: File; fileName: string; previewUrl?: string }[]
 	>([]);
+	let floorPlanAssets = $state<{ id: number; file: File; fileName: string; previewUrl?: string }[]>(
+		[]
+	);
 	let nextAssetId = $state(1);
+	let nextFloorPlanId = $state(1);
 	let errors = $state<Record<string, string>>({});
 	let saving = $state(false);
 	let developerPopoverOpen = $state(false);
+	let managerPopoverOpen = $state(false);
+	let seniorManagerPopoverOpen = $state(false);
 	let pictureInputRef: HTMLInputElement | undefined = $state(undefined);
 	let videoInputRef: HTMLInputElement | undefined = $state(undefined);
+	let floorPlanInputRef: HTMLInputElement | undefined = $state(undefined);
 	let developerSearchValue = $state('');
+	let managerSearchValue = $state('');
+	let seniorManagerSearchValue = $state('');
 	let activeTab = $state<'property-details' | 'property-photo-videos'>('property-details');
 
-	const apartmentBedroomTypes: NonNullable<Listing['bedroomType']>[] = [
-		'studio',
-		'1bed',
-		'2bed',
-		'2bed+maid',
-		'3bed',
-		'3bed+maid',
-		'4bed',
-		'duplex',
-		'penthouse',
-		'podium-townhouse'
-	];
+	type UserResult = {
+		id: string;
+		email: string | null;
+		displayName?: string | null;
+		photoURL?: string | null;
+	};
 
-	const villaTownhouseBedroomTypes: NonNullable<Listing['bedroomType']>[] = [
-		'2bed',
-		'3bed',
-		'4bed',
-		'5bed',
-		'6-7bed'
-	];
+	let managerSearchResults = $state<UserResult[]>([]);
+	let seniorManagerSearchResults = $state<UserResult[]>([]);
+	let managerSearchLoading = $state(false);
+	let seniorManagerSearchLoading = $state(false);
+	let managerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let seniorManagerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-	const developers = [
-		{ value: 'emaar', label: 'Emaar' },
-		{ value: 'damac', label: 'DAMAC' },
-		{ value: 'nakheel', label: 'Nakheel' },
-		{ value: 'sobha', label: 'Sobha Realty' },
-		{ value: 'meraas', label: 'Meraas' },
-		{ value: 'aldar', label: 'Aldar' },
-		{ value: 'azizi', label: 'Azizi' }
-	];
+	const developers = LISTING_DEVELOPERS.map((label) => ({ value: label, label }));
 
 	const developerLabel = $derived(
-		developers.find((item) => item.value === developer)?.label ?? 'Developer'
+		developers.find((item) => item.value === developerName)?.label ?? (developerName || 'Developer')
 	);
+
+	const isOffPlan = $derived(projectType === 'Off-Plan Property');
+	const isReady = $derived(projectType === 'Ready Property');
+	const isRented = $derived(isReady && unitStatus === 'Rented');
+	const requiresBedrooms = $derived(
+		['Apartment', 'Villa', 'Townhouse', 'Mansion'].includes(unitType)
+	);
+	const selectedPaymentPlan = $derived(
+		paymentPlan === 'Others' ? paymentPlanOther.trim() : paymentPlan
+	);
+	const selectedLocation = $derived(community === 'Others' ? customCommunity.trim() : community);
+	const photoCount = $derived(mediaAssets.filter((asset) => asset.type === 'photo').length);
 
 	const filteredDevelopers = $derived(
 		developers.filter((item) =>
@@ -137,15 +181,62 @@
 		)
 	);
 
-	function formatBedroomLabel(value: string) {
-		return value
-			.replace('+', ' + ')
-			.replace('-', '/')
-			.replace('bed', ' Bed')
-			.replace('studio', 'Studio')
-			.replace('duplex', 'Duplex')
-			.replace('penthouse', 'Penthouse')
-			.replace('podium townhouse', 'Podium Townhouse');
+	async function doUserSearch(
+		term: string,
+		roleFilter: 'manager' | 'senior-manager',
+		setLoading: (value: boolean) => void,
+		setResults: (value: UserResult[]) => void
+	) {
+		setLoading(true);
+		try {
+			setResults(await searchUsersRemote({ q: term.trim(), roleFilter }));
+		} catch {
+			setResults([]);
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	function handleManagerSearchInput(value: string) {
+		managerSearchValue = value;
+		if (managerDebounceTimer) clearTimeout(managerDebounceTimer);
+		managerDebounceTimer = setTimeout(
+			() =>
+				doUserSearch(
+					value,
+					'manager',
+					(next) => (managerSearchLoading = next),
+					(next) => (managerSearchResults = next)
+				),
+			300
+		);
+	}
+
+	function handleSeniorManagerSearchInput(value: string) {
+		seniorManagerSearchValue = value;
+		if (seniorManagerDebounceTimer) clearTimeout(seniorManagerDebounceTimer);
+		seniorManagerDebounceTimer = setTimeout(
+			() =>
+				doUserSearch(
+					value,
+					'senior-manager',
+					(next) => (seniorManagerSearchLoading = next),
+					(next) => (seniorManagerSearchResults = next)
+				),
+			300
+		);
+	}
+
+	function selectManager(user: UserResult) {
+		reportingManager = user.email ?? '';
+		reportingManagerName = user.displayName ?? reportingManager;
+		managerPopoverOpen = false;
+	}
+
+	function selectSeniorManager(user: UserResult) {
+		seniorManager = user.email ?? '';
+		seniorManagerName = user.displayName ?? seniorManager;
+		seniorManagerPopoverOpen = false;
 	}
 
 	function onFileSelect(event: Event, key: 'titleDeed' | 'passport' | 'emiratesId') {
@@ -214,23 +305,59 @@
 		mediaAssets = mediaAssets.filter((asset) => asset.id !== id);
 	}
 
+	function addFloorPlanFiles(files: FileList | null) {
+		if (!files || files.length === 0) return;
+		const incoming = Array.from(files)
+			.filter((file) => file.type.startsWith('image/') || file.type === 'application/pdf')
+			.map((file) => ({
+				id: nextFloorPlanId++,
+				file,
+				fileName: file.name,
+				previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+			}));
+		if (incoming.length > 0) {
+			floorPlanAssets = [...floorPlanAssets, ...incoming];
+		}
+	}
+
+	function onFloorPlanInputChange(event: Event) {
+		addFloorPlanFiles((event.currentTarget as HTMLInputElement).files);
+	}
+
+	function removeFloorPlanAsset(id: number) {
+		const assetToRemove = floorPlanAssets.find((asset) => asset.id === id);
+		revokePreviewUrl(assetToRemove?.previewUrl);
+		floorPlanAssets = floorPlanAssets.filter((asset) => asset.id !== id);
+	}
+
 	function resetForm() {
 		listingType = 'internal';
+		availableFor = '';
+		furnishing = '';
 		firstName = '';
 		lastName = '';
 		clientPhone = '';
 		clientEmail = '';
-		developer = '';
+		agentEmail = currentUserEmail || '';
+		agentMobile = '';
+		reportingManager = '';
+		reportingManagerName = '';
+		seniorManager = '';
+		seniorManagerName = '';
+		developerName = '';
 		community = '';
-		project = '';
+		customCommunity = '';
+		projectName = '';
 		unitNo = '';
-		propertyType = 'apartment';
-		commercialSubType = 'office';
-		bedroomType = 'studio';
-		propertySize = '';
-		plotArea = '';
+		projectType = '';
+		unitType = '';
+		unitTypeOther = '';
+		bedrooms = '';
+		unitArea = '';
+		internalArea = '';
+		balconyArea = '';
+		plotSize = '';
 		builtUpArea = '';
-		grossFloorArea = '';
 		addressLine1 = '';
 		addressLine2 = '';
 		buildingName = '';
@@ -243,15 +370,27 @@
 		titleDeedFileName = '';
 		passportFileName = '';
 		emiratesIdFileName = '';
-		buyingPrice = '';
-		liquidityInvested = '';
-		sellingPrice = '';
-		dxbPrice = '';
+		unitStatus = '';
+		paymentType = '';
+		rentAmount = '';
+		vacantDate = '';
+		handoverYear = '';
+		handoverQuarter = '';
+		paymentPlan = '';
+		paymentPlanOther = '';
+		originalPrice = '';
+		purchasePrice = '';
+		amountPaid = '';
+		price = '';
 		listedByEmails = [currentUserEmail || ''];
 		for (const asset of mediaAssets) {
 			revokePreviewUrl(asset.previewUrl);
 		}
+		for (const asset of floorPlanAssets) {
+			revokePreviewUrl(asset.previewUrl);
+		}
 		mediaAssets = [];
+		floorPlanAssets = [];
 		activeTab = 'property-details';
 		errors = {};
 	}
@@ -259,45 +398,48 @@
 	function validate() {
 		const nextErrors: Record<string, string> = {};
 
+		if (!availableFor) nextErrors.availableFor = 'Property available for is required';
+		if (!furnishing) nextErrors.furnishing = 'Furnishing status is required';
+		if (!city) nextErrors.city = 'City is required';
+		if (!selectedLocation) nextErrors.location = 'Community is required';
+		if (!agentEmail.trim()) nextErrors.agentEmail = 'Agent email is required';
+		if (!agentMobile.trim()) nextErrors.agentMobile = 'Agent mobile number is required';
 		if (!firstName.trim()) nextErrors.firstName = 'First name is required';
 		if (!lastName.trim()) nextErrors.lastName = 'Last name is required';
 		if (!clientPhone.trim()) nextErrors.clientPhone = 'Mobile number is required';
 		if (!clientEmail.trim()) nextErrors.clientEmail = 'Email is required';
-		if (!developer.trim()) nextErrors.developer = 'Developer name is required';
-		if (!project.trim()) nextErrors.project = 'Project name is required';
-		if (!unitNo.trim()) nextErrors.unitNo = 'Unit no is required';
-		if (!buyingPrice && buyingPrice !== 0) nextErrors.buyingPrice = 'Buying price is required';
-		if (!liquidityInvested && liquidityInvested !== 0)
-			nextErrors.liquidityInvested = 'Liquidity invested is required';
-		if (!sellingPrice && sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required';
-		if (dxbPrice !== '' && Number(dxbPrice) < 0)
-			nextErrors.dxbPrice = 'DxB price must be 0 or greater';
+		if (!reportingManager) nextErrors.reportingManager = 'Reporting manager is required';
+		if (!seniorManager) nextErrors.seniorManager = 'Senior manager is required';
+		if (!developerName.trim()) nextErrors.developerName = 'Developer name is required';
+		if (!projectName.trim()) nextErrors.projectName = 'Project name is required';
+		if (!projectType) nextErrors.projectType = 'Project type is required';
+		if (!unitType) nextErrors.unitType = 'Unit type is required';
+		if (unitType === 'Others' && !unitTypeOther.trim())
+			nextErrors.unitTypeOther = 'Please specify unit type';
+		if (requiresBedrooms && !bedrooms) nextErrors.bedrooms = 'Bedrooms are required';
+		if (!unitArea && unitArea !== 0) nextErrors.unitArea = 'Unit area is required';
+		if (!paymentType) nextErrors.paymentType = 'Payment type is required';
+		if (isOffPlan) {
+			if (!handoverYear) nextErrors.handoverYear = 'Handover year is required';
+			if (!handoverQuarter) nextErrors.handoverQuarter = 'Handover quarter is required';
+			if (!selectedPaymentPlan) nextErrors.paymentPlan = 'Payment plan is required';
+			if (!amountPaid && amountPaid !== 0) nextErrors.amountPaid = 'Amount paid is required';
+		}
+		if (isReady) {
+			if (!unitStatus) nextErrors.unitStatus = 'Unit status is required';
+			if (unitStatus === 'Rented' && !rentAmount && rentAmount !== 0)
+				nextErrors.rentAmount = 'Monthly rent is required';
+		}
+		if (!price && price !== 0) nextErrors.price = 'Expected selling price is required';
 		const validListedBy = listedByEmails.map((value) => value.trim()).filter(Boolean);
 		if (!validListedBy.length) {
 			nextErrors.listedByEmails = 'At least one listed by email is required';
 		}
 
-		if (propertyType === 'apartment') {
-			if (!propertySize && propertySize !== 0)
-				nextErrors.propertySize = 'Property size is required for apartment';
-		}
-		if (propertyType === 'townhouse' || propertyType === 'villa') {
-			if (!plotArea && plotArea !== 0) nextErrors.plotArea = 'Plot area is required';
-			if (!builtUpArea && builtUpArea !== 0) nextErrors.builtUpArea = 'Built up area is required';
-		}
-		if (propertyType === 'commercial') {
-			if (!propertySize && propertySize !== 0)
-				nextErrors.propertySize = 'Property size is required';
-			if (commercialSubType === 'warehouse' && !grossFloorArea && grossFloorArea !== 0) {
-				nextErrors.grossFloorArea = 'Gross floor area is required for warehouse';
-			}
-		}
-		if (propertyType === 'plot' && !plotArea && plotArea !== 0) {
-			nextErrors.plotArea = 'Plot area is required for plot';
-		}
+		if (!titleDeedFileName) nextErrors.titleDeedFileName = 'Title deed/Qood is required';
+		if (!floorPlanAssets.length) nextErrors.floorPlanFiles = 'Floor plan is required';
+		if (photoCount === 0) nextErrors.pictureFiles = 'At least one property photo is required';
 		if (listingType === 'portal') {
-			if (!titleDeedFileName)
-				nextErrors.titleDeedFileName = 'Title deed/Qood is required for portal listing';
 			if (!passportFileName)
 				nextErrors.passportFileName = 'Passport is required for portal listing';
 		}
@@ -366,7 +508,34 @@
 			<input type="hidden" name="createdByUid" value={currentUserUid} />
 			<input type="hidden" name="createdByEmail" value={currentUserEmail} />
 			<input type="hidden" name="listingType" value={listingType} />
-			<input type="hidden" name="developer" value={developer} />
+			<input type="hidden" name="developerName" value={developerName} />
+			<input type="hidden" name="availableFor" value={availableFor} />
+			<input type="hidden" name="furnishing" value={furnishing} />
+			<input type="hidden" name="city" value={city} />
+			<input type="hidden" name="location" value={selectedLocation} />
+			<input type="hidden" name="agentEmail" value={agentEmail} />
+			<input type="hidden" name="agentMobile" value={agentMobile} />
+			<input type="hidden" name="reportingManager" value={reportingManager} />
+			<input type="hidden" name="seniorManager" value={seniorManager} />
+			<input type="hidden" name="projectType" value={projectType} />
+			<input type="hidden" name="unitType" value={unitType} />
+			<input type="hidden" name="unitTypeOther" value={unitTypeOther} />
+			<input type="hidden" name="bedrooms" value={bedrooms} />
+			<input type="hidden" name="unitArea" value={unitArea} />
+			<input type="hidden" name="internalArea" value={internalArea} />
+			<input type="hidden" name="balconyArea" value={balconyArea} />
+			<input type="hidden" name="plotSize" value={plotSize} />
+			<input type="hidden" name="unitStatus" value={isOffPlan ? 'Off-Plan' : unitStatus} />
+			<input type="hidden" name="paymentType" value={paymentType} />
+			<input type="hidden" name="rentAmount" value={rentAmount} />
+			<input type="hidden" name="vacantDate" value={vacantDate} />
+			<input type="hidden" name="handoverYear" value={handoverYear} />
+			<input type="hidden" name="handoverQuarter" value={handoverQuarter} />
+			<input type="hidden" name="paymentPlan" value={selectedPaymentPlan} />
+			<input type="hidden" name="originalPrice" value={originalPrice} />
+			<input type="hidden" name="purchasePrice" value={purchasePrice} />
+			<input type="hidden" name="amountPaid" value={amountPaid} />
+			<input type="hidden" name="price" value={price} />
 			{#each listedByEmails.map((e) => e.trim()).filter(Boolean) as email (email)}
 				<input type="hidden" name="listedByEmails" value={email} />
 			{/each}
@@ -375,6 +544,15 @@
 				name="pictureFiles[]"
 				multiple
 				bind:this={pictureInputRef}
+				class="sr-only"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
+			<input
+				type="file"
+				name="floorPlanFiles[]"
+				multiple
+				bind:this={floorPlanInputRef}
 				class="sr-only"
 				tabindex="-1"
 				aria-hidden="true"
@@ -462,9 +640,106 @@
 					</Field.Set>
 
 					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
+						<Field.Legend class="text-lg font-medium">Listing Overview</Field.Legend>
+						<Field.Group>
+							<div class="grid grid-cols-2 gap-4">
+								<Field.Field>
+									<Field.Label>Property Available For</Field.Label>
+									<select
+										bind:value={availableFor}
+										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+									>
+										<option value="">Select Availability</option>
+										<option>Sell</option>
+										<option>Rent</option>
+										<option>Both</option>
+									</select>
+									{#if errors.availableFor}<Field.Error class="text-sm text-destructive"
+											>{errors.availableFor}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Furnishing Status</Field.Label>
+									<select
+										bind:value={furnishing}
+										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+									>
+										<option value="">Select Furnishing</option>
+										<option>Furnished</option>
+										<option>Unfurnished</option>
+										<option>Semi-Furnished</option>
+									</select>
+									{#if errors.furnishing}<Field.Error class="text-sm text-destructive"
+											>{errors.furnishing}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>City</Field.Label>
+									<select
+										bind:value={city}
+										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+									>
+										<option value="">Select City</option>
+										{#each LISTING_CITIES as option (option)}
+											<option>{option}</option>
+										{/each}
+									</select>
+									{#if errors.city}<Field.Error class="text-sm text-destructive"
+											>{errors.city}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Community Name</Field.Label>
+									{#if city === 'Dubai'}
+										<select
+											bind:value={community}
+											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										>
+											<option value="">Select Community</option>
+											{#each DUBAI_COMMUNITIES as option (option)}
+												<option>{option}</option>
+											{/each}
+										</select>
+									{:else}
+										<Input bind:value={community} placeholder="e.g. Corniche, Al Reem Island" />
+									{/if}
+									{#if community === 'Others'}
+										<Input
+											class="mt-2"
+											bind:value={customCommunity}
+											placeholder="Specify community"
+										/>
+									{/if}
+									{#if errors.location}<Field.Error class="text-sm text-destructive"
+											>{errors.location}</Field.Error
+										>{/if}
+								</Field.Field>
+							</div>
+						</Field.Group>
+					</Field.Set>
+
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Agent & Client Information</Field.Legend>
 						<Field.Group>
 							<div class="grid grid-cols-3 gap-4">
+								<Field.Field>
+									<Field.Label>Agent Official Email</Field.Label>
+									<Input
+										type="email"
+										bind:value={agentEmail}
+										placeholder="agent@indglobalrealty.com"
+									/>
+									{#if errors.agentEmail}<Field.Error class="text-sm text-destructive"
+											>{errors.agentEmail}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Agent Mobile Number</Field.Label>
+									<Input bind:value={agentMobile} placeholder="+971 52 123 4567" />
+									{#if errors.agentMobile}<Field.Error class="text-sm text-destructive"
+											>{errors.agentMobile}</Field.Error
+										>{/if}
+								</Field.Field>
 								<Field.Field>
 									<Input name="firstName" bind:value={firstName} placeholder="First Name" />
 									{#if errors.firstName}<Field.Error class="text-sm text-destructive"
@@ -488,9 +763,150 @@
 											>{errors.clientEmail}</Field.Error
 										>{/if}
 								</Field.Field>
+								<Field.Field>
+									<Field.Label>Reporting Manager</Field.Label>
+									<Popover.Root bind:open={managerPopoverOpen}>
+										<Popover.Trigger
+											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+										>
+											{#if reportingManager}
+												<Avatar.Root class="h-5 w-5">
+													<Avatar.Fallback class="text-[10px]">
+														{getInitials(reportingManagerName || reportingManager)}
+													</Avatar.Fallback>
+												</Avatar.Root>
+												<span class="truncate">{reportingManagerName || reportingManager}</span>
+											{:else}
+												<UserRound class="h-4 w-4 text-muted-foreground" />
+												<span class="text-muted-foreground">Select manager...</span>
+											{/if}
+										</Popover.Trigger>
+										<Popover.Content class="w-72 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search managers..."
+													value={managerSearchValue}
+													oninput={(event) =>
+														handleManagerSearchInput((event.target as HTMLInputElement).value)}
+												/>
+												<Command.List>
+													{#if managerSearchLoading}
+														<div class="flex items-center justify-center py-4">
+															<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+														</div>
+													{:else if managerSearchResults.length === 0}
+														<Command.Empty>
+															{managerSearchValue.trim() ? 'No users found.' : 'Type to search...'}
+														</Command.Empty>
+													{:else}
+														<Command.Group>
+															{#each managerSearchResults as user (user.id)}
+																<Command.Item value={user.id} onSelect={() => selectManager(user)}>
+																	<Avatar.Root class="h-5 w-5">
+																		{#if user.photoURL}
+																			<Avatar.Image src={user.photoURL} alt={user.displayName} />
+																		{/if}
+																		<Avatar.Fallback class="text-[10px]">
+																			{getInitials(user.displayName ?? user.email ?? 'User')}
+																		</Avatar.Fallback>
+																	</Avatar.Root>
+																	<div class="ml-2 min-w-0">
+																		<div class="truncate text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'User'}
+																		</div>
+																		<div class="truncate text-xs text-muted-foreground">
+																			{user.email}
+																		</div>
+																	</div>
+																</Command.Item>
+															{/each}
+														</Command.Group>
+													{/if}
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									{#if errors.reportingManager}<Field.Error class="text-sm text-destructive"
+											>{errors.reportingManager}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Senior Manager</Field.Label>
+									<Popover.Root bind:open={seniorManagerPopoverOpen}>
+										<Popover.Trigger
+											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+										>
+											{#if seniorManager}
+												<Avatar.Root class="h-5 w-5">
+													<Avatar.Fallback class="text-[10px]">
+														{getInitials(seniorManagerName || seniorManager)}
+													</Avatar.Fallback>
+												</Avatar.Root>
+												<span class="truncate">{seniorManagerName || seniorManager}</span>
+											{:else}
+												<UserRound class="h-4 w-4 text-muted-foreground" />
+												<span class="text-muted-foreground">Select senior manager...</span>
+											{/if}
+										</Popover.Trigger>
+										<Popover.Content class="w-72 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search senior managers..."
+													value={seniorManagerSearchValue}
+													oninput={(event) =>
+														handleSeniorManagerSearchInput(
+															(event.target as HTMLInputElement).value
+														)}
+												/>
+												<Command.List>
+													{#if seniorManagerSearchLoading}
+														<div class="flex items-center justify-center py-4">
+															<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+														</div>
+													{:else if seniorManagerSearchResults.length === 0}
+														<Command.Empty>
+															{seniorManagerSearchValue.trim()
+																? 'No users found.'
+																: 'Type to search...'}
+														</Command.Empty>
+													{:else}
+														<Command.Group>
+															{#each seniorManagerSearchResults as user (user.id)}
+																<Command.Item
+																	value={user.id}
+																	onSelect={() => selectSeniorManager(user)}
+																>
+																	<Avatar.Root class="h-5 w-5">
+																		{#if user.photoURL}
+																			<Avatar.Image src={user.photoURL} alt={user.displayName} />
+																		{/if}
+																		<Avatar.Fallback class="text-[10px]">
+																			{getInitials(user.displayName ?? user.email ?? 'User')}
+																		</Avatar.Fallback>
+																	</Avatar.Root>
+																	<div class="ml-2 min-w-0">
+																		<div class="truncate text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'User'}
+																		</div>
+																		<div class="truncate text-xs text-muted-foreground">
+																			{user.email}
+																		</div>
+																	</div>
+																</Command.Item>
+															{/each}
+														</Command.Group>
+													{/if}
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									{#if errors.seniorManager}<Field.Error class="text-sm text-destructive"
+											>{errors.seniorManager}</Field.Error
+										>{/if}
+								</Field.Field>
 							</div>
 							<Field.Field>
-								<Field.Label>Phone Number</Field.Label>
+								<Field.Label>Client Mobile No</Field.Label>
 								<Input
 									name="clientPhone"
 									bind:value={clientPhone}
@@ -535,7 +951,7 @@
 															<Command.Item
 																value={item.value}
 																onSelect={() => {
-																	developer = item.value;
+																	developerName = item.value;
 																	developerPopoverOpen = false;
 																	developerSearchValue = '';
 																}}
@@ -548,20 +964,16 @@
 											</Command.Root>
 										</Popover.Content>
 									</Popover.Root>
-									{#if errors.developer}<Field.Error class="text-sm text-destructive"
-											>{errors.developer}</Field.Error
+									{#if errors.developerName}<Field.Error class="text-sm text-destructive"
+											>{errors.developerName}</Field.Error
 										>{/if}
 								</Field.Field>
 								<Field.Field>
 									<Field.Label
 										>Community <span class="text-muted-foreground">(Optional)</span></Field.Label
 									>
-									<InputGroup.Root id="community">
-										<InputGroup.Input
-											name="community"
-											bind:value={community}
-											placeholder="Community (Optional)"
-										/>
+									<InputGroup.Root id="location">
+										<InputGroup.Input bind:value={community} placeholder="Community (Optional)" />
 										<InputGroup.Addon>
 											<Home />
 										</InputGroup.Addon>
@@ -571,16 +983,16 @@
 									<Field.Label>Project Name</Field.Label>
 									<InputGroup.Root id="project">
 										<InputGroup.Input
-											name="project"
-											bind:value={project}
+											name="projectName"
+											bind:value={projectName}
 											placeholder="Select Project"
 										/>
 										<InputGroup.Addon>
 											<Building />
 										</InputGroup.Addon>
 									</InputGroup.Root>
-									{#if errors.project}<Field.Error class="text-sm text-destructive"
-											>{errors.project}</Field.Error
+									{#if errors.projectName}<Field.Error class="text-sm text-destructive"
+											>{errors.projectName}</Field.Error
 										>{/if}
 								</Field.Field>
 								<Field.Field>
@@ -596,112 +1008,205 @@
 										>{/if}
 								</Field.Field>
 								<Field.Field>
-									<Field.Label>Property Type</Field.Label>
+									<Field.Label>Project Type</Field.Label>
 									<select
-										name="propertyType"
+										bind:value={projectType}
 										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-										bind:value={propertyType}
 									>
-										<option value="apartment">Apartment</option>
-										<option value="townhouse">Townhouse</option>
-										<option value="villa">Villa</option>
-										<option value="commercial">Commercial</option>
-										<option value="plot">Plot</option>
+										<option value="">Select Type</option>
+										<option>Off-Plan Property</option>
+										<option>Ready Property</option>
 									</select>
+									{#if errors.projectType}<Field.Error class="text-sm text-destructive"
+											>{errors.projectType}</Field.Error
+										>{/if}
 								</Field.Field>
-								{#if propertyType === 'commercial'}
+								<Field.Field>
+									<Field.Label>Unit Type</Field.Label>
+									<select
+										bind:value={unitType}
+										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+									>
+										<option value="">Select Unit Type</option>
+										{#each UNIT_TYPES as option (option)}
+											<option>{option}</option>
+										{/each}
+									</select>
+									{#if errors.unitType}<Field.Error class="text-sm text-destructive"
+											>{errors.unitType}</Field.Error
+										>{/if}
+								</Field.Field>
+								{#if unitType === 'Others'}
 									<Field.Field>
-										<Field.Label>Commercial Type</Field.Label>
-										<select
-											name="commercialSubType"
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-											bind:value={commercialSubType}
-										>
-											<option value="office">Office Space</option>
-											<option value="warehouse">Warehouse</option>
-										</select>
-									</Field.Field>
-								{/if}
-
-								{#if propertyType === 'apartment'}
-									<Field.Field>
-										<Field.Label>No of Bedrooms</Field.Label>
-										<select
-											name="bedroomType"
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-											bind:value={bedroomType}
-										>
-											{#each apartmentBedroomTypes as option (option)}
-												<option value={option}>{formatBedroomLabel(option)}</option>
-											{/each}
-										</select>
-									</Field.Field>
-									<Field.Field>
-										<Field.Label>Property Size (Sqft)</Field.Label>
-										<Input name="propertySize" type="number" bind:value={propertySize} />
-										{#if errors.propertySize}<Field.Error class="text-sm text-destructive"
-												>{errors.propertySize}</Field.Error
+										<Field.Label>Please specify Unit Type</Field.Label>
+										<Input bind:value={unitTypeOther} placeholder="e.g. Penthouse, Plot" />
+										{#if errors.unitTypeOther}<Field.Error class="text-sm text-destructive"
+												>{errors.unitTypeOther}</Field.Error
 											>{/if}
 									</Field.Field>
 								{/if}
-
-								{#if propertyType === 'townhouse' || propertyType === 'villa'}
+								{#if requiresBedrooms}
 									<Field.Field>
-										<Field.Label>No of Bedrooms</Field.Label>
+										<Field.Label>No. of Bedrooms</Field.Label>
 										<select
-											name="bedroomType"
+											bind:value={bedrooms}
 											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-											bind:value={bedroomType}
 										>
-											{#each villaTownhouseBedroomTypes as option (option)}
-												<option value={option}>{formatBedroomLabel(option)}</option>
+											<option value="">Select Bedrooms</option>
+											{#each BEDROOM_OPTIONS as option (option)}
+												<option>{option}</option>
 											{/each}
 										</select>
-									</Field.Field>
-									<Field.Field>
-										<Field.Label>Plot Area</Field.Label>
-										<Input name="plotArea" type="number" bind:value={plotArea} />
-										{#if errors.plotArea}<Field.Error class="text-sm text-destructive"
-												>{errors.plotArea}</Field.Error
+										{#if errors.bedrooms}<Field.Error class="text-sm text-destructive"
+												>{errors.bedrooms}</Field.Error
 											>{/if}
 									</Field.Field>
+								{/if}
+								<Field.Field>
+									<Field.Label>Unit Area (sqft)</Field.Label>
+									<Input type="number" bind:value={unitArea} placeholder="e.g. 1200" />
+									{#if errors.unitArea}<Field.Error class="text-sm text-destructive"
+											>{errors.unitArea}</Field.Error
+										>{/if}
+								</Field.Field>
+								{#if unitType === 'Apartment' || unitType === 'Studio'}
 									<Field.Field>
-										<Field.Label>Built Up Area</Field.Label>
+										<Field.Label>Internal Area (sqft)</Field.Label>
+										<Input type="number" bind:value={internalArea} placeholder="e.g. 950" />
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Balcony Area (sqft)</Field.Label>
+										<Input type="number" bind:value={balconyArea} placeholder="e.g. 250" />
+									</Field.Field>
+								{/if}
+								{#if unitType === 'Villa' || unitType === 'Townhouse' || unitType === 'Mansion'}
+									<Field.Field>
+										<Field.Label>Plot Size (sqft)</Field.Label>
+										<Input type="number" bind:value={plotSize} placeholder="e.g. 4500" />
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Built Up Area (sqft)</Field.Label>
 										<Input name="builtUpArea" type="number" bind:value={builtUpArea} />
-										{#if errors.builtUpArea}<Field.Error class="text-sm text-destructive"
-												>{errors.builtUpArea}</Field.Error
+									</Field.Field>
+								{/if}
+								<Field.Field>
+									<Field.Label>Payment Type</Field.Label>
+									<select
+										bind:value={paymentType}
+										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+									>
+										<option value="">Select Payment Type</option>
+										<option>Cash</option>
+										<option>Finance (Cash + Mortgage)</option>
+									</select>
+									{#if errors.paymentType}<Field.Error class="text-sm text-destructive"
+											>{errors.paymentType}</Field.Error
+										>{/if}
+								</Field.Field>
+								{#if isReady}
+									<Field.Field>
+										<Field.Label>Unit Status</Field.Label>
+										<select
+											bind:value={unitStatus}
+											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										>
+											<option value="">Select Status</option>
+											<option>Rented</option>
+											<option>Vacant</option>
+										</select>
+										{#if errors.unitStatus}<Field.Error class="text-sm text-destructive"
+												>{errors.unitStatus}</Field.Error
 											>{/if}
 									</Field.Field>
 								{/if}
-
-								{#if propertyType === 'commercial'}
+								{#if isRented}
 									<Field.Field>
-										<Field.Label>Property Size (Sqft)</Field.Label>
-										<Input name="propertySize" type="number" bind:value={propertySize} />
-										{#if errors.propertySize}<Field.Error class="text-sm text-destructive"
-												>{errors.propertySize}</Field.Error
+										<Field.Label>Current Monthly Rent (AED)</Field.Label>
+										<Input type="number" bind:value={rentAmount} />
+										{#if errors.rentAmount}<Field.Error class="text-sm text-destructive"
+												>{errors.rentAmount}</Field.Error
 											>{/if}
 									</Field.Field>
-									{#if commercialSubType === 'warehouse'}
+									<Field.Field>
+										<Field.Label>Expected Vacancy Date</Field.Label>
+										<Input type="date" bind:value={vacantDate} />
+									</Field.Field>
+								{/if}
+								{#if isOffPlan}
+									<Field.Field>
+										<Field.Label>Handover Year</Field.Label>
+										<select
+											bind:value={handoverYear}
+											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										>
+											<option value="">Select Year</option>
+											{#each HANDOVER_YEARS as option (option)}
+												<option>{option}</option>
+											{/each}
+										</select>
+										{#if errors.handoverYear}<Field.Error class="text-sm text-destructive"
+												>{errors.handoverYear}</Field.Error
+											>{/if}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Handover Quarter</Field.Label>
+										<select
+											bind:value={handoverQuarter}
+											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										>
+											<option value="">Select Quarter</option>
+											{#each HANDOVER_QUARTERS as option (option)}
+												<option>{option}</option>
+											{/each}
+										</select>
+										{#if errors.handoverQuarter}<Field.Error class="text-sm text-destructive"
+												>{errors.handoverQuarter}</Field.Error
+											>{/if}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Payment Plan</Field.Label>
+										<select
+											bind:value={paymentPlan}
+											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										>
+											<option value="">Select Payment Plan</option>
+											{#each PAYMENT_PLANS as option (option)}
+												<option>{option}</option>
+											{/each}
+										</select>
+										{#if errors.paymentPlan}<Field.Error class="text-sm text-destructive"
+												>{errors.paymentPlan}</Field.Error
+											>{/if}
+									</Field.Field>
+									{#if paymentPlan === 'Others'}
 										<Field.Field>
-											<Field.Label>Gross Floor Area (GFA)</Field.Label>
-											<Input name="grossFloorArea" type="number" bind:value={grossFloorArea} />
-											{#if errors.grossFloorArea}<Field.Error class="text-sm text-destructive"
-													>{errors.grossFloorArea}</Field.Error
-												>{/if}
+											<Field.Label>Please specify Payment Plan</Field.Label>
+											<Input bind:value={paymentPlanOther} placeholder="e.g. Custom Plan" />
 										</Field.Field>
 									{/if}
-								{/if}
-
-								{#if propertyType === 'plot'}
 									<Field.Field>
-										<Field.Label>Plot Area (Sqft)</Field.Label>
-										<Input name="plotArea" type="number" bind:value={plotArea} />
-										{#if errors.plotArea}<Field.Error class="text-sm text-destructive"
-												>{errors.plotArea}</Field.Error
+										<Field.Label>Amount Paid Till Now (AED)</Field.Label>
+										<Input type="number" bind:value={amountPaid} />
+										{#if errors.amountPaid}<Field.Error class="text-sm text-destructive"
+												>{errors.amountPaid}</Field.Error
 											>{/if}
 									</Field.Field>
 								{/if}
+								<Field.Field>
+									<Field.Label>Last Transaction Price as per DLD/DXB Interact (AED)</Field.Label>
+									<Input type="number" bind:value={originalPrice} />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Original Price (AED)</Field.Label>
+									<Input type="number" bind:value={purchasePrice} />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Expected Selling Price (AED)</Field.Label>
+									<Input type="number" bind:value={price} />
+									{#if errors.price}<Field.Error class="text-sm text-destructive"
+											>{errors.price}</Field.Error
+										>{/if}
+								</Field.Field>
 							</div>
 						</Field.Group>
 					</Field.Set>
@@ -744,7 +1249,7 @@
 								</Field.Field>
 								<Field.Field>
 									<Field.Label>City</Field.Label>
-									<Input name="city" bind:value={city} placeholder="City" />
+									<Input bind:value={city} placeholder="City" />
 								</Field.Field>
 								<Field.Field>
 									<Field.Label>Country</Field.Label>
@@ -925,62 +1430,6 @@
 					</Field.Set>
 
 					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Financial Details</Field.Legend>
-						<Field.Group>
-							<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-								<Field.Field>
-									<Field.Label>Buying Price</Field.Label>
-									<Input
-										name="buyingPrice"
-										type="number"
-										bind:value={buyingPrice}
-										placeholder="Buying Price"
-									/>
-									{#if errors.buyingPrice}<Field.Error class="text-sm text-destructive"
-											>{errors.buyingPrice}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label>Liquidity Invested</Field.Label>
-									<Input
-										name="liquidityInvested"
-										type="number"
-										bind:value={liquidityInvested}
-										placeholder="Liquidity Invested"
-									/>
-									{#if errors.liquidityInvested}<Field.Error class="text-sm text-destructive"
-											>{errors.liquidityInvested}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label>Selling Price</Field.Label>
-									<Input
-										name="sellingPrice"
-										type="number"
-										bind:value={sellingPrice}
-										placeholder="Selling Price"
-									/>
-									{#if errors.sellingPrice}<Field.Error class="text-sm text-destructive"
-											>{errors.sellingPrice}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label>
-									<Input
-										name="dxbPrice"
-										type="number"
-										bind:value={dxbPrice}
-										placeholder="DxB Price"
-									/>
-									{#if errors.dxbPrice}<Field.Error class="text-sm text-destructive"
-											>{errors.dxbPrice}</Field.Error
-										>{/if}
-								</Field.Field>
-							</div>
-						</Field.Group>
-					</Field.Set>
-
-					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Listed by</Field.Legend>
 						<Field.Group>
 							<div class="flex flex-col gap-3">
@@ -1017,6 +1466,60 @@
 				</div>
 				<div class:hidden={activeTab !== 'property-photo-videos'}>
 					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Floor Plans</Field.Legend>
+						<Field.Group>
+							<label
+								for="floor-plan-input"
+								class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-4 text-sm font-semibold text-foreground transition hover:border-foreground/60"
+							>
+								<Upload class="h-5 w-5 text-gray-600" />
+								Upload Floor Plan
+							</label>
+							<Input
+								id="floor-plan-input"
+								class="sr-only"
+								type="file"
+								accept=".pdf,image/jpeg,image/jpg,image/png,image/webp"
+								multiple
+								onchange={onFloorPlanInputChange}
+							/>
+							{#if errors.floorPlanFiles}<Field.Error class="text-sm text-destructive"
+									>{errors.floorPlanFiles}</Field.Error
+								>{/if}
+							{#if floorPlanAssets.length > 0}
+								<div class="grid grid-cols-2 gap-3">
+									{#each floorPlanAssets as asset (asset.id)}
+										<div class="rounded-lg border border-border/60 bg-background/60 p-2">
+											{#if asset.previewUrl}
+												<img
+													src={asset.previewUrl}
+													alt={asset.fileName}
+													class="h-28 w-full rounded-md object-cover"
+												/>
+											{:else}
+												<div
+													class="flex h-28 items-center justify-center rounded-md bg-muted text-xs"
+												>
+													{asset.fileName}
+												</div>
+											{/if}
+											<div class="mt-2 flex items-center justify-between gap-2">
+												<p class="truncate text-xs text-muted-foreground">{asset.fileName}</p>
+												<button
+													type="button"
+													class="text-destructive hover:text-destructive/80"
+													onclick={() => removeFloorPlanAsset(asset.id)}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</Field.Group>
+					</Field.Set>
+					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Photo/Videos</Field.Legend>
 						<Field.Group>
 							<div
@@ -1046,6 +1549,9 @@
 									onchange={onMediaInputChange}
 								/>
 							</div>
+							{#if errors.pictureFiles}<Field.Error class="text-sm text-destructive"
+									>{errors.pictureFiles}</Field.Error
+								>{/if}
 
 							{#if mediaAssets.length > 0}
 								<div class="grid grid-cols-2 gap-3">

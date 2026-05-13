@@ -46,17 +46,60 @@ async function generateListingId(): Promise<string> {
 	});
 }
 
-const optionalMoney = z.preprocess((value) => {
+const optionalNumber = z.preprocess((value) => {
 	if (value === null || value === undefined) return undefined;
 	if (typeof value === 'string' && value.trim() === '') return undefined;
 	return value;
-}, z.coerce.number().min(0, 'DxB price must be 0 or greater').optional());
+}, z.coerce.number().min(0).optional());
+
+const optionalString = z.preprocess((value) => {
+	if (typeof value !== 'string') return value;
+	const trimmed = value.trim();
+	return trimmed === '' ? undefined : trimmed;
+}, z.string().optional());
+
+const fileArray = z
+	.union([
+		z.array(z.custom<File>((f) => f instanceof File)),
+		z.custom<File>((f) => f instanceof File).transform((f) => [f])
+	])
+	.optional()
+	.default([]);
+
+const stringArrayFromForm = z.preprocess(
+	(v) => {
+		if (Array.isArray(v)) return v;
+		if (typeof v !== 'string') return v;
+		const s = v.trim();
+		if (!s) return [];
+		if (s.startsWith('[')) {
+			try {
+				const parsed = JSON.parse(s);
+				if (Array.isArray(parsed)) return parsed;
+			} catch {
+				return [];
+			}
+		}
+		return [s];
+	},
+	z.array(z.string().min(1)).optional().default([])
+);
 
 // Shared shape (all fields except createdByUid/createdByEmail)
 // Extracted so both listingSchema and updateListingSchema can be built without .omit()
 // (Zod v4 forbids .omit() on schemas containing refinements)
 const listingShape = {
 	listingType: z.enum(['internal', 'portal']),
+
+	// Sample-compatible listing overview
+	availableFor: z.enum(['Sell', 'Rent', 'Both']),
+	furnishing: z.enum(['Furnished', 'Unfurnished', 'Semi-Furnished']),
+	city: z.string().min(1, 'City is required'),
+	location: z.string().min(1, 'Community is required'),
+	agentEmail: z.string().email('Valid agent email is required'),
+	agentMobile: z.string().min(1, 'Agent mobile number is required'),
+	reportingManager: z.string().min(1, 'Reporting manager is required'),
+	seniorManager: z.string().min(1, 'Senior manager is required'),
 
 	// Client details
 	firstName: z.string().min(1, 'First name is required'),
@@ -65,32 +108,28 @@ const listingShape = {
 	clientEmail: z.string().email('Valid email is required'),
 
 	// Property details
-	developer: z.string().min(1, 'Developer is required'),
-	community: z.string().optional(),
-	project: z.string().min(1, 'Project is required'),
+	developerName: z.string().min(1, 'Developer is required'),
+	projectName: z.string().min(1, 'Project is required'),
 	unitNo: z.string().min(1, 'Unit number is required'),
-	propertyType: z.enum(['apartment', 'townhouse', 'villa', 'commercial', 'plot']),
-	bedroomType: z
-		.enum([
-			'studio',
-			'1bed',
-			'2bed',
-			'2bed+maid',
-			'3bed',
-			'3bed+maid',
-			'4bed',
-			'5bed',
-			'6-7bed',
-			'duplex',
-			'penthouse',
-			'podium-townhouse'
-		])
-		.optional(),
-	commercialSubType: z.enum(['office', 'warehouse']).optional(),
-	propertySize: z.coerce.number().optional(),
-	plotArea: z.coerce.number().optional(),
-	builtUpArea: z.coerce.number().optional(),
-	grossFloorArea: z.coerce.number().optional(),
+	projectType: z.enum(['Off-Plan Property', 'Ready Property']),
+	unitType: z.string().min(1, 'Unit type is required'),
+	unitTypeOther: optionalString,
+	bedrooms: optionalString,
+	unitArea: z.coerce.number().min(0, 'Unit area is required'),
+	internalArea: optionalNumber,
+	balconyArea: optionalNumber,
+	plotSize: optionalNumber,
+	builtUpArea: optionalNumber,
+	unitStatus: optionalString,
+	paymentType: z.string().min(1, 'Payment type is required'),
+	rentAmount: optionalNumber,
+	vacantDate: optionalString,
+	handoverYear: optionalString,
+	handoverQuarter: optionalString,
+	paymentPlan: optionalString,
+	originalPrice: optionalNumber,
+	purchasePrice: optionalNumber,
+	amountPaid: optionalNumber,
 
 	// Address (all optional)
 	addressLine1: z.string().optional(),
@@ -98,7 +137,6 @@ const listingShape = {
 	buildingName: z.string().optional(),
 	street: z.string().optional(),
 	area: z.string().optional(),
-	city: z.string().optional(),
 	country: z.string().optional(),
 	postalCode: z.string().optional(),
 	landmark: z.string().optional(),
@@ -109,46 +147,16 @@ const listingShape = {
 	emiratesIdFile: z.custom<File>((f) => !f || f instanceof File).optional(),
 
 	// Media (multiple files — set programmatically before submit)
-	pictureFiles: z
-		.union([
-			z.array(z.custom<File>((f) => f instanceof File)),
-			z.custom<File>((f) => f instanceof File).transform((f) => [f])
-		])
-		.optional()
-		.default([]),
-	videoFiles: z
-		.union([
-			z.array(z.custom<File>((f) => f instanceof File)),
-			z.custom<File>((f) => f instanceof File).transform((f) => [f])
-		])
-		.optional()
-		.default([]),
+	pictureFiles: fileArray,
+	videoFiles: fileArray,
+	floorPlanFiles: fileArray,
 
 	// Existing media URLs that should be kept on update
-	retainedMediaUrls: z.preprocess(
-		(v) => {
-			if (Array.isArray(v)) return v;
-			if (typeof v !== 'string') return v;
-			const s = v.trim();
-			if (!s) return [];
-			if (s.startsWith('[')) {
-				try {
-					const parsed = JSON.parse(s);
-					if (Array.isArray(parsed)) return parsed;
-				} catch {
-					return [];
-				}
-			}
-			return [s];
-		},
-		z.array(z.string().min(1)).optional().default([])
-	),
+	retainedMediaUrls: stringArrayFromForm,
+	retainedFloorPlanUrls: stringArrayFromForm,
 
 	// Pricing
-	buyingPrice: z.coerce.number().min(0, 'Buying price is required'),
-	liquidityInvested: z.coerce.number().min(0, 'Liquidity invested is required'),
-	sellingPrice: z.coerce.number().min(0, 'Selling price is required'),
-	dxbPrice: optionalMoney,
+	price: z.coerce.number().min(0, 'Expected selling price is required'),
 
 	// Listed by agents
 	listedByEmails: z.preprocess(
@@ -178,89 +186,97 @@ const listingSchema = z
 		...listingShape
 	})
 	.superRefine((data, ctx) => {
-		if (data.propertyType === 'apartment') {
-			if (!data.bedroomType) {
+		if (data.unitType === 'Others' && !data.unitTypeOther) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['unitTypeOther'],
+				message: 'Please specify the unit type'
+			});
+		}
+
+		if (['Apartment', 'Villa', 'Townhouse', 'Mansion'].includes(data.unitType) && !data.bedrooms) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['bedrooms'],
+				message: 'Number of bedrooms is required'
+			});
+		}
+
+		if (data.projectType === 'Off-Plan Property') {
+			if (!data.handoverYear) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['bedroomType'],
-					message: 'Bedroom type is required for apartments'
+					path: ['handoverYear'],
+					message: 'Handover year is required for off-plan listings'
 				});
 			}
-			if (!data.propertySize) {
+			if (!data.handoverQuarter) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['propertySize'],
-					message: 'Property size is required for apartments'
+					path: ['handoverQuarter'],
+					message: 'Handover quarter is required for off-plan listings'
+				});
+			}
+			if (!data.paymentPlan) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['paymentPlan'],
+					message: 'Payment plan is required for off-plan listings'
+				});
+			}
+			if (data.amountPaid == null) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['amountPaid'],
+					message: 'Amount paid is required for off-plan listings'
 				});
 			}
 		}
 
-		if (data.propertyType === 'townhouse' || data.propertyType === 'villa') {
-			if (!data.bedroomType) {
+		if (data.projectType === 'Ready Property') {
+			if (!data.unitStatus) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['bedroomType'],
-					message: 'Bedroom type is required'
+					path: ['unitStatus'],
+					message: 'Unit status is required'
 				});
 			}
-			if (!data.plotArea) {
+			if (data.unitStatus === 'Rented' && data.rentAmount == null) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['plotArea'],
-					message: 'Plot area is required'
-				});
-			}
-			if (!data.builtUpArea) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['builtUpArea'],
-					message: 'Built up area is required'
+					path: ['rentAmount'],
+					message: 'Current monthly rent is required for rented units'
 				});
 			}
 		}
 
-		if (data.propertyType === 'commercial') {
-			if (!data.commercialSubType) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['commercialSubType'],
-					message: 'Commercial type is required'
-				});
-			}
-			if (!data.propertySize) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['propertySize'],
-					message: 'Property size is required for commercial properties'
-				});
-			}
-			if (data.commercialSubType === 'warehouse' && !data.grossFloorArea) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['grossFloorArea'],
-					message: 'Gross floor area is required for warehouses'
-				});
-			}
+		const pictureFiles = Array.isArray(data.pictureFiles) ? data.pictureFiles : [];
+		if (!pictureFiles.some((file) => file instanceof File && file.size > 0)) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['pictureFiles'],
+				message: 'Please upload at least one property photo'
+			});
 		}
 
-		if (data.propertyType === 'plot') {
-			if (!data.plotArea) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['plotArea'],
-					message: 'Plot area is required for plots'
-				});
-			}
+		const floorPlanFiles = Array.isArray(data.floorPlanFiles) ? data.floorPlanFiles : [];
+		if (!floorPlanFiles.some((file) => file instanceof File && file.size > 0)) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['floorPlanFiles'],
+				message: 'Please upload at least one floor plan'
+			});
+		}
+
+		if (!data.titleDeedFile || (data.titleDeedFile as File).size <= 0) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['titleDeedFile'],
+				message: 'Title deed / Qood is required'
+			});
 		}
 
 		if (data.listingType === 'portal') {
-			if (!data.titleDeedFile || (data.titleDeedFile as File).size <= 0) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['titleDeedFile'],
-					message: 'Title deed / Qood is required for portal listings'
-				});
-			}
 			if (!data.passportFile || (data.passportFile as File).size <= 0) {
 				ctx.addIssue({
 					code: 'custom',
@@ -300,12 +316,16 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 	// Upload media files in parallel
 	const pictureFileInputs = Array.isArray(data.pictureFiles) ? data.pictureFiles : [];
 	const videoFileInputs = Array.isArray(data.videoFiles) ? data.videoFiles : [];
+	const floorPlanFileInputs = Array.isArray(data.floorPlanFiles) ? data.floorPlanFiles : [];
 
-	const [uploadedPictures, uploadedVideos] = await Promise.all([
+	const [uploadedPictures, uploadedVideos, uploadedFloorPlans] = await Promise.all([
 		Promise.all(
 			pictureFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/pictures`))
 		),
-		Promise.all(videoFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/video`)))
+		Promise.all(videoFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/video`))),
+		Promise.all(
+			floorPlanFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/floor-plans`))
+		)
 	]);
 
 	const mediaAssets = [
@@ -320,27 +340,52 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 	const listingRecord = {
 		id: listingId,
 		listingType: data.listingType,
+		availableFor: data.availableFor,
+		furnishing: data.furnishing,
+		city: data.city,
+		location: data.location,
+		agentEmail: data.agentEmail,
+		agentMobile: data.agentMobile,
+		reportingManager: data.reportingManager,
+		seniorManager: data.seniorManager,
 		clientName: `${data.firstName} ${data.lastName}`.trim(),
 		clientPhone: data.clientPhone,
 		clientEmail: data.clientEmail,
-		developer: data.developer,
-		...(data.community && { community: data.community }),
-		project: data.project,
+		developerName: data.developerName,
+		projectName: data.projectName,
 		unitNo: data.unitNo,
-		propertyType: data.propertyType,
-		...(data.bedroomType && { bedroomType: data.bedroomType }),
-		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
-		...(data.propertySize && { propertySize: data.propertySize }),
-		...(data.plotArea && { plotArea: data.plotArea }),
+		projectType: data.projectType,
+		unitType: data.unitType === 'Others' ? (data.unitTypeOther ?? 'Others') : data.unitType,
+		unitTypeOther: data.unitType === 'Others' ? data.unitTypeOther : null,
+		bedrooms: data.bedrooms ?? null,
+		unitArea: data.unitArea,
+		internalArea: data.internalArea ?? null,
+		balconyArea: data.balconyArea ?? null,
+		plotSize: data.plotSize ?? null,
 		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
-		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
+		unitStatus: data.projectType === 'Off-Plan Property' ? 'Off-Plan' : data.unitStatus,
+		paymentType: data.paymentType,
+		rentAmount:
+			data.projectType === 'Ready Property' && data.unitStatus === 'Rented'
+				? (data.rentAmount ?? null)
+				: null,
+		vacantDate:
+			data.projectType === 'Ready Property' && data.unitStatus === 'Rented'
+				? (data.vacantDate ?? null)
+				: null,
+		handoverYear: data.projectType === 'Off-Plan Property' ? (data.handoverYear ?? '') : '',
+		handoverQuarter: data.projectType === 'Off-Plan Property' ? (data.handoverQuarter ?? '') : '',
+		paymentPlan: data.projectType === 'Off-Plan Property' ? (data.paymentPlan ?? '') : '',
+		originalPrice: data.originalPrice ?? null,
+		purchasePrice: data.purchasePrice ?? null,
+		amountPaid: data.projectType === 'Off-Plan Property' ? (data.amountPaid ?? null) : null,
 		propertyAddress: {
 			...(data.addressLine1 && { addressLine1: data.addressLine1 }),
 			...(data.addressLine2 && { addressLine2: data.addressLine2 }),
 			...(data.buildingName && { buildingName: data.buildingName }),
 			...(data.street && { street: data.street }),
-			...(data.area && { area: data.area }),
-			...(data.city && { city: data.city }),
+			area: data.location,
+			city: data.city,
 			...(data.country && { country: data.country }),
 			...(data.postalCode && { postalCode: data.postalCode }),
 			...(data.landmark && { landmark: data.landmark })
@@ -349,11 +394,15 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		titleDeedFileName: titleDeedFile?.name ?? null,
 		passportFileName: passportFile?.name ?? null,
 		emiratesIdFileName: emiratesIdFile?.name ?? null,
+		floorPlansFileName: uploadedFloorPlans
+			.filter(Boolean)
+			.map((file) => file!.name)
+			.join(', '),
 		mediaAssets,
-		buyingPrice: data.buyingPrice,
-		liquidityInvested: data.liquidityInvested,
-		sellingPrice: data.sellingPrice,
-		dxbPrice: data.dxbPrice ?? null,
+		floorPlanAssets: uploadedFloorPlans
+			.filter(Boolean)
+			.map((f) => ({ fileName: f!.name, url: f!.downloadURL })),
+		price: data.price,
 		listedByEmails: Array.isArray(data.listedByEmails)
 			? data.listedByEmails
 			: [data.listedByEmails],
@@ -363,7 +412,8 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 			passport: passportFile ?? null,
 			emiratesId: emiratesIdFile ?? null,
 			pictures: uploadedPictures.filter(Boolean),
-			videos: uploadedVideos.filter(Boolean)
+			videos: uploadedVideos.filter(Boolean),
+			floorPlans: uploadedFloorPlans.filter(Boolean)
 		},
 		createdByUid,
 		createdByEmail,
@@ -413,6 +463,27 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 	const timestamp = FieldValue.serverTimestamp();
 	const basePath = `listings/${existing.createdByUid}/${data.listingId}`;
 
+	if (data.unitType === 'Others' && !data.unitTypeOther) {
+		issue.unitTypeOther = 'Please specify the unit type';
+	}
+	if (['Apartment', 'Villa', 'Townhouse', 'Mansion'].includes(data.unitType) && !data.bedrooms) {
+		issue.bedrooms = 'Number of bedrooms is required';
+	}
+	if (data.projectType === 'Off-Plan Property') {
+		if (!data.handoverYear) issue.handoverYear = 'Handover year is required for off-plan listings';
+		if (!data.handoverQuarter)
+			issue.handoverQuarter = 'Handover quarter is required for off-plan listings';
+		if (!data.paymentPlan) issue.paymentPlan = 'Payment plan is required for off-plan listings';
+		if (data.amountPaid == null) issue.amountPaid = 'Amount paid is required for off-plan listings';
+	}
+	if (data.projectType === 'Ready Property') {
+		if (!data.unitStatus) issue.unitStatus = 'Unit status is required';
+		if (data.unitStatus === 'Rented' && data.rentAmount == null) {
+			issue.rentAmount = 'Current monthly rent is required for rented units';
+		}
+	}
+	if (Object.keys(issue).length > 0) return;
+
 	// Upload only if a real new file was provided
 	const [newTitleDeed, newPassport, newEmiratesId] = await Promise.all([
 		toUploadedFile(data.titleDeedFile as File | null, `${basePath}/title-deed`),
@@ -422,12 +493,16 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 
 	const pictureFileInputs = Array.isArray(data.pictureFiles) ? data.pictureFiles : [];
 	const videoFileInputs = Array.isArray(data.videoFiles) ? data.videoFiles : [];
+	const floorPlanFileInputs = Array.isArray(data.floorPlanFiles) ? data.floorPlanFiles : [];
 
-	const [uploadedPictures, uploadedVideos] = await Promise.all([
+	const [uploadedPictures, uploadedVideos, uploadedFloorPlans] = await Promise.all([
 		Promise.all(
 			pictureFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/pictures`))
 		),
-		Promise.all(videoFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/video`)))
+		Promise.all(videoFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/video`))),
+		Promise.all(
+			floorPlanFileInputs.map((f) => toUploadedFile(f as File | null, `${basePath}/floor-plans`))
+		)
 	]);
 
 	// Resolve final attachment metadata: prefer new upload, fall back to existing Firestore record
@@ -435,11 +510,10 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 	const finalPassport = newPassport ?? existing.attachments?.passport ?? null;
 	const finalEmiratesId = newEmiratesId ?? existing.attachments?.emiratesId ?? null;
 
-	// For portal listings: each required document must exist (new or pre-existing)
+	// Required documents/files can be new or pre-existing on update.
+	if (!finalTitleDeed) issue.titleDeedFile = 'Title deed / Qood is required';
 	if (data.listingType === 'portal') {
-		if (!finalTitleDeed) issue.titleDeedFile = 'Title deed / Qood is required for portal listings';
 		if (!finalPassport) issue.passportFile = 'Passport is required for portal listings';
-		if (Object.keys(issue).length > 0) return;
 	}
 
 	const newMediaAssets = [
@@ -452,12 +526,28 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 	];
 
 	const retainedMediaUrlSet = new Set(data.retainedMediaUrls ?? []);
+	const retainedFloorPlanUrlSet = new Set(data.retainedFloorPlanUrls ?? []);
 
 	const retainedExistingMediaAssets = (existing.mediaAssets ?? []).filter(
 		(asset: { url?: string }) => !!asset?.url && retainedMediaUrlSet.has(asset.url)
 	);
 
 	const mergedMediaAssets = [...retainedExistingMediaAssets, ...newMediaAssets];
+	if (!mergedMediaAssets.some((asset) => asset.type === 'photo')) {
+		issue.pictureFiles = 'Please upload at least one property photo';
+	}
+
+	const retainedExistingFloorPlanAssets = (existing.floorPlanAssets ?? []).filter(
+		(asset: { url?: string }) => !!asset?.url && retainedFloorPlanUrlSet.has(asset.url)
+	);
+	const newFloorPlanAssets = uploadedFloorPlans
+		.filter(Boolean)
+		.map((f) => ({ fileName: f!.name, url: f!.downloadURL }));
+	const mergedFloorPlanAssets = [...retainedExistingFloorPlanAssets, ...newFloorPlanAssets];
+	if (!mergedFloorPlanAssets.length) {
+		issue.floorPlanFiles = 'Please upload at least one floor plan';
+	}
+	if (Object.keys(issue).length > 0) return;
 
 	const retainedPictureAttachments = (existing.attachments?.pictures ?? []).filter(
 		(file: { downloadURL?: string }) =>
@@ -468,30 +558,59 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 		(file: { downloadURL?: string }) =>
 			!!file?.downloadURL && retainedMediaUrlSet.has(file.downloadURL)
 	);
+	const retainedFloorPlanAttachments = (existing.attachments?.floorPlans ?? []).filter(
+		(file: { downloadURL?: string }) =>
+			!!file?.downloadURL && retainedFloorPlanUrlSet.has(file.downloadURL)
+	);
 
 	const updateRecord = {
 		listingType: data.listingType,
+		availableFor: data.availableFor,
+		furnishing: data.furnishing,
+		city: data.city,
+		location: data.location,
+		agentEmail: data.agentEmail,
+		agentMobile: data.agentMobile,
+		reportingManager: data.reportingManager,
+		seniorManager: data.seniorManager,
 		clientName: `${data.firstName} ${data.lastName}`.trim(),
 		clientPhone: data.clientPhone,
 		clientEmail: data.clientEmail,
-		developer: data.developer,
-		community: data.community ?? null,
-		project: data.project,
+		developerName: data.developerName,
+		projectName: data.projectName,
 		unitNo: data.unitNo,
-		propertyType: data.propertyType,
-		bedroomType: data.bedroomType ?? null,
-		commercialSubType: data.commercialSubType ?? null,
-		propertySize: data.propertySize ?? null,
-		plotArea: data.plotArea ?? null,
+		projectType: data.projectType,
+		unitType: data.unitType === 'Others' ? (data.unitTypeOther ?? 'Others') : data.unitType,
+		unitTypeOther: data.unitType === 'Others' ? data.unitTypeOther : null,
+		bedrooms: data.bedrooms ?? null,
+		unitArea: data.unitArea,
+		internalArea: data.internalArea ?? null,
+		balconyArea: data.balconyArea ?? null,
+		plotSize: data.plotSize ?? null,
 		builtUpArea: data.builtUpArea ?? null,
-		grossFloorArea: data.grossFloorArea ?? null,
+		unitStatus: data.projectType === 'Off-Plan Property' ? 'Off-Plan' : data.unitStatus,
+		paymentType: data.paymentType,
+		rentAmount:
+			data.projectType === 'Ready Property' && data.unitStatus === 'Rented'
+				? (data.rentAmount ?? null)
+				: null,
+		vacantDate:
+			data.projectType === 'Ready Property' && data.unitStatus === 'Rented'
+				? (data.vacantDate ?? null)
+				: null,
+		handoverYear: data.projectType === 'Off-Plan Property' ? (data.handoverYear ?? '') : '',
+		handoverQuarter: data.projectType === 'Off-Plan Property' ? (data.handoverQuarter ?? '') : '',
+		paymentPlan: data.projectType === 'Off-Plan Property' ? (data.paymentPlan ?? '') : '',
+		originalPrice: data.originalPrice ?? null,
+		purchasePrice: data.purchasePrice ?? null,
+		amountPaid: data.projectType === 'Off-Plan Property' ? (data.amountPaid ?? null) : null,
 		propertyAddress: {
 			...(data.addressLine1 && { addressLine1: data.addressLine1 }),
 			...(data.addressLine2 && { addressLine2: data.addressLine2 }),
 			...(data.buildingName && { buildingName: data.buildingName }),
 			...(data.street && { street: data.street }),
-			...(data.area && { area: data.area }),
-			...(data.city && { city: data.city }),
+			area: data.location,
+			city: data.city,
 			...(data.country && { country: data.country }),
 			...(data.postalCode && { postalCode: data.postalCode }),
 			...(data.landmark && { landmark: data.landmark })
@@ -500,10 +619,9 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 		passportFileName: finalPassport?.name ?? existing.passportFileName ?? null,
 		emiratesIdFileName: finalEmiratesId?.name ?? existing.emiratesIdFileName ?? null,
 		mediaAssets: mergedMediaAssets,
-		buyingPrice: data.buyingPrice,
-		liquidityInvested: data.liquidityInvested,
-		sellingPrice: data.sellingPrice,
-		dxbPrice: data.dxbPrice ?? null,
+		floorPlanAssets: mergedFloorPlanAssets,
+		floorPlansFileName: mergedFloorPlanAssets.map((asset) => asset.fileName).join(', '),
+		price: data.price,
 		listedByEmails: Array.isArray(data.listedByEmails)
 			? data.listedByEmails
 			: [data.listedByEmails],
@@ -512,7 +630,8 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 			passport: finalPassport,
 			emiratesId: finalEmiratesId,
 			pictures: [...retainedPictureAttachments, ...uploadedPictures.filter(Boolean)],
-			videos: [...retainedVideoAttachments, ...uploadedVideos.filter(Boolean)]
+			videos: [...retainedVideoAttachments, ...uploadedVideos.filter(Boolean)],
+			floorPlans: [...retainedFloorPlanAttachments, ...uploadedFloorPlans.filter(Boolean)]
 		},
 		updatedAt: timestamp,
 		updatedByUid: userUid,

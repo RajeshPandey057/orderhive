@@ -27,16 +27,16 @@
 	}
 
 	const portalUrl = $derived(
-		listing ? `/listings/${slugify(listing.project)}-${listing.id.toLowerCase()}` : '#'
+		listing ? `/listings/${slugify(listing.projectName)}-${listing.id.toLowerCase()}` : '#'
 	);
 
 	const propertyTypeLabel = $derived(
-		(listing?.propertyType ?? '').charAt(0).toUpperCase() + (listing?.propertyType ?? '').slice(1)
+		(listing?.unitType ?? '').charAt(0).toUpperCase() + (listing?.unitType ?? '').slice(1)
 	);
 
 	const bedroomLabel = $derived(
-		listing?.bedroomType
-			? listing.bedroomType.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed')
+		listing?.bedrooms
+			? listing.bedrooms.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed')
 			: 'N/A'
 	);
 
@@ -59,7 +59,7 @@
 			</a>
 			{#if listing}
 				<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
-				<h1 class="text-lg font-medium">{listing.project}</h1>
+				<h1 class="text-lg font-medium">{listing.projectName}</h1>
 			{/if}
 		</div>
 		{#if listing?.listingType === 'portal'}
@@ -92,7 +92,7 @@
 				<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div>
 						<div class="flex items-center gap-2">
-							<h2 class="text-xl font-bold text-foreground">{listing.project}</h2>
+							<h2 class="text-xl font-bold text-foreground">{listing.projectName}</h2>
 							<span
 								class="rounded-full px-2 py-0.5 text-xs font-semibold {listing.listingType ===
 								'portal'
@@ -118,7 +118,7 @@
 						</p>
 					</div>
 					<p class="text-2xl font-bold text-foreground">
-						AED {formatPrice(listing.sellingPrice)}
+						AED {formatPrice(listing.price)}
 					</p>
 				</div>
 				<div class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
@@ -148,7 +148,7 @@
 				<ListingMediaGallery
 					mediaItems={mediaItems}
 					listingId={listing.id}
-					listingTitle={listing.project}
+					listingTitle={listing.projectName}
 				/>
 			</section>
 
@@ -190,16 +190,16 @@
 					<div class="space-y-3 text-sm">
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Developer</span>
-							<span class="font-medium">{listing.developer}</span>
+							<span class="font-medium">{listing.developerName}</span>
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Community</span>
-							<span class="font-medium">{listing.community ?? 'N/A'}</span>
+							<span class="font-medium">{listing.location ?? 'N/A'}</span>
 						</div>
-						{#if listing.propertySize}
+						{#if listing.unitArea}
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Property Size</span>
-								<span class="font-medium">{listing.propertySize} sqft</span>
+								<span class="font-medium">{listing.unitArea} sqft</span>
 							</div>
 						{/if}
 						{#if listing.builtUpArea}
@@ -208,22 +208,22 @@
 								<span class="font-medium">{listing.builtUpArea} sqft</span>
 							</div>
 						{/if}
-						{#if listing.plotArea}
+						{#if listing.plotSize}
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Plot Area</span>
-								<span class="font-medium">{listing.plotArea} sqft</span>
+								<span class="font-medium">{listing.plotSize} sqft</span>
 							</div>
 						{/if}
-						{#if listing.grossFloorArea}
+						{#if listing.builtUpArea}
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Gross Floor Area</span>
-								<span class="font-medium">{listing.grossFloorArea} sqft</span>
+								<span class="font-medium">{listing.builtUpArea} sqft</span>
 							</div>
 						{/if}
-						{#if listing.commercialSubType}
+						{#if listing.unitType}
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Commercial Type</span>
-								<span class="font-medium capitalize">{listing.commercialSubType}</span>
+								<span class="font-medium capitalize">{listing.unitType}</span>
 							</div>
 						{/if}
 					</div>
@@ -238,22 +238,22 @@
 					<div class="space-y-3 text-sm">
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Buying Price</span>
-							<span class="font-medium">AED {formatPrice(listing.buyingPrice)}</span>
+							<span class="font-medium">AED {formatPrice(listing.purchasePrice ?? 0)}</span>
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Liquidity Invested</span>
-							<span class="font-medium">AED {formatPrice(listing.liquidityInvested)}</span>
+							<span class="font-medium">AED {formatPrice(listing.amountPaid ?? 0)}</span>
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Selling Price</span>
 							<span class="font-semibold text-foreground"
-								>AED {formatPrice(listing.sellingPrice)}</span
+								>AED {formatPrice(listing.price)}</span
 							>
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">DxB Price</span>
 							<span class="font-medium">
-								{listing.dxbPrice == null ? 'N/A' : `AED ${formatPrice(listing.dxbPrice)}`}
+								{listing.originalPrice == null ? 'N/A' : `AED ${formatPrice(listing.originalPrice)}`}
 							</span>
 						</div>
 					</div>

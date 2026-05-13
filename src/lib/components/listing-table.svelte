@@ -21,11 +21,11 @@
 	let searchQuery = $state('');
 	let selectedDeveloper = $state('all');
 	let selectedAgent = $state('all');
-	let selectedPropertyType = $state('all');
+	let selectedUnitType = $state('all');
 
 	const developerOptions = $derived([
 		'all',
-		...new Set(listings.map((listing) => listing.developer).filter(Boolean))
+		...new Set(listings.map((listing) => listing.developerName).filter(Boolean))
 	]);
 	const agentOptions = $derived([
 		'all',
@@ -36,9 +36,9 @@
 				.filter(Boolean)
 		)
 	]);
-	const propertyTypeOptions = $derived([
+	const unitTypeOptions = $derived([
 		'all',
-		...new Set(listings.map((listing) => listing.propertyType))
+		...new Set(listings.map((listing) => listing.unitType).filter(Boolean))
 	]);
 
 	const filteredListings = $derived.by(() => {
@@ -48,19 +48,18 @@
 			const matchesSearch =
 				!query ||
 				listing.clientName.toLowerCase().includes(query) ||
-				listing.project.toLowerCase().includes(query) ||
-				listing.developer.toLowerCase().includes(query) ||
+				listing.projectName.toLowerCase().includes(query) ||
+				listing.developerName.toLowerCase().includes(query) ||
 				listing.unitNo.toLowerCase().includes(query) ||
 				(listing.listedByEmails ?? []).some((email) => email.toLowerCase().includes(query));
 
 			const matchesDeveloper =
-				selectedDeveloper === 'all' || listing.developer === selectedDeveloper;
+				selectedDeveloper === 'all' || listing.developerName === selectedDeveloper;
 			const matchesAgent =
 				selectedAgent === 'all' || (listing.listedByEmails ?? []).includes(selectedAgent);
-			const matchesPropertyType =
-				selectedPropertyType === 'all' || listing.propertyType === selectedPropertyType;
+			const matchesUnitType = selectedUnitType === 'all' || listing.unitType === selectedUnitType;
 
-			return matchesSearch && matchesDeveloper && matchesAgent && matchesPropertyType;
+			return matchesSearch && matchesDeveloper && matchesAgent && matchesUnitType;
 		});
 	});
 
@@ -72,30 +71,9 @@
 	}
 
 	function getBedroomOrSize(listing: Listing) {
-		if (
-			listing.propertyType === 'apartment' ||
-			listing.propertyType === 'townhouse' ||
-			listing.propertyType === 'villa'
-		) {
-			return listing.bedroomType ? listing.bedroomType.replace('-', '/').replace('+', ' + ') : '-';
-		}
-		if (listing.propertyType === 'commercial') {
-			if (listing.commercialSubType === 'warehouse') {
-				return `Size: ${listing.propertySize ?? '-'} | GFA: ${listing.grossFloorArea ?? '-'}`;
-			}
-			return `Size: ${listing.propertySize ?? '-'}`;
-		}
-		if (listing.propertyType === 'plot') {
-			return `Plot: ${listing.plotArea ?? '-'}`;
-		}
-		return '-';
-	}
-
-	function toTitleCase(value: string) {
-		return value
-			.split('-')
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
+		if (listing.bedrooms) return listing.bedrooms;
+		if (listing.plotSize) return `Plot: ${listing.plotSize.toLocaleString()} sqft`;
+		return `${listing.unitArea.toLocaleString()} sqft`;
 	}
 </script>
 
@@ -126,11 +104,11 @@
 	</select>
 	<select
 		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-		bind:value={selectedPropertyType}
+		bind:value={selectedUnitType}
 	>
-		{#each propertyTypeOptions as option (option)}
+		{#each unitTypeOptions as option (option)}
 			<option value={option}>
-				{option === 'all' ? 'All Property Types' : toTitleCase(option)}
+				{option === 'all' ? 'All Unit Types' : option}
 			</option>
 		{/each}
 	</select>
@@ -143,11 +121,11 @@
 				<Table.Head>Client Name</Table.Head>
 				<Table.Head>Listing ID</Table.Head>
 				<Table.Head>Property</Table.Head>
-				<Table.Head>Property Type</Table.Head>
+				<Table.Head>Project Type</Table.Head>
 				<Table.Head>Bedrooms / Size</Table.Head>
-				<Table.Head class="text-right">Buying Price</Table.Head>
-				<Table.Head class="text-right">Selling Price</Table.Head>
-				<Table.Head class="text-right">DxB Price</Table.Head>
+				<Table.Head class="text-right">Original Price</Table.Head>
+				<Table.Head class="text-right">Expected Price</Table.Head>
+				<Table.Head class="text-right">DLD/DXB Price</Table.Head>
 				<Table.Head>Created By</Table.Head>
 				<Table.Head>Listing Type</Table.Head>
 				{#if hasActions}
@@ -182,15 +160,17 @@
 						<Table.Cell class="font-medium">{listing.clientName}</Table.Cell>
 						<Table.Cell class="font-mono text-xs font-medium">{listing.id}</Table.Cell>
 						<Table.Cell>
-							<div class="font-medium">{listing.project}</div>
-							<div class="text-sm text-muted-foreground">{listing.developer}</div>
+							<div class="font-medium">{listing.projectName}</div>
+							<div class="text-sm text-muted-foreground">{listing.developerName}</div>
 						</Table.Cell>
-						<Table.Cell>{toTitleCase(listing.propertyType)}</Table.Cell>
+						<Table.Cell>{listing.projectType}</Table.Cell>
 						<Table.Cell>{getBedroomOrSize(listing)}</Table.Cell>
-						<Table.Cell class="text-right">{formatMoney(listing.buyingPrice)}</Table.Cell>
-						<Table.Cell class="text-right">{formatMoney(listing.sellingPrice)}</Table.Cell>
 						<Table.Cell class="text-right">
-							{listing.dxbPrice == null ? '-' : formatMoney(listing.dxbPrice)}
+							{listing.purchasePrice == null ? '-' : formatMoney(listing.purchasePrice)}
+						</Table.Cell>
+						<Table.Cell class="text-right">{formatMoney(listing.price)}</Table.Cell>
+						<Table.Cell class="text-right">
+							{listing.originalPrice == null ? '-' : formatMoney(listing.originalPrice)}
 						</Table.Cell>
 						<Table.Cell class="max-w-48 truncate text-sm text-muted-foreground">
 							{listing.createdByEmail || '-'}

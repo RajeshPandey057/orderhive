@@ -18,6 +18,15 @@
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import {
+		APARTMENT_BEDROOM_OPTIONS,
+		COMMERCIAL_SUB_TYPE_OPTIONS,
+		PROPERTY_TYPE_OPTIONS,
+		SALE_COMMUNITY_OPTIONS,
+		SALE_DEVELOPER_OPTIONS,
+		SALE_TYPE_OPTIONS,
+		TOWNHOUSE_VILLA_BEDROOM_OPTIONS
+	} from '$lib/listing-options';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
@@ -358,97 +367,13 @@
 		if (input) input.value = '';
 	};
 
-	const saleTypes = [
-		{ value: 'off-plan', label: 'Off Plan' },
-		{ value: 'secondary', label: 'Secondary' }
-	];
-	const developers = [
-		{ value: 'al-wasl', label: 'Al Wasl' },
-		{ value: 'aldar', label: 'Aldar' },
-		{ value: 'alef', label: 'Alef' },
-		{ value: 'arada', label: 'Arada' },
-		{ value: 'ayat', label: 'Ayat' },
-		{ value: 'azizi', label: 'Azizi' },
-		{ value: 'binghatti', label: 'Binghatti' },
-		{ value: 'damac', label: 'Damac' },
-		{ value: 'danube', label: 'Danube' },
-		{ value: 'deyaar', label: 'Deyaar' },
-		{ value: 'dgm-vision', label: 'Dgm Vision' },
-		{ value: 'dubai-properties', label: 'Dubai Properties' },
-		{ value: 'dubai-south', label: 'Dubai South' },
-		{ value: 'dvm-properties', label: 'DVM Properties' },
-		{ value: 'ellington', label: 'Ellington' },
-		{ value: 'emaar', label: 'Emaar' },
-		{ value: 'expo', label: 'Expo' },
-		{ value: 'london-gate', label: 'London Gate' },
-		{ value: 'majid-al-futtaim', label: 'Majid Al Futtaim' },
-		{ value: 'meraas', label: 'Meraas' },
-		{ value: 'refine', label: 'Refine' },
-		{ value: 'reportage', label: 'Reportage' },
-		{ value: 'siroya', label: 'Siroya' },
-		{ value: 'sobha', label: 'Sobha' },
-		{ value: 'stella', label: 'Stella' },
-		{ value: 'townx', label: 'TownX' },
-		{ value: 'union-properties', label: 'Union Properties' },
-		{ value: 'urban', label: 'Urban' },
-		{ value: 'vision', label: 'Vision' },
-		{ value: 'zaya', label: 'Zaya' }
-	];
-	const communities = [
-		{ value: 'arabian-ranches', label: 'Arabian Ranches' },
-		{ value: 'business-bay', label: 'Business Bay' },
-		{ value: 'creek-harbour', label: 'Creek Harbour' },
-		{ value: 'damac-hills', label: 'DAMAC Hills' },
-		{ value: 'dubai-creek-island', label: 'Dubai Creek Island' },
-		{ value: 'dubai-hills-estate', label: 'Dubai Hills Estate' },
-		{ value: 'dubai-marina', label: 'Dubai Marina' },
-		{ value: 'dubai-south', label: 'Dubai South' },
-		{ value: 'downtown-dubai', label: 'Downtown Dubai' },
-		{ value: 'emirates-hills', label: 'Emirates Hills' },
-		{ value: 'jbr', label: 'JBR (Jumeirah Beach Residence)' },
-		{ value: 'jlt', label: 'JLT (Jumeirah Lake Towers)' },
-		{ value: 'jvc', label: 'JVC (Jumeirah Village Circle)' },
-		{ value: 'meydan', label: 'Meydan' },
-		{ value: 'mirdif', label: 'Mirdif' },
-		{ value: 'palm-jumeirah', label: 'Palm Jumeirah' },
-		{ value: 'silicon-oasis', label: 'Silicon Oasis' },
-		{ value: 'sports-city', label: 'Sports City' },
-		{ value: 'tilal-al-ghaf', label: 'Tilal Al Ghaf' },
-		{ value: 'town-square', label: 'Town Square' }
-	];
-	const propertyTypes = [
-		{ value: 'apartment', label: 'Apartment' },
-		{ value: 'townhouse', label: 'Townhouse' },
-		{ value: 'villa', label: 'Villa' },
-		{ value: 'commercial', label: 'Commercial' },
-		{ value: 'plot', label: 'Plot' }
-	];
-
-	const apartmentBedrooms = [
-		{ value: 'studio', label: 'Studio' },
-		{ value: '1bed', label: '1 Bed' },
-		{ value: '2bed', label: '2 Bed' },
-		{ value: '2bed+maid', label: '2 Bed + Maid' },
-		{ value: '3bed', label: '3 Bed' },
-		{ value: '3bed+maid', label: '3 Bed + Maid' },
-		{ value: '4bed', label: '4 Bed' },
-		{ value: 'duplex', label: 'Duplex' },
-		{ value: 'penthouse', label: 'Penthouse' },
-		{ value: 'podium-townhouse', label: 'Podium Townhouse' }
-	];
-
-	const townhouseVillaBedrooms = [
-		{ value: '2bed', label: '2 Bed' },
-		{ value: '3bed', label: '3 Bed' },
-		{ value: '4bed', label: '4 Bed' },
-		{ value: '5bed', label: '5 Bed' },
-		{ value: '6-7bed', label: '6/7 Bed' }
-	];
-
-	const commercialSubTypes = [
-		{ value: 'office', label: 'Office Space' },
-		{ value: 'warehouse', label: 'Warehouse' }
-	];
+	const saleTypes = SALE_TYPE_OPTIONS;
+	const developers = SALE_DEVELOPER_OPTIONS;
+	const communities = SALE_COMMUNITY_OPTIONS;
+	const propertyTypes = PROPERTY_TYPE_OPTIONS;
+	const apartmentBedrooms = APARTMENT_BEDROOM_OPTIONS;
+	const townhouseVillaBedrooms = TOWNHOUSE_VILLA_BEDROOM_OPTIONS;
+	const commercialSubTypes = COMMERCIAL_SUB_TYPE_OPTIONS;
 
 	const saleTypeLabel = $derived(
 		saleTypes.find((d) => d.value === updateSale.fields.saleType.value())?.label ?? 'Sale Type'

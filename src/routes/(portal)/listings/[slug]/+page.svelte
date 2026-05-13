@@ -16,12 +16,12 @@
 	const listing = $derived(data.firestoreListing as Listing | null);
 
 	const propertyTypeLabel = $derived(
-		(listing?.propertyType ?? '').charAt(0).toUpperCase() + (listing?.propertyType ?? '').slice(1)
+		(listing?.unitType ?? '').charAt(0).toUpperCase() + (listing?.unitType ?? '').slice(1)
 	);
 
 	const bedroomLabel = $derived(
-		listing?.bedroomType
-			? listing.bedroomType.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed')
+		listing?.bedrooms
+			? listing.bedrooms.replace('-', '/').replace('+', ' + ').replace('bed', ' Bed')
 			: 'N/A'
 	);
 
@@ -63,12 +63,12 @@
 				<section class="rounded-xl border border-border bg-card p-5 sm:p-6">
 					<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 						<div>
-							<h1 class="text-2xl font-bold text-foreground sm:text-3xl">{listing.project}</h1>
+							<h1 class="text-2xl font-bold text-foreground sm:text-3xl">{listing.projectName}</h1>
 							<p class="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
 								<MapPinIcon class="h-4 w-4" />
-								{listing.propertyAddress.buildingName ?? listing.project}, {listing.propertyAddress
+								{listing.propertyAddress.buildingName ?? listing.projectName}, {listing.propertyAddress
 									.area ??
-									listing.community ??
+									listing.location ??
 									'Area N/A'}, {listing.propertyAddress.city ?? 'City N/A'}
 							</p>
 							<p class="mt-1 text-xs text-muted-foreground">
@@ -79,7 +79,7 @@
 							</p>
 						</div>
 						<p class="text-2xl font-bold text-foreground sm:text-3xl">
-							AED {formatPrice(listing.sellingPrice)}
+							AED {formatPrice(listing.price)}
 						</p>
 					</div>
 					<div class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
@@ -102,7 +102,7 @@
 					<ListingMediaGallery
 						mediaItems={mediaItems}
 						listingId={listing.id}
-						listingTitle={listing.project}
+						listingTitle={listing.projectName}
 					/>
 				</section>
 
@@ -115,17 +115,17 @@
 						<div class="space-y-3 text-sm">
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Developer</span><span
-									class="text-right font-medium">{listing.developer}</span
+									class="text-right font-medium">{listing.developerName}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Community</span><span
-									class="text-right font-medium">{listing.community ?? 'N/A'}</span
+									class="text-right font-medium">{listing.location ?? 'N/A'}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Property Size</span><span
-									class="text-right font-medium">{listing.propertySize ?? 'N/A'} sqft</span
+									class="text-right font-medium">{listing.unitArea ?? 'N/A'} sqft</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
@@ -135,17 +135,17 @@
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Plot Area</span><span
-									class="text-right font-medium">{listing.plotArea ?? 'N/A'} sqft</span
+									class="text-right font-medium">{listing.plotSize ?? 'N/A'} sqft</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Gross Floor Area</span><span
-									class="text-right font-medium">{listing.grossFloorArea ?? 'N/A'} sqft</span
+									class="text-right font-medium">{listing.builtUpArea ?? 'N/A'} sqft</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Commercial Type</span><span
-									class="text-right font-medium">{listing.commercialSubType ?? 'N/A'}</span
+									class="text-right font-medium">{listing.unitType ?? 'N/A'}</span
 								>
 							</div>
 						</div>
@@ -159,23 +159,23 @@
 						<div class="space-y-3 text-sm">
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Buying Price</span><span
-									class="text-right font-medium">AED {formatPrice(listing.buyingPrice)}</span
+									class="text-right font-medium">AED {formatPrice(listing.purchasePrice ?? 0)}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Liquidity Invested</span><span
-									class="text-right font-medium">AED {formatPrice(listing.liquidityInvested)}</span
+									class="text-right font-medium">AED {formatPrice(listing.amountPaid ?? 0)}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">Selling Price</span><span
-									class="text-right font-medium">AED {formatPrice(listing.sellingPrice)}</span
+									class="text-right font-medium">AED {formatPrice(listing.price)}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">DxB Price</span><span
 									class="text-right font-medium"
-									>{listing.dxbPrice == null ? 'N/A' : `AED ${formatPrice(listing.dxbPrice)}`}</span
+									>{listing.originalPrice == null ? 'N/A' : `AED ${formatPrice(listing.originalPrice)}`}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">

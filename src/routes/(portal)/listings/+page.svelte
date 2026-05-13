@@ -98,7 +98,7 @@
 	}
 
 	function getListingSlug(listing: Listing): string {
-		return `${slugify(listing.project)}-${listing.id.toLowerCase()}`;
+		return `${slugify(listing.projectName)}-${listing.id.toLowerCase()}`;
 	}
 
 	function getListingUrl(listing: Listing): string {
@@ -111,11 +111,11 @@
 		allListings.filter((l) => {
 			const matchPropertyName =
 				!propertyNameSearch ||
-				l.project.toLowerCase().includes(propertyNameSearch.toLowerCase()) ||
+				l.projectName.toLowerCase().includes(propertyNameSearch.toLowerCase()) ||
 				(l.propertyAddress.buildingName ?? '')
 					.toLowerCase()
 					.includes(propertyNameSearch.toLowerCase()) ||
-				(l.developer ?? '').toLowerCase().includes(propertyNameSearch.toLowerCase());
+				(l.developerName ?? '').toLowerCase().includes(propertyNameSearch.toLowerCase());
 
 			const matchLocation =
 				!locationSearch ||
@@ -123,33 +123,33 @@
 					.join(' ')
 					.toLowerCase()
 					.includes(locationSearch.toLowerCase()) ||
-				l.project.toLowerCase().includes(locationSearch.toLowerCase()) ||
-				(l.community ?? '').toLowerCase().includes(locationSearch.toLowerCase());
+				l.projectName.toLowerCase().includes(locationSearch.toLowerCase()) ||
+				(l.location ?? '').toLowerCase().includes(locationSearch.toLowerCase());
 
 			const matchType =
 				!propertyTypeFilter ||
 				(propertyTypeFilter === 'residential'
-					? ['apartment', 'villa', 'townhouse'].includes(l.propertyType)
+					? ['apartment', 'villa', 'townhouse'].includes(l.unitType)
 					: propertyTypeFilter === 'commercial'
-						? l.propertyType === 'commercial'
+						? l.unitType === 'commercial'
 						: true);
 
 			const matchPrice =
-				(!priceMin || l.sellingPrice >= Number(priceMin)) &&
-				(!priceMax || l.sellingPrice <= Number(priceMax));
+				(!priceMin || l.price >= Number(priceMin)) &&
+				(!priceMax || l.price <= Number(priceMax));
 
 			const matchArea =
-				!areaMin || (l.builtUpArea ?? l.propertySize ?? l.plotArea ?? 0) >= Number(areaMin);
+				!areaMin || (l.builtUpArea ?? l.unitArea ?? l.plotSize ?? 0) >= Number(areaMin);
 
 			const matchBeds =
 				!bedsFilter ||
-				(bedsFilter === 'studio' && l.bedroomType === 'studio') ||
-				(bedsFilter === '1' && l.bedroomType === '1bed') ||
-				(bedsFilter === '2' && (l.bedroomType === '2bed' || l.bedroomType === '2bed+maid')) ||
-				(bedsFilter === '3' && (l.bedroomType === '3bed' || l.bedroomType === '3bed+maid')) ||
+				(bedsFilter === 'studio' && l.bedrooms === 'studio') ||
+				(bedsFilter === '1' && l.bedrooms === '1bed') ||
+				(bedsFilter === '2' && (l.bedrooms === '2bed' || l.bedrooms === '2bed+maid')) ||
+				(bedsFilter === '3' && (l.bedrooms === '3bed' || l.bedrooms === '3bed+maid')) ||
 				(bedsFilter === '4+' &&
 					['4bed', '5bed', '6-7bed', 'duplex', 'penthouse', 'podium-townhouse'].includes(
-						l.bedroomType ?? ''
+						l.bedrooms ?? ''
 					));
 
 			return (
@@ -349,7 +349,7 @@
 						class="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md sm:flex-row"
 						role="link"
 						tabindex="0"
-						aria-label={`View details for ${listing.project}`}
+						aria-label={`View details for ${listing.projectName}`}
 						onclick={() => (window.location.href = getListingUrl(listing))}
 						onkeydown={(event) => {
 							if (event.key === 'Enter' || event.key === ' ') {
@@ -362,7 +362,7 @@
 						<div class="relative h-52 w-full shrink-0 overflow-hidden sm:h-auto sm:w-56">
 							<img
 								src={getImageUrl(listing)}
-								alt={listing.project}
+								alt={listing.projectName}
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="lazy"
 							/>
@@ -395,7 +395,7 @@
 								<!-- Name & Address -->
 								<div>
 									<h3 class="text-sm leading-tight font-semibold text-foreground">
-										{listing.project}
+										{listing.projectName}
 									</h3>
 									<p class="mt-0.5 text-xs text-muted-foreground">
 										{listing.propertyAddress.buildingName
@@ -406,7 +406,7 @@
 
 								<!-- Price -->
 								<p class="text-lg font-bold text-foreground">
-									AED {formatPrice(listing.sellingPrice)}
+									AED {formatPrice(listing.price)}
 								</p>
 
 								<!-- Property meta row -->
@@ -414,19 +414,19 @@
 									<span
 										class="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground"
 									>
-										{propertyTypeLabels[listing.propertyType]}
+										{propertyTypeLabels[listing.unitType]}
 									</span>
 
-									{#if listing.bedroomType !== 'studio'}
+									{#if listing.bedrooms !== 'studio'}
 										<span class="flex items-center gap-1">
 											<BedDoubleIcon class="h-3.5 w-3.5" />
-											{getBedroomLabel(listing.bedroomType)}
+											{getBedroomLabel(listing.bedrooms)}
 										</span>
 									{/if}
 
 									<span class="flex items-center gap-1">
 										<BathIcon class="h-3.5 w-3.5" />
-										{getBathroomCount(listing.bedroomType)}
+										{getBathroomCount(listing.bedrooms)}
 									</span>
 
 									{#if listing.builtUpArea}
@@ -439,7 +439,7 @@
 
 								<!-- Highlights -->
 								<p class="line-clamp-3 text-xs font-medium text-teal-600 sm:line-clamp-2">
-									{listing.developer} | {listing.community}
+									{listing.developerName} | {listing.location}
 								</p>
 							</div>
 
@@ -448,7 +448,7 @@
 								<div class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
 									<MapPinIcon class="h-3 w-3 shrink-0" />
 									<span class="truncate">
-										{listing.community ?? listing.propertyAddress.area}, {listing.propertyAddress
+										{listing.location ?? listing.propertyAddress.area}, {listing.propertyAddress
 											.city}
 									</span>
 								</div>

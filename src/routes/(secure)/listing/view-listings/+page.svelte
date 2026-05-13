@@ -1,9 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { browser } from '$app/environment';
+	import {
+		BEDROOM_OPTIONS,
+		DUBAI_COMMUNITIES,
+		HANDOVER_QUARTERS,
+		HANDOVER_YEARS,
+		LISTING_CITIES,
+		LISTING_DEVELOPERS,
+		UNIT_TYPES
+	} from '$lib/listing-options';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { SvelteSet } from 'svelte/reactivity';
-	import BathIcon from '~icons/lucide/bath';
 	import BedDoubleIcon from '~icons/lucide/bed-double';
 	import BookmarkIcon from '~icons/lucide/bookmark';
 	import Building2Icon from '~icons/lucide/building-2';
@@ -12,43 +21,23 @@
 	import MapPinIcon from '~icons/lucide/map-pin';
 	import Maximize2Icon from '~icons/lucide/maximize-2';
 	import SearchIcon from '~icons/lucide/search';
-	import SlidersHorizontalIcon from '~icons/lucide/sliders-horizontal';
 
 	let { data } = $props();
 
-	let searchQuery = $state('');
-	let propertyTypeFilter = $state('');
-	let listingTypeFilter = $state('');
+	let developerFilter = $state('');
+	let projectFilter = $state('');
+	let cityFilter = $state('');
+	let communityFilter = $state('');
+	let handoverFilter = $state('');
+	let projectTypeFilter = $state('');
+	let unitTypeFilter = $state('');
 	let bedsFilter = $state('');
-	let showMoreFilters = $state(false);
 	let priceMin = $state('');
 	let priceMax = $state('');
-	let areaMin = $state('');
-	let distressOnly = $state(false);
+	let distressFilter = $state('');
+	let sortFilter = $state('new');
 	let savedListings = $state<Set<string>>(new Set());
-
-	const bedroomLabels: Record<string, string> = {
-		studio: 'Studio',
-		'1bed': '1',
-		'2bed': '2',
-		'2bed+maid': '2+M',
-		'3bed': '3',
-		'3bed+maid': '3+M',
-		'4bed': '4',
-		'5bed': '5',
-		'6-7bed': '6-7',
-		duplex: 'Duplex',
-		penthouse: 'PH',
-		'podium-townhouse': 'PT'
-	};
-
-	const propertyTypeLabels: Record<string, string> = {
-		apartment: 'Apartment',
-		townhouse: 'Townhouse',
-		villa: 'Villa',
-		commercial: 'Commercial',
-		plot: 'Plot'
-	};
+	let initializedFromUrl = $state(false);
 
 	function formatPrice(price: number): string {
 		return new Intl.NumberFormat('en-AE').format(price);
@@ -57,30 +46,6 @@
 	function getImageUrl(listing: Listing): string {
 		const firstPhoto = listing.mediaAssets?.find((a) => a.type === 'photo' && a.url);
 		return firstPhoto?.url ?? `https://picsum.photos/seed/${listing.id}/560/380`;
-	}
-
-	function getBedroomLabel(type?: string): string {
-		if (!type) return '—';
-		return bedroomLabels[type] ?? type;
-	}
-
-	function getBathroomCount(type?: string): string {
-		if (!type) return '1';
-		const map: Record<string, string> = {
-			studio: '1',
-			'1bed': '1',
-			'2bed': '2',
-			'2bed+maid': '2',
-			'3bed': '2',
-			'3bed+maid': '3',
-			'4bed': '4',
-			'5bed': '5',
-			'6-7bed': '6',
-			duplex: '3',
-			penthouse: '4',
-			'podium-townhouse': '3'
-		};
-		return map[type] ?? '1';
 	}
 
 	function toggleSave(id: string) {
@@ -106,72 +71,138 @@
 	}
 
 	function getPortalUrl(listing: Listing): string {
-		return resolve(`/listings/${slugify(listing.project)}-${listing.id.toLowerCase()}`);
+		return resolve(`/listings/${slugify(listing.projectName)}-${listing.id.toLowerCase()}`);
 	}
 
 	const allListings = $derived((data.listings ?? []) as Listing[]);
+	const projectOptions = $derived([
+		...new Set(allListings.map((listing) => listing.projectName).filter(Boolean))
+	].sort());
+	const handoverOptions = $derived([
+		...new Set(
+			allListings
+				.map((listing) =>
+					listing.handoverYear && listing.handoverQuarter
+						? `${listing.handoverYear}-${listing.handoverQuarter}`
+						: ''
+				)
+				.filter(Boolean)
+		)
+	].sort());
+
+	function getDistressType(listing: Listing): 'market' | 'original' | 'normal' {
+		const salePrice = listing.price;
+		const dldPrice = listing.originalPrice ?? 0;
+		const originalPurchase = listing.purchasePrice ?? 0;
+		if (dldPrice > 0 && salePrice < dldPrice) return 'market';
+		if (originalPurchase > 0 && salePrice < originalPurchase) return 'original';
+		return 'normal';
+	}
+
+	function getDistressLabel(type: 'market' | 'original' | 'normal') {
+		if (type === 'market') return 'Below Market';
+		if (type === 'original') return 'Below Original Price';
+		return 'Normal Listing';
+	}
 
 	const filteredListings = $derived(
-		allListings.filter((l) => {
-			const q = searchQuery.trim().toLowerCase();
-			const matchSearch =
-				!q ||
-				l.clientName.toLowerCase().includes(q) ||
-				l.project.toLowerCase().includes(q) ||
-				l.developer.toLowerCase().includes(q) ||
-				l.unitNo.toLowerCase().includes(q) ||
-				(l.community ?? '').toLowerCase().includes(q) ||
-				Object.values(l.propertyAddress).join(' ').toLowerCase().includes(q) ||
-				(l.listedByEmails ?? []).some((e) => e.toLowerCase().includes(q));
-
-			const matchType = !propertyTypeFilter || l.propertyType === propertyTypeFilter;
-
-			const matchListingType = !listingTypeFilter || l.listingType === listingTypeFilter;
+		allListings
+			.filter((l) => {
+				const salePrice = l.price;
+				const location = l.location;
+				const handover =
+					l.handoverYear && l.handoverQuarter ? `${l.handoverYear}-${l.handoverQuarter}` : '';
+				const matchDeveloper = !developerFilter || l.developerName === developerFilter;
+				const matchProject = !projectFilter || l.projectName === projectFilter;
+				const matchCity = !cityFilter || l.city === cityFilter;
+				const matchCommunity = !communityFilter || location === communityFilter;
+				const matchHandover = !handoverFilter || handover === handoverFilter;
+				const matchProjectType = !projectTypeFilter || l.projectType === projectTypeFilter;
+				const matchUnitType = !unitTypeFilter || l.unitType === unitTypeFilter;
 
 			const matchBeds =
 				!bedsFilter ||
-				(bedsFilter === 'studio' && l.bedroomType === 'studio') ||
-				(bedsFilter === '1' && l.bedroomType === '1bed') ||
-				(bedsFilter === '2' && (l.bedroomType === '2bed' || l.bedroomType === '2bed+maid')) ||
-				(bedsFilter === '3' && (l.bedroomType === '3bed' || l.bedroomType === '3bed+maid')) ||
-				(bedsFilter === '4+' &&
-					['4bed', '5bed', '6-7bed', 'duplex', 'penthouse', 'podium-townhouse'].includes(
-						l.bedroomType ?? ''
-					));
+				l.bedrooms === bedsFilter ||
+				l.bedrooms === bedsFilter.replace(' Bed', '');
 
 			const matchPrice =
-				(!priceMin || l.sellingPrice >= Number(priceMin)) &&
-				(!priceMax || l.sellingPrice <= Number(priceMax));
+				(!priceMin || salePrice >= Number(priceMin)) &&
+				(!priceMax || salePrice <= Number(priceMax));
 
-			const matchArea =
-				!areaMin || (l.builtUpArea ?? l.propertySize ?? l.plotArea ?? 0) >= Number(areaMin);
-
-			const matchDistress =
-				!distressOnly ||
-				(typeof l.dxbPrice === 'number' && l.dxbPrice > 0 && l.sellingPrice < l.dxbPrice);
+				const matchDistress = !distressFilter || getDistressType(l) === distressFilter;
 
 			return (
-				matchSearch &&
-				matchType &&
-				matchListingType &&
+				matchDeveloper &&
+				matchProject &&
+				matchCity &&
+				matchCommunity &&
+				matchHandover &&
+				matchProjectType &&
+				matchUnitType &&
 				matchBeds &&
 				matchPrice &&
-				matchArea &&
 				matchDistress
 			);
-		})
+			})
+			.sort((a, b) => {
+				if (sortFilter === 'old') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+				if (sortFilter === 'price-asc') return a.price - b.price;
+				if (sortFilter === 'price-desc') return b.price - a.price;
+				return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+			})
 	);
 
 	function clearFilters() {
-		searchQuery = '';
-		propertyTypeFilter = '';
-		listingTypeFilter = '';
+		developerFilter = '';
+		projectFilter = '';
+		cityFilter = '';
+		communityFilter = '';
+		handoverFilter = '';
+		projectTypeFilter = '';
+		unitTypeFilter = '';
 		bedsFilter = '';
 		priceMin = '';
 		priceMax = '';
-		areaMin = '';
-		distressOnly = false;
+		distressFilter = '';
+		sortFilter = 'new';
 	}
+
+	$effect(() => {
+		if (!browser || initializedFromUrl) return;
+		const params = new URLSearchParams(window.location.search);
+		developerFilter = params.get('developer') ?? '';
+		projectFilter = params.get('project') ?? '';
+		cityFilter = params.get('city') ?? '';
+		communityFilter = params.get('community') ?? '';
+		handoverFilter = params.get('handover') ?? '';
+		priceMin = params.get('minPrice') ?? '';
+		priceMax = params.get('maxPrice') ?? '';
+		projectTypeFilter = params.get('projectType') ?? '';
+		unitTypeFilter = params.get('unitType') ?? '';
+		bedsFilter = params.get('beds') ?? '';
+		distressFilter = params.get('distress') ?? '';
+		sortFilter = params.get('sort') ?? 'new';
+		initializedFromUrl = true;
+	});
+
+	$effect(() => {
+		if (!browser || !initializedFromUrl) return;
+		const params = new URLSearchParams();
+		if (developerFilter) params.set('developer', developerFilter);
+		if (projectFilter) params.set('project', projectFilter);
+		if (cityFilter) params.set('city', cityFilter);
+		if (communityFilter) params.set('community', communityFilter);
+		if (handoverFilter) params.set('handover', handoverFilter);
+		if (priceMin) params.set('minPrice', priceMin);
+		if (priceMax) params.set('maxPrice', priceMax);
+		if (projectTypeFilter) params.set('projectType', projectTypeFilter);
+		if (unitTypeFilter) params.set('unitType', unitTypeFilter);
+		if (bedsFilter) params.set('beds', bedsFilter);
+		if (distressFilter) params.set('distress', distressFilter);
+		if (sortFilter !== 'new') params.set('sort', sortFilter);
+		const query = params.toString();
+		window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+	});
 </script>
 
 <header
@@ -191,137 +222,89 @@
 
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
 	<!-- Filters bar -->
-	<div class="rounded-xl border border-border bg-card p-4">
-		<div class="flex flex-col gap-3 xl:flex-row xl:items-center">
-			<!-- Search -->
-			<div class="relative min-w-0 flex-1">
-				<SearchIcon
-					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+		<div class="rounded-xl border border-border bg-card p-4">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+				<select bind:value={developerFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Developers</option>
+					{#each LISTING_DEVELOPERS as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={projectFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Projects</option>
+					{#each projectOptions as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={cityFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Cities</option>
+					{#each LISTING_CITIES as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={communityFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Communities</option>
+					{#each DUBAI_COMMUNITIES.filter((option) => option !== 'Others') as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={handoverFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">Any Handover</option>
+					{#each handoverOptions.length ? handoverOptions : HANDOVER_YEARS.flatMap((year) => HANDOVER_QUARTERS.map((quarter) => `${year}-${quarter}`)) as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<input
+					type="number"
+					placeholder="Min Price (AED)"
+					bind:value={priceMin}
+					class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
 				/>
 				<input
-					type="text"
-					placeholder="Search by client, project, developer, unit, agent…"
-					bind:value={searchQuery}
-					class="h-10 w-full rounded-lg border border-input bg-background pr-4 pl-9 text-sm placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 focus:outline-none"
+					type="number"
+					placeholder="Max Price (AED)"
+					bind:value={priceMax}
+					class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
 				/>
+				<select bind:value={projectTypeFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Types</option>
+					<option>Off-Plan Property</option>
+					<option>Ready Property</option>
+				</select>
+				<select bind:value={unitTypeFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Unit Types</option>
+					{#each UNIT_TYPES.filter((option) => option !== 'Others') as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={bedsFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">Any Bedrooms</option>
+					{#each BEDROOM_OPTIONS as option (option)}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={distressFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="">All Listings</option>
+					<option value="market">Below Market</option>
+					<option value="original">Below Original Price</option>
+					<option value="normal">Normal Listing</option>
+				</select>
+				<select bind:value={sortFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+					<option value="new">Recently Added</option>
+					<option value="old">Oldest First</option>
+					<option value="price-asc">Price: Low to High</option>
+					<option value="price-desc">Price: High to Low</option>
+				</select>
 			</div>
-
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:flex xl:items-center">
-				<!-- Property type -->
-				<div class="relative">
-					<select
-						bind:value={propertyTypeFilter}
-						class="h-10 w-full appearance-none rounded-lg border border-input bg-background pr-9 pl-4 text-sm focus:border-ring focus:ring-2 focus:ring-ring/20 focus:outline-none xl:w-auto"
-					>
-						<option value="">All Types</option>
-						<option value="apartment">Apartment</option>
-						<option value="townhouse">Townhouse</option>
-						<option value="villa">Villa</option>
-						<option value="commercial">Commercial</option>
-						<option value="plot">Plot</option>
-					</select>
-					<ChevronDownIcon
-						class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-					/>
-				</div>
-
-				<!-- Listing type -->
-				<div class="relative">
-					<select
-						bind:value={listingTypeFilter}
-						class="h-10 w-full appearance-none rounded-lg border border-input bg-background pr-9 pl-4 text-sm focus:border-ring focus:ring-2 focus:ring-ring/20 focus:outline-none xl:w-auto"
-					>
-						<option value="">All Listings</option>
-						<option value="internal">Internal</option>
-						<option value="portal">Portal</option>
-					</select>
-					<ChevronDownIcon
-						class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-					/>
-				</div>
-
-				<!-- Beds -->
-				<div class="relative">
-					<select
-						bind:value={bedsFilter}
-						class="h-10 w-full appearance-none rounded-lg border border-input bg-background pr-9 pl-4 text-sm focus:border-ring focus:ring-2 focus:ring-ring/20 focus:outline-none xl:w-auto"
-					>
-						<option value="">Beds & Baths</option>
-						<option value="studio">Studio</option>
-						<option value="1">1 Bed</option>
-						<option value="2">2 Beds</option>
-						<option value="3">3 Beds</option>
-						<option value="4+">4+ Beds</option>
-					</select>
-					<ChevronDownIcon
-						class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-					/>
-				</div>
-
-				<!-- More filters toggle -->
+			<div class="mt-3 flex justify-end">
 				<button
-					onclick={() => (showMoreFilters = !showMoreFilters)}
-					class="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 text-sm transition-colors hover:bg-accent xl:w-auto"
-					class:bg-primary={showMoreFilters}
-					class:text-primary-foreground={showMoreFilters}
-					class:border-primary={showMoreFilters}
+					onclick={clearFilters}
+					class="h-9 rounded-lg border border-input px-4 text-sm text-muted-foreground hover:bg-accent"
 				>
-					<SlidersHorizontalIcon class="h-4 w-4" />
-					<span>More Filters</span>
-				</button>
-				<button
-					onclick={() => (distressOnly = !distressOnly)}
-					class="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 text-sm transition-colors hover:bg-accent xl:w-auto"
-					class:bg-primary={distressOnly}
-					class:text-primary-foreground={distressOnly}
-					class:border-primary={distressOnly}
-				>
-					Distress
+					Clear
 				</button>
 			</div>
 		</div>
-
-		{#if showMoreFilters}
-			<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-3">
-				<div class="flex flex-col gap-1">
-					<label for="vl-price-min" class="text-xs font-medium text-muted-foreground"
-						>Min Price (AED)</label
-					>
-					<input
-						id="vl-price-min"
-						type="number"
-						placeholder="500,000"
-						bind:value={priceMin}
-						class="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring/20 focus:outline-none"
-					/>
-				</div>
-				<div class="flex flex-col gap-1">
-					<label for="vl-price-max" class="text-xs font-medium text-muted-foreground"
-						>Max Price (AED)</label
-					>
-					<input
-						id="vl-price-max"
-						type="number"
-						placeholder="5,000,000"
-						bind:value={priceMax}
-						class="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring/20 focus:outline-none"
-					/>
-				</div>
-				<div class="flex flex-col gap-1">
-					<label for="vl-area-min" class="text-xs font-medium text-muted-foreground"
-						>Min Area (sqft)</label
-					>
-					<input
-						id="vl-area-min"
-						type="number"
-						placeholder="500"
-						bind:value={areaMin}
-						class="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring/20 focus:outline-none"
-					/>
-				</div>
-			</div>
-		{/if}
-	</div>
 
 	<!-- Listings grid -->
 	{#if filteredListings.length === 0}
@@ -344,7 +327,7 @@
 					class="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md sm:flex-row"
 					role="link"
 					tabindex="0"
-					aria-label={`View details for ${listing.project}`}
+					aria-label={`View details for ${listing.projectName}`}
 					onclick={() => (window.location.href = getDetailUrl(listing))}
 					onkeydown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') {
@@ -357,7 +340,7 @@
 					<div class="relative h-52 w-full shrink-0 overflow-hidden sm:h-auto sm:w-52">
 						<img
 							src={getImageUrl(listing)}
-							alt={listing.project}
+							alt={listing.projectName}
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 							loading="lazy"
 						/>
@@ -394,7 +377,7 @@
 						<div class="space-y-1.5">
 							<div>
 								<h3 class="text-sm leading-tight font-semibold text-foreground">
-									{listing.project}
+									{listing.projectName}
 								</h3>
 								<p class="mt-0.5 text-xs text-muted-foreground">
 									{listing.propertyAddress.buildingName
@@ -405,11 +388,11 @@
 								</p>
 							</div>
 							<p class="text-lg font-bold text-foreground">
-								AED {formatPrice(listing.sellingPrice)}
+								AED {formatPrice(listing.price)}
 							</p>
-							{#if listing.dxbPrice != null}
+							{#if listing.originalPrice != null}
 								<p class="text-xs text-muted-foreground">
-									DxB AED {formatPrice(listing.dxbPrice)}
+									DLD/DXB AED {formatPrice(listing.originalPrice)}
 								</p>
 							{/if}
 							<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -417,27 +400,21 @@
 								<span
 									class="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground"
 								>
-									{propertyTypeLabels[listing.propertyType]}
+									{listing.unitType}
 								</span>
-								{#if listing.bedroomType && listing.bedroomType !== 'studio'}
+								{#if listing.bedrooms}
 									<span class="flex items-center gap-1">
 										<BedDoubleIcon class="h-3.5 w-3.5" />
-										{getBedroomLabel(listing.bedroomType)}
+										{listing.bedrooms}
 									</span>
 								{/if}
 								<span class="flex items-center gap-1">
-									<BathIcon class="h-3.5 w-3.5" />
-									{getBathroomCount(listing.bedroomType)}
+									<Maximize2Icon class="h-3.5 w-3.5" />
+									{listing.unitArea.toLocaleString()} sqft
 								</span>
-								{#if listing.builtUpArea}
-									<span class="flex items-center gap-1">
-										<Maximize2Icon class="h-3.5 w-3.5" />
-										{listing.builtUpArea.toLocaleString()} sqft
-									</span>
-								{/if}
 							</div>
 							<p class="line-clamp-2 text-xs font-medium text-teal-600">
-								{listing.developer}{listing.community ? ` | ${listing.community}` : ''}
+								{listing.developerName}{listing.location ? ` | ${listing.location}` : ''}
 							</p>
 							<p class="text-xs text-muted-foreground">
 								Client: {listing.clientName}
@@ -450,10 +427,7 @@
 							<div class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
 								<MapPinIcon class="h-3 w-3 shrink-0" />
 								<span class="truncate">
-									{listing.community ?? listing.propertyAddress.area ?? ''}{listing.propertyAddress
-										.city
-										? `, ${listing.propertyAddress.city}`
-										: ''}
+									{listing.location}{listing.city ? `, ${listing.city}` : ''}
 								</span>
 							</div>
 							{#if isPortal}

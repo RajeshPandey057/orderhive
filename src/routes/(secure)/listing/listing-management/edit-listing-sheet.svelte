@@ -18,9 +18,9 @@
 	import Upload from '~icons/lucide/upload';
 	import { updateListing } from './listing.remote';
 
-	type PropertyType = Listing['propertyType'];
+	type PropertyType = 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
 	type ListingType = Listing['listingType'];
-	type CommercialSubType = NonNullable<Listing['commercialSubType']>;
+	type CommercialSubType = 'office' | 'warehouse';
 
 	let {
 		listing,
@@ -38,6 +38,14 @@
 	}
 
 	let listingType = $state<ListingType>('internal');
+	let availableFor = $state('');
+	let furnishing = $state('');
+	let sampleCity = $state('');
+	let sampleLocation = $state('');
+	let agentEmail = $state('');
+	let agentMobile = $state('');
+	let reportingManager = $state('');
+	let seniorManager = $state('');
 	let firstName = $state('');
 	let lastName = $state('');
 	let clientPhone = $state('');
@@ -46,10 +54,18 @@
 	let community = $state('');
 	let project = $state('');
 	let unitNo = $state('');
+	let projectType = $state('');
+	let unitType = $state('');
+	let unitTypeOther = $state('');
+	let bedrooms = $state('');
 	let propertyType = $state<PropertyType>('apartment');
 	let commercialSubType = $state<CommercialSubType>('office');
-	let bedroomType = $state<NonNullable<Listing['bedroomType']>>('studio');
+	let bedroomType = $state<string>('studio');
 	let propertySize = $state<number | ''>('');
+	let unitArea = $state<number | ''>('');
+	let internalArea = $state<number | ''>('');
+	let balconyArea = $state<number | ''>('');
+	let plotSize = $state<number | ''>('');
 	let plotArea = $state<number | ''>('');
 	let builtUpArea = $state<number | ''>('');
 	let grossFloorArea = $state<number | ''>('');
@@ -70,6 +86,16 @@
 	let liquidityInvested = $state<number | ''>(0);
 	let sellingPrice = $state<number | ''>(0);
 	let dxbPrice = $state<number | ''>('');
+	let unitStatus = $state('');
+	let paymentType = $state('');
+	let rentAmount = $state<number | ''>('');
+	let vacantDate = $state('');
+	let handoverYear = $state('');
+	let handoverQuarter = $state('');
+	let paymentPlan = $state('');
+	let originalPrice = $state<number | ''>('');
+	let purchasePrice = $state<number | ''>('');
+	let amountPaid = $state<number | ''>('');
 	let listedByEmails = $state<string[]>(['']);
 
 	// Track whether a new file was picked for each attachment (so we can clear the existing display)
@@ -83,6 +109,7 @@
 	let existingMediaAssets = $state<{ type: 'photo' | 'video'; fileName: string; url: string }[]>(
 		[]
 	);
+	let existingFloorPlanAssets = $state<{ fileName: string; url: string }[]>([]);
 	let nextAssetId = $state(1);
 	let errors = $state<Record<string, string>>({});
 	let saving = $state(false);
@@ -117,21 +144,46 @@
 		const l = listing;
 		const [fn, ln] = splitName(l.clientName);
 		listingType = l.listingType;
+		availableFor = l.availableFor ?? 'Sell';
+		furnishing = l.furnishing ?? 'Unfurnished';
+		sampleCity = l.city ?? l.propertyAddress?.city ?? '';
+		sampleLocation = l.location ?? l.location ?? l.propertyAddress?.area ?? '';
+		agentEmail = l.agentEmail ?? l.createdByEmail ?? '';
+		agentMobile = l.agentMobile ?? '';
+		reportingManager = l.reportingManager ?? '';
+		seniorManager = l.seniorManager ?? '';
 		firstName = fn;
 		lastName = ln;
 		clientPhone = l.clientPhone;
 		clientEmail = l.clientEmail;
-		developer = l.developer;
-		community = l.community ?? '';
-		project = l.project;
+		developer = l.developerName;
+		community = l.location ?? '';
+		project = l.projectName;
 		unitNo = l.unitNo;
-		propertyType = l.propertyType;
-		commercialSubType = l.commercialSubType ?? 'office';
-		bedroomType = l.bedroomType ?? 'studio';
-		propertySize = l.propertySize ?? '';
-		plotArea = l.plotArea ?? '';
+		projectType = l.projectType ?? 'Ready Property';
+		unitType = l.unitType ?? (l.unitType === 'apartment' ? 'Apartment' : l.unitType);
+		unitTypeOther = l.unitTypeOther ?? '';
+		bedrooms = l.bedrooms ?? '';
+		propertyType =
+			l.unitType === 'Townhouse'
+				? 'townhouse'
+				: l.unitType === 'Villa' || l.unitType === 'Mansion'
+					? 'villa'
+					: l.unitType === 'Commercial' || l.unitType === 'Retail'
+						? 'commercial'
+						: l.unitType === 'Plot'
+							? 'plot'
+							: 'apartment';
+		commercialSubType = 'office';
+		bedroomType = l.bedrooms ?? 'studio';
+		propertySize = l.unitArea ?? '';
+		unitArea = l.unitArea ?? l.unitArea ?? l.builtUpArea ?? l.plotSize ?? '';
+		internalArea = l.internalArea ?? '';
+		balconyArea = l.balconyArea ?? '';
+		plotSize = l.plotSize ?? l.plotSize ?? '';
+		plotArea = l.plotSize ?? '';
 		builtUpArea = l.builtUpArea ?? '';
-		grossFloorArea = l.grossFloorArea ?? '';
+		grossFloorArea = l.builtUpArea ?? '';
 		addressLine1 = l.propertyAddress?.addressLine1 ?? '';
 		addressLine2 = l.propertyAddress?.addressLine2 ?? '';
 		buildingName = l.propertyAddress?.buildingName ?? '';
@@ -144,10 +196,20 @@
 		titleDeedFileName = l.titleDeedFileName ?? '';
 		passportFileName = l.passportFileName ?? '';
 		emiratesIdFileName = l.emiratesIdFileName ?? '';
-		buyingPrice = l.buyingPrice;
-		liquidityInvested = l.liquidityInvested;
-		sellingPrice = l.sellingPrice;
-		dxbPrice = l.dxbPrice ?? '';
+		buyingPrice = l.purchasePrice ?? '';
+		liquidityInvested = l.amountPaid ?? '';
+		sellingPrice = l.price;
+		dxbPrice = l.originalPrice ?? '';
+		unitStatus = l.unitStatus ?? (l.projectType === 'Off-Plan Property' ? 'Off-Plan' : 'Vacant');
+		paymentType = l.paymentType ?? 'Cash';
+		rentAmount = l.rentAmount ?? '';
+		vacantDate = l.vacantDate ?? '';
+		handoverYear = l.handoverYear ?? '';
+		handoverQuarter = l.handoverQuarter ?? '';
+		paymentPlan = l.paymentPlan ?? '';
+		originalPrice = l.originalPrice ?? l.originalPrice ?? '';
+		purchasePrice = l.purchasePrice ?? l.purchasePrice ?? '';
+		amountPaid = l.amountPaid ?? l.amountPaid ?? '';
 		listedByEmails = l.listedByEmails?.length ? [...l.listedByEmails] : [''];
 		titleDeedReplaced = false;
 		passportReplaced = false;
@@ -156,12 +218,15 @@
 			(asset): asset is { type: 'photo' | 'video'; fileName: string; url: string } =>
 				!!asset?.url && !!asset?.fileName && (asset.type === 'photo' || asset.type === 'video')
 		);
+		existingFloorPlanAssets = (l.floorPlanAssets ?? []).filter(
+			(asset): asset is { fileName: string; url: string } => !!asset?.url && !!asset?.fileName
+		);
 		mediaAssets = [];
 		activeTab = 'property-details';
 		errors = {};
 	});
 
-	const apartmentBedroomTypes: NonNullable<Listing['bedroomType']>[] = [
+	const apartmentBedroomTypes: string[] = [
 		'studio',
 		'1bed',
 		'2bed',
@@ -173,7 +238,7 @@
 		'penthouse',
 		'podium-townhouse'
 	];
-	const villaTownhouseBedroomTypes: NonNullable<Listing['bedroomType']>[] = [
+	const villaTownhouseBedroomTypes: string[] = [
 		'2bed',
 		'3bed',
 		'4bed',
@@ -195,6 +260,7 @@
 	);
 	const sanitizedListedByEmails = $derived(listedByEmails.map((e) => e.trim()).filter(Boolean));
 	const retainedMediaUrls = $derived(existingMediaAssets.map((asset) => asset.url));
+	const retainedFloorPlanUrls = $derived(existingFloorPlanAssets.map((asset) => asset.url));
 	const filteredDevelopers = $derived(
 		developers.filter((item) =>
 			item.label.toLowerCase().includes(developerSearchValue.toLowerCase())
@@ -382,9 +448,37 @@
 			<!-- Hidden fields -->
 			<input type="hidden" name="listingId" value={listing.id} />
 			<input type="hidden" name="listingType" value={listingType} />
-			<input type="hidden" name="developer" value={developer} />
+			<input type="hidden" name="developerName" value={developer} />
+			<input type="hidden" name="availableFor" value={availableFor} />
+			<input type="hidden" name="furnishing" value={furnishing} />
+			<input type="hidden" name="city" value={sampleCity} />
+			<input type="hidden" name="location" value={sampleLocation} />
+			<input type="hidden" name="agentEmail" value={agentEmail} />
+			<input type="hidden" name="agentMobile" value={agentMobile || clientPhone} />
+			<input type="hidden" name="reportingManager" value={reportingManager || listing.createdByEmail} />
+			<input type="hidden" name="seniorManager" value={seniorManager || listing.createdByEmail} />
+			<input type="hidden" name="projectType" value={projectType} />
+			<input type="hidden" name="unitType" value={unitType} />
+			<input type="hidden" name="unitTypeOther" value={unitTypeOther} />
+			<input type="hidden" name="bedrooms" value={bedrooms} />
+			<input type="hidden" name="unitArea" value={unitArea} />
+			<input type="hidden" name="internalArea" value={internalArea} />
+			<input type="hidden" name="balconyArea" value={balconyArea} />
+			<input type="hidden" name="plotSize" value={plotSize} />
+			<input type="hidden" name="unitStatus" value={unitStatus} />
+			<input type="hidden" name="paymentType" value={paymentType} />
+			<input type="hidden" name="rentAmount" value={rentAmount} />
+			<input type="hidden" name="vacantDate" value={vacantDate} />
+			<input type="hidden" name="handoverYear" value={handoverYear} />
+			<input type="hidden" name="handoverQuarter" value={handoverQuarter} />
+			<input type="hidden" name="paymentPlan" value={paymentPlan} />
+			<input type="hidden" name="originalPrice" value={originalPrice} />
+			<input type="hidden" name="purchasePrice" value={purchasePrice} />
+			<input type="hidden" name="amountPaid" value={amountPaid} />
+			<input type="hidden" name="price" value={sellingPrice} />
 			<input type="hidden" name="listedByEmails" value={JSON.stringify(sanitizedListedByEmails)} />
 			<input type="hidden" name="retainedMediaUrls" value={JSON.stringify(retainedMediaUrls)} />
+			<input type="hidden" name="retainedFloorPlanUrls" value={JSON.stringify(retainedFloorPlanUrls)} />
 			<input
 				type="file"
 				name="pictureFiles[]"
@@ -574,7 +668,7 @@
 									>
 									<InputGroup.Root id="community">
 										<InputGroup.Input
-											name="community"
+											
 											bind:value={community}
 											placeholder="Community (Optional)"
 										/>
@@ -585,7 +679,7 @@
 									<Field.Label>Project Name</Field.Label>
 									<InputGroup.Root id="project">
 										<InputGroup.Input
-											name="project"
+											name="projectName"
 											bind:value={project}
 											placeholder="Select Project"
 										/>
@@ -608,7 +702,7 @@
 								<Field.Field>
 									<Field.Label>Property Type</Field.Label>
 									<select
-										name="propertyType"
+										
 										bind:value={propertyType}
 										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 									>
@@ -636,7 +730,7 @@
 									<Field.Field>
 										<Field.Label>Bedroom Type</Field.Label>
 										<select
-											name="bedroomType"
+											
 											bind:value={bedroomType}
 											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 										>
@@ -650,7 +744,7 @@
 									<Field.Field>
 										<Field.Label>Property Size (sqft)</Field.Label>
 										<Input
-											name="propertySize"
+											
 											type="number"
 											bind:value={propertySize}
 											placeholder="Property Size"
@@ -664,7 +758,7 @@
 									<Field.Field>
 										<Field.Label>Plot Area (sqft)</Field.Label>
 										<Input
-											name="plotArea"
+											
 											type="number"
 											bind:value={plotArea}
 											placeholder="Plot Area"
@@ -692,7 +786,7 @@
 									<Field.Field>
 										<Field.Label>Gross Floor Area (sqft)</Field.Label>
 										<Input
-											name="grossFloorArea"
+											
 											type="number"
 											bind:value={grossFloorArea}
 											placeholder="Gross Floor Area"
@@ -828,7 +922,7 @@
 								<Field.Field>
 									<Field.Label>Buying Price</Field.Label>
 									<Input
-										name="buyingPrice"
+										
 										type="number"
 										bind:value={buyingPrice}
 										placeholder="Buying Price"
@@ -840,7 +934,7 @@
 								<Field.Field>
 									<Field.Label>Liquidity Invested</Field.Label>
 									<Input
-										name="liquidityInvested"
+										
 										type="number"
 										bind:value={liquidityInvested}
 										placeholder="Liquidity Invested"
@@ -852,7 +946,7 @@
 								<Field.Field>
 									<Field.Label>Selling Price</Field.Label>
 									<Input
-										name="sellingPrice"
+										
 										type="number"
 										bind:value={sellingPrice}
 										placeholder="Selling Price"
@@ -864,7 +958,7 @@
 								<Field.Field>
 									<Field.Label>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label>
 									<Input
-										name="dxbPrice"
+										
 										type="number"
 										bind:value={dxbPrice}
 										placeholder="DxB Price"
