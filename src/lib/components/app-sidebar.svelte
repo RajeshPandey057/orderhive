@@ -1,9 +1,11 @@
 <script lang="ts" module>
 	import LucideBell from '~icons/lucide/bell';
-	import LucideBuilding2 from '~icons/lucide/building-2';
 	import LucideBookMarked from '~icons/lucide/book-marked';
+	import LucideBuilding2 from '~icons/lucide/building-2';
 	import LucideCalendarClock from '~icons/lucide/calendar-clock';
+	import LucideCalendarDays from '~icons/lucide/calendar-days';
 	import LucideClipboardCheck from '~icons/lucide/clipboard-check';
+	import LucideClock from '~icons/lucide/clock';
 	import LucideUploadCloud from '~icons/lucide/cloud-upload';
 	import LucideFileText from '~icons/lucide/file-text';
 	import LucideLayoutPanelTop from '~icons/lucide/layout-panel-top';
@@ -12,8 +14,6 @@
 	import LucideShield from '~icons/lucide/shield';
 	import LucideUserCog from '~icons/lucide/user-cog';
 	import LucideUsers from '~icons/lucide/users';
-	import LucideClock from '~icons/lucide/clock';
-	import LucideCalendarDays from '~icons/lucide/calendar-days';
 
 	// Icon mapping for menu items
 	const iconMap: Record<string, typeof LucideLayoutPanelTop> = {
@@ -57,8 +57,8 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { getDefaultRoute, getMenuItems, isMenuItemActive, type AccessType } from '$lib/constants';
-	import FullLogo from '@/svg/full-logo.svelte';
-	import Logo from '@/svg/logo.svelte';
+	import FullLogoDark from '@/svg/full-logo-dark.svelte';
+	import LogoDark from '@/svg/logo-dark.svelte';
 	import type { ComponentProps } from 'svelte';
 	import { firekitUser } from 'svelte-firekit';
 	import NavMain from './nav-main.svelte';
@@ -163,13 +163,13 @@
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
-				class="px-2 py-6"
+				class="flex justify-center overflow-hidden px-2 py-6 group-data-[collapsible=icon]:px-0"
 				onclick={() => data?.user?.role && goto(getDefaultRoute(data.user.role))}
 			>
 				{#if sidebar.open}
-					<FullLogo />
+					<FullLogoDark />
 				{:else}
-					<Logo />
+					<LogoDark />
 				{/if}
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>

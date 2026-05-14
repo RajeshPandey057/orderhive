@@ -3,10 +3,10 @@
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { getInitials } from '@/utils';
-	import { firekitAuth } from 'svelte-firekit';
-	import { toast } from 'svelte-sonner';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
+	import { firekitAuth } from 'svelte-firekit';
+	import { toast } from 'svelte-sonner';
 
 	let {
 		user
@@ -49,7 +49,9 @@
 		>
 			<Avatar.Root class="size-8 rounded-lg">
 				<Avatar.Image src={user.avatar} alt={user.name} />
-				<Avatar.Fallback class="rounded-lg">{getInitials(user.name)}</Avatar.Fallback>
+				<Avatar.Fallback class="rounded-lg text-accent-foreground"
+					>{getInitials(user.name)}</Avatar.Fallback
+				>
 			</Avatar.Root>
 			<div class="grid flex-1 text-start text-sm leading-tight">
 				<span class="truncate font-medium">{user.name}</span>

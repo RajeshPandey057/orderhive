@@ -8,7 +8,7 @@
 </script>
 
 <AuthGuard requireAuth={true} redirectTo="/">
-	<Sidebar.Provider>
+	<Sidebar.Provider open={false}>
 		<AppSidebar {data} />
 		<Sidebar.Inset>
 			{@render children?.()}
