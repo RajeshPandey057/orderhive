@@ -25,6 +25,24 @@ import {
 
 export const biometricPunchesCollection = firestore.collection('biometricPunches');
 
+/** Serialize a raw Firestore biometricPunches document to a plain BiometricPunch object. */
+export function serializePunch(id: string, data: FirebaseFirestore.DocumentData): BiometricPunch {
+	return {
+		id,
+		deviceSn: data.deviceSn ?? '',
+		deviceUserId: data.deviceUserId ?? '',
+		employeeEmail: data.employeeEmail ?? null,
+		employeeName: data.employeeName ?? null,
+		date: data.date ?? '',
+		timeStr: data.timeStr ?? '',
+		timestamp: data.timestamp ?? '',
+		inOutMode: typeof data.inOutMode === 'number' ? data.inOutMode : 0,
+		verifyType: typeof data.verifyType === 'number' ? data.verifyType : 0,
+		processed: data.processed === true,
+		branch: data.branch ?? undefined
+	};
+}
+
 /** Standard workday target in minutes (8 hours). */
 const STANDARD_WORKDAY_MINUTES = 480;
 

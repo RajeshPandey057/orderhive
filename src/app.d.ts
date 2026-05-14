@@ -154,6 +154,20 @@ declare global {
 		createdAt?: string;
 		createdByEmail: string;
 	};
+	type BiometricPunch = {
+		id: string;
+		deviceSn: string;
+		deviceUserId: string;
+		employeeEmail: string | null;
+		employeeName: string | null;
+		date: string;
+		timeStr: string;
+		timestamp: string;
+		inOutMode: number;
+		verifyType: number;
+		processed: boolean;
+		branch?: string;
+	};
 	type SaleDocumentStatus = 'pending' | 'generated' | 'raised' | 'paid' | 'rejected';
 	type SaleDocumentFile = {
 		financeStatus: SaleDocumentStatus;
