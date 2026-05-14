@@ -49,7 +49,6 @@ export async function load() {
 				mediaAssets: d.mediaAssets ?? [],
 				floorPlanAssets: d.floorPlanAssets ?? [],
 				price: d.price ?? 0,
-				listedByEmails: d.listedByEmails ?? [],
 				createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
 				createdByUid: d.createdByUid ?? '',
 				createdByEmail: d.createdByEmail ?? ''

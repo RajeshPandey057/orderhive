@@ -26,7 +26,7 @@ export async function load({ locals }) {
 				furnishing: d.furnishing,
 				city: d.city ?? '',
 				location: d.location ?? '',
-				agentEmail: d.agentEmail,
+				agentEmail: d.agentEmail ?? '',
 				agentMobile: d.agentMobile,
 				reportingManager: d.reportingManager,
 				seniorManager: d.seniorManager,
@@ -66,7 +66,6 @@ export async function load({ locals }) {
 				mediaAssets: d.mediaAssets ?? [],
 				floorPlanAssets: d.floorPlanAssets ?? [],
 				price: d.price ?? 0,
-				listedByEmails: d.listedByEmails ?? [],
 				createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
 				createdByUid: d.createdByUid ?? '',
 				createdByEmail: d.createdByEmail ?? ''

@@ -92,11 +92,7 @@
 	let purchasePrice = $state<number | ''>('');
 	let amountPaid = $state<number | ''>('');
 	let price = $state<number | ''>('');
-	let listedByEmails = $state<string[]>(['']);
 	$effect(() => {
-		if (currentUserEmail && listedByEmails[0] === '') {
-			listedByEmails = [currentUserEmail];
-		}
 		if (currentUserEmail && !agentEmail) agentEmail = currentUserEmail;
 	});
 
@@ -415,7 +411,6 @@
 		purchasePrice = '';
 		amountPaid = '';
 		price = '';
-		listedByEmails = [currentUserEmail || ''];
 		for (const asset of mediaAssets) {
 			revokePreviewUrl(asset.previewUrl);
 		}
@@ -464,10 +459,6 @@
 				nextErrors.rentAmount = 'Monthly rent is required';
 		}
 		if (!price && price !== 0) nextErrors.price = 'Expected selling price is required';
-		const validListedBy = listedByEmails.map((value) => value.trim()).filter(Boolean);
-		if (!validListedBy.length) {
-			nextErrors.listedByEmails = 'At least one listed by email is required';
-		}
 
 		if (!titleDeedFileName) nextErrors.titleDeedFileName = 'Title deed/Qood is required';
 		if (!floorPlanAssets.length) nextErrors.floorPlanFiles = 'Floor plan is required';
@@ -484,22 +475,6 @@
 	function handleOpenChange(nextOpen: boolean) {
 		open = nextOpen;
 		if (!nextOpen) resetForm();
-	}
-
-	function addListedByEmail() {
-		listedByEmails = [...listedByEmails, ''];
-	}
-
-	function updateListedByEmail(index: number, value: string) {
-		listedByEmails = listedByEmails.map((email, i) => (i === index ? value : email));
-	}
-
-	function removeListedByEmail(index: number) {
-		if (listedByEmails.length === 1) {
-			listedByEmails = [''];
-			return;
-		}
-		listedByEmails = listedByEmails.filter((_, i) => i !== index);
 	}
 </script>
 
@@ -569,9 +544,6 @@
 			<input type="hidden" name="purchasePrice" value={purchasePrice} />
 			<input type="hidden" name="amountPaid" value={amountPaid} />
 			<input type="hidden" name="price" value={price} />
-			{#each listedByEmails.map((e) => e.trim()).filter(Boolean) as email (email)}
-				<input type="hidden" name="listedByEmails" value={email} />
-			{/each}
 			<input
 				type="file"
 				name="pictureFiles[]"
@@ -651,7 +623,7 @@
 					</div>
 				</div>
 
-				<div class:hidden={activeTab !== 'property-details'}>
+				<div class="space-y-8" class:hidden={activeTab !== 'property-details'}>
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Listing Type</Field.Legend>
 						<div class="mt-3 flex gap-2">
@@ -675,12 +647,12 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Listing Overview</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-2 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
 								<Field.Field>
 									<Field.Label>Property Available For</Field.Label>
 									<select
 										bind:value={availableFor}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select Availability</option>
 										<option>Sell</option>
@@ -695,7 +667,7 @@
 									<Field.Label>Furnishing Status</Field.Label>
 									<select
 										bind:value={furnishing}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select Furnishing</option>
 										<option>Furnished</option>
@@ -710,7 +682,7 @@
 									<Field.Label>City</Field.Label>
 									<select
 										bind:value={city}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select City</option>
 										{#each LISTING_CITIES as option (option)}
@@ -726,7 +698,7 @@
 									{#if city === 'Dubai'}
 										<select
 											bind:value={community}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Community</option>
 											{#each DUBAI_COMMUNITIES as option (option)}
@@ -752,9 +724,54 @@
 					</Field.Set>
 
 					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Agent & Client Information</Field.Legend>
+						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-3 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
+								<Field.Field>
+									<Field.Label>First Name</Field.Label>
+									<Input name="firstName" bind:value={firstName} placeholder="First Name" />
+									{#if errors.firstName}<Field.Error class="text-sm text-destructive"
+											>{errors.firstName}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Last Name</Field.Label>
+									<Input name="lastName" bind:value={lastName} placeholder="Last Name" />
+									{#if errors.lastName}<Field.Error class="text-sm text-destructive"
+											>{errors.lastName}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Client Email</Field.Label>
+									<Input
+										type="email"
+										name="clientEmail"
+										bind:value={clientEmail}
+										placeholder="Email"
+									/>
+									{#if errors.clientEmail}<Field.Error class="text-sm text-destructive"
+											>{errors.clientEmail}</Field.Error
+										>{/if}
+								</Field.Field>
+							</div>
+							<Field.Field>
+								<Field.Label>Client Mobile No</Field.Label>
+								<Input
+									name="clientPhone"
+									bind:value={clientPhone}
+									placeholder="Enter a phone number"
+								/>
+								{#if errors.clientPhone}<Field.Error class="text-sm text-destructive"
+										>{errors.clientPhone}</Field.Error
+									>{/if}
+							</Field.Field>
+						</Field.Group>
+					</Field.Set>
+
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Agent & Reporting</Field.Legend>
+						<Field.Group>
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
 								<Field.Field>
 									<Field.Label>Agent Official Email</Field.Label>
 									<Input
@@ -774,33 +791,10 @@
 										>{/if}
 								</Field.Field>
 								<Field.Field>
-									<Input name="firstName" bind:value={firstName} placeholder="First Name" />
-									{#if errors.firstName}<Field.Error class="text-sm text-destructive"
-											>{errors.firstName}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Input name="lastName" bind:value={lastName} placeholder="Last Name" />
-									{#if errors.lastName}<Field.Error class="text-sm text-destructive"
-											>{errors.lastName}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Input
-										type="email"
-										name="clientEmail"
-										bind:value={clientEmail}
-										placeholder="Email"
-									/>
-									{#if errors.clientEmail}<Field.Error class="text-sm text-destructive"
-											>{errors.clientEmail}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
 									<Field.Label>Reporting Manager</Field.Label>
 									<Popover.Root bind:open={managerPopoverOpen}>
 										<Popover.Trigger
-											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+											class="flex h-9 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											{#if reportingManager}
 												<Avatar.Root class="h-5 w-5">
@@ -867,7 +861,7 @@
 									<Field.Label>Senior Manager</Field.Label>
 									<Popover.Root bind:open={seniorManagerPopoverOpen}>
 										<Popover.Trigger
-											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+											class="flex h-9 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											{#if seniorManager}
 												<Avatar.Root class="h-5 w-5">
@@ -938,24 +932,13 @@
 										>{/if}
 								</Field.Field>
 							</div>
-							<Field.Field>
-								<Field.Label>Client Mobile No</Field.Label>
-								<Input
-									name="clientPhone"
-									bind:value={clientPhone}
-									placeholder="Enter a phone number"
-								/>
-								{#if errors.clientPhone}<Field.Error class="text-sm text-destructive"
-										>{errors.clientPhone}</Field.Error
-									>{/if}
-							</Field.Field>
 						</Field.Group>
 					</Field.Set>
 
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-2 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
 								<Field.Field>
 									<Field.Label>Developer Name</Field.Label>
 									<Popover.Root bind:open={developerPopoverOpen}>
@@ -965,7 +948,7 @@
 												type="button"
 												role="combobox"
 												aria-expanded={developerPopoverOpen}
-												class="w-full justify-start gap-2"
+												class="h-9 w-full justify-start gap-2"
 											>
 												<Hammer class="h-4 w-4" />
 												<span class="truncate">{developerLabel}</span>
@@ -1002,17 +985,6 @@
 										>{/if}
 								</Field.Field>
 								<Field.Field>
-									<Field.Label
-										>Community <span class="text-muted-foreground">(Optional)</span></Field.Label
-									>
-									<InputGroup.Root id="location">
-										<InputGroup.Input bind:value={community} placeholder="Community (Optional)" />
-										<InputGroup.Addon>
-											<Home />
-										</InputGroup.Addon>
-									</InputGroup.Root>
-								</Field.Field>
-								<Field.Field>
 									<Field.Label>Project Name</Field.Label>
 									<InputGroup.Root id="project">
 										<InputGroup.Input
@@ -1044,7 +1016,7 @@
 									<Field.Label>Project Type</Field.Label>
 									<select
 										bind:value={projectType}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select Type</option>
 										<option>Off-Plan Property</option>
@@ -1058,7 +1030,7 @@
 									<Field.Label>Unit Type</Field.Label>
 									<select
 										bind:value={unitType}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select Unit Type</option>
 										{#each UNIT_TYPES as option (option)}
@@ -1083,7 +1055,7 @@
 										<Field.Label>No. of Bedrooms</Field.Label>
 										<select
 											bind:value={bedrooms}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Bedrooms</option>
 											{#each BEDROOM_OPTIONS as option (option)}
@@ -1126,7 +1098,7 @@
 									<Field.Label>Payment Type</Field.Label>
 									<select
 										bind:value={paymentType}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="">Select Payment Type</option>
 										<option>Cash</option>
@@ -1141,7 +1113,7 @@
 										<Field.Label>Unit Status</Field.Label>
 										<select
 											bind:value={unitStatus}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Status</option>
 											<option>Rented</option>
@@ -1170,7 +1142,7 @@
 										<Field.Label>Handover Year</Field.Label>
 										<select
 											bind:value={handoverYear}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Year</option>
 											{#each HANDOVER_YEARS as option (option)}
@@ -1185,7 +1157,7 @@
 										<Field.Label>Handover Quarter</Field.Label>
 										<select
 											bind:value={handoverQuarter}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Quarter</option>
 											{#each HANDOVER_QUARTERS as option (option)}
@@ -1200,7 +1172,7 @@
 										<Field.Label>Payment Plan</Field.Label>
 										<select
 											bind:value={paymentPlan}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="">Select Payment Plan</option>
 											{#each PAYMENT_PLANS as option (option)}
@@ -1458,41 +1430,6 @@
 											>{/if}
 									</Field.Field>
 								</div>
-							</div>
-						</Field.Group>
-					</Field.Set>
-
-					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Listed by</Field.Legend>
-						<Field.Group>
-							<div class="flex flex-col gap-3">
-								{#each listedByEmails as email, index (index)}
-									<div class="flex items-center gap-2">
-										<Input
-											type="email"
-											placeholder="agent@example.com"
-											value={email}
-											oninput={(event) => updateListedByEmail(index, event.currentTarget.value)}
-										/>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onclick={() => removeListedByEmail(index)}
-										>
-											Remove
-										</Button>
-									</div>
-								{/each}
-								<div class="flex items-center gap-2">
-									<Button type="button" variant="outline" size="sm" onclick={addListedByEmail}>
-										+ Add Agent
-									</Button>
-								</div>
-								{#if errors.listedByEmails}
-									<Field.Error class="text-sm text-destructive">{errors.listedByEmails}</Field.Error
-									>
-								{/if}
 							</div>
 						</Field.Group>
 					</Field.Set>

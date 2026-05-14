@@ -60,7 +60,9 @@
 					<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 						<div>
 							<div class="flex items-center gap-2">
-								<h2 class="text-2xl font-bold text-foreground sm:text-3xl">{listing.projectName}</h2>
+								<h2 class="text-2xl font-bold text-foreground sm:text-3xl">
+									{listing.projectName}
+								</h2>
 								<span
 									class="rounded-full px-2 py-0.5 text-xs font-semibold {listing.listingType ===
 									'portal'
@@ -72,8 +74,8 @@
 							</div>
 							<p class="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
 								<MapPinIcon class="h-4 w-4" />
-								{listing.propertyAddress.buildingName ?? listing.projectName}, {listing.propertyAddress
-									.area ??
+								{listing.propertyAddress.buildingName ?? listing.projectName}, {listing
+									.propertyAddress.area ??
 									listing.location ??
 									'Area N/A'}, {listing.propertyAddress.city ?? 'City N/A'}
 							</p>
@@ -112,7 +114,7 @@
 
 				<section class="rounded-xl border border-border bg-card p-3 sm:p-4">
 					<ListingMediaGallery
-						mediaItems={mediaItems}
+						{mediaItems}
 						listingId={listing.id}
 						listingTitle={listing.projectName}
 					/>
@@ -139,10 +141,8 @@
 								<span class="font-medium">{listing.clientEmail}</span>
 							</div>
 							<div class="flex justify-between gap-4">
-								<span class="text-muted-foreground">Listed By</span>
-								<span class="text-right font-medium">
-									{(listing.listedByEmails ?? []).join(', ') || 'N/A'}
-								</span>
+								<span class="text-muted-foreground">Agent</span>
+								<span class="text-right font-medium">{listing.agentEmail || 'N/A'}</span>
 							</div>
 						</div>
 					</section>
@@ -216,7 +216,9 @@
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">DxB Price</span><span
 									class="text-right font-medium"
-									>{listing.originalPrice == null ? 'N/A' : `AED ${formatPrice(listing.originalPrice)}`}</span
+									>{listing.originalPrice == null
+										? 'N/A'
+										: `AED ${formatPrice(listing.originalPrice)}`}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">

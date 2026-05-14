@@ -156,27 +156,7 @@ const listingShape = {
 	retainedFloorPlanUrls: stringArrayFromForm,
 
 	// Pricing
-	price: z.coerce.number().min(0, 'Expected selling price is required'),
-
-	// Listed by agents
-	listedByEmails: z.preprocess(
-		(v) => {
-			if (Array.isArray(v)) return v;
-			if (typeof v !== 'string') return v;
-			const s = v.trim();
-			if (!s) return [];
-			if (s.startsWith('[')) {
-				try {
-					const parsed = JSON.parse(s);
-					if (Array.isArray(parsed)) return parsed;
-				} catch {
-					return [s];
-				}
-			}
-			return [s];
-		},
-		z.array(z.string().min(1)).min(1, 'At least one agent is required')
-	)
+	price: z.coerce.number().min(0, 'Expected selling price is required')
 };
 
 const listingSchema = z
@@ -403,9 +383,6 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 			.filter(Boolean)
 			.map((f) => ({ fileName: f!.name, url: f!.downloadURL })),
 		price: data.price,
-		listedByEmails: Array.isArray(data.listedByEmails)
-			? data.listedByEmails
-			: [data.listedByEmails],
 		// Full file metadata for downloads / compliance
 		attachments: {
 			titleDeed: titleDeedFile ?? null,
@@ -622,9 +599,6 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 		floorPlanAssets: mergedFloorPlanAssets,
 		floorPlansFileName: mergedFloorPlanAssets.map((asset) => asset.fileName).join(', '),
 		price: data.price,
-		listedByEmails: Array.isArray(data.listedByEmails)
-			? data.listedByEmails
-			: [data.listedByEmails],
 		attachments: {
 			titleDeed: finalTitleDeed,
 			passport: finalPassport,

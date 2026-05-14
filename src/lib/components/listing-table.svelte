@@ -29,12 +29,7 @@
 	]);
 	const agentOptions = $derived([
 		'all',
-		...new Set(
-			listings
-				.flatMap((listing) => listing.listedByEmails ?? [])
-				.map((email) => email.trim())
-				.filter(Boolean)
-		)
+		...new Set(listings.map((listing) => listing.agentEmail?.trim()).filter(Boolean))
 	]);
 	const unitTypeOptions = $derived([
 		'all',
@@ -51,12 +46,11 @@
 				listing.projectName.toLowerCase().includes(query) ||
 				listing.developerName.toLowerCase().includes(query) ||
 				listing.unitNo.toLowerCase().includes(query) ||
-				(listing.listedByEmails ?? []).some((email) => email.toLowerCase().includes(query));
+				listing.agentEmail.toLowerCase().includes(query);
 
 			const matchesDeveloper =
 				selectedDeveloper === 'all' || listing.developerName === selectedDeveloper;
-			const matchesAgent =
-				selectedAgent === 'all' || (listing.listedByEmails ?? []).includes(selectedAgent);
+			const matchesAgent = selectedAgent === 'all' || listing.agentEmail === selectedAgent;
 			const matchesUnitType = selectedUnitType === 'all' || listing.unitType === selectedUnitType;
 
 			return matchesSearch && matchesDeveloper && matchesAgent && matchesUnitType;

@@ -146,7 +146,7 @@
 			<!-- Gallery -->
 			<section class="rounded-xl border border-border bg-card p-3">
 				<ListingMediaGallery
-					mediaItems={mediaItems}
+					{mediaItems}
 					listingId={listing.id}
 					listingTitle={listing.projectName}
 				/>
@@ -173,10 +173,8 @@
 							<span class="font-medium">{listing.clientEmail}</span>
 						</div>
 						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">Listed By</span>
-							<span class="text-right font-medium">
-								{(listing.listedByEmails ?? []).join(', ') || 'N/A'}
-							</span>
+							<span class="text-muted-foreground">Agent</span>
+							<span class="text-right font-medium">{listing.agentEmail || 'N/A'}</span>
 						</div>
 					</div>
 				</section>
@@ -246,14 +244,14 @@
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">Selling Price</span>
-							<span class="font-semibold text-foreground"
-								>AED {formatPrice(listing.price)}</span
-							>
+							<span class="font-semibold text-foreground">AED {formatPrice(listing.price)}</span>
 						</div>
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">DxB Price</span>
 							<span class="font-medium">
-								{listing.originalPrice == null ? 'N/A' : `AED ${formatPrice(listing.originalPrice)}`}
+								{listing.originalPrice == null
+									? 'N/A'
+									: `AED ${formatPrice(listing.originalPrice)}`}
 							</span>
 						</div>
 					</div>

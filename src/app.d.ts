@@ -320,7 +320,6 @@ declare global {
 	type Listing = {
 		id: string;
 		listingType: 'internal' | 'portal';
-		listedByEmails: string[];
 		mediaAssets: { type: 'photo' | 'video'; fileName: string; url?: string }[];
 		floorPlanAssets?: { fileName: string; url?: string }[];
 		propertyAddress: {

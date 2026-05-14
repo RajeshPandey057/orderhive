@@ -8,6 +8,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DUBAI_COMMUNITIES, LISTING_CITIES } from '$lib/listing-options';
 	import { getInitials } from '$lib/utils.js';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
@@ -57,7 +58,6 @@
 	let clientPhone = $state('');
 	let clientEmail = $state('');
 	let developer = $state('');
-	let community = $state('');
 	let project = $state('');
 	let unitNo = $state('');
 	let projectType = $state('');
@@ -102,7 +102,6 @@
 	let originalPrice = $state<number | ''>('');
 	let purchasePrice = $state<number | ''>('');
 	let amountPaid = $state<number | ''>('');
-	let listedByEmails = $state<string[]>(['']);
 
 	// Track whether a new file was picked for each attachment (so we can clear the existing display)
 	let titleDeedReplaced = $state(false);
@@ -268,7 +267,7 @@
 		furnishing = l.furnishing ?? 'Unfurnished';
 		sampleCity = l.city ?? l.propertyAddress?.city ?? '';
 		sampleLocation = l.location ?? l.location ?? l.propertyAddress?.area ?? '';
-		agentEmail = l.agentEmail ?? l.createdByEmail ?? '';
+		agentEmail = l.agentEmail ?? '';
 		agentMobile = l.agentMobile ?? '';
 		reportingManager = l.reportingManager ?? '';
 		reportingManagerName = l.reportingManager ?? '';
@@ -279,7 +278,6 @@
 		clientPhone = l.clientPhone;
 		clientEmail = l.clientEmail;
 		developer = l.developerName;
-		community = l.location ?? '';
 		project = l.projectName;
 		unitNo = l.unitNo;
 		projectType = l.projectType ?? 'Ready Property';
@@ -332,7 +330,6 @@
 		originalPrice = l.originalPrice ?? l.originalPrice ?? '';
 		purchasePrice = l.purchasePrice ?? l.purchasePrice ?? '';
 		amountPaid = l.amountPaid ?? l.amountPaid ?? '';
-		listedByEmails = l.listedByEmails?.length ? [...l.listedByEmails] : [''];
 		titleDeedReplaced = false;
 		passportReplaced = false;
 		emiratesIdReplaced = false;
@@ -380,7 +377,6 @@
 	const developerLabel = $derived(
 		developers.find((item) => item.value === developer)?.label ?? (developer || 'Developer')
 	);
-	const sanitizedListedByEmails = $derived(listedByEmails.map((e) => e.trim()).filter(Boolean));
 	const retainedMediaUrls = $derived(existingMediaAssets.map((asset) => asset.url));
 	const retainedFloorPlanUrls = $derived(existingFloorPlanAssets.map((asset) => asset.url));
 	const filteredDevelopers = $derived(
@@ -480,22 +476,6 @@
 		existingMediaAssets = existingMediaAssets.filter((asset) => asset.url !== url);
 	}
 
-	function addListedByEmail() {
-		listedByEmails = [...listedByEmails, ''];
-	}
-
-	function updateListedByEmail(index: number, value: string) {
-		listedByEmails = listedByEmails.map((email, i) => (i === index ? value : email));
-	}
-
-	function removeListedByEmail(index: number) {
-		if (listedByEmails.length === 1) {
-			listedByEmails = [''];
-			return;
-		}
-		listedByEmails = listedByEmails.filter((_, i) => i !== index);
-	}
-
 	function validate() {
 		const nextErrors: Record<string, string> = {};
 		if (!firstName.trim()) nextErrors.firstName = 'First name is required';
@@ -511,9 +491,6 @@
 		if (!sellingPrice && sellingPrice !== 0) nextErrors.sellingPrice = 'Selling price is required';
 		if (dxbPrice !== '' && Number(dxbPrice) < 0)
 			nextErrors.dxbPrice = 'DxB price must be 0 or greater';
-		const validListedBy = listedByEmails.map((v) => v.trim()).filter(Boolean);
-		if (!validListedBy.length)
-			nextErrors.listedByEmails = 'At least one listed by email is required';
 		if (propertyType === 'apartment' && !propertySize && propertySize !== 0)
 			nextErrors.propertySize = 'Property size is required for apartment';
 		if (propertyType === 'townhouse' || propertyType === 'villa') {
@@ -602,7 +579,6 @@
 			<input type="hidden" name="purchasePrice" value={purchasePrice} />
 			<input type="hidden" name="amountPaid" value={amountPaid} />
 			<input type="hidden" name="price" value={sellingPrice} />
-			<input type="hidden" name="listedByEmails" value={JSON.stringify(sanitizedListedByEmails)} />
 			<input type="hidden" name="retainedMediaUrls" value={JSON.stringify(retainedMediaUrls)} />
 			<input
 				type="hidden"
@@ -681,7 +657,7 @@
 					</div>
 				</div>
 
-				<div class:hidden={activeTab !== 'property-details'}>
+				<div class="space-y-8" class:hidden={activeTab !== 'property-details'}>
 					<!-- Listing Type -->
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Listing Type</Field.Legend>
@@ -699,24 +675,91 @@
 						</div>
 					</Field.Set>
 
+					<!-- Listing Overview -->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Listing Overview</Field.Legend>
+						<Field.Group>
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
+								<Field.Field>
+									<Field.Label>Property Available For</Field.Label>
+									<select
+										bind:value={availableFor}
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
+									>
+										<option value="">Select Availability</option>
+										<option>Sell</option>
+										<option>Rent</option>
+										<option>Both</option>
+									</select>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Furnishing Status</Field.Label>
+									<select
+										bind:value={furnishing}
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
+									>
+										<option value="">Select Furnishing</option>
+										<option>Furnished</option>
+										<option>Unfurnished</option>
+										<option>Semi-Furnished</option>
+									</select>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>City</Field.Label>
+									<select
+										bind:value={sampleCity}
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
+									>
+										<option value="">Select City</option>
+										{#each LISTING_CITIES as option (option)}
+											<option>{option}</option>
+										{/each}
+									</select>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Community Name</Field.Label>
+									{#if sampleCity === 'Dubai'}
+										<select
+											bind:value={sampleLocation}
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
+										>
+											<option value="">Select Community</option>
+											{#each DUBAI_COMMUNITIES as option (option)}
+												<option>{option}</option>
+											{/each}
+										</select>
+									{:else}
+										<Input
+											bind:value={sampleLocation}
+											placeholder="e.g. Corniche, Al Reem Island"
+										/>
+									{/if}
+								</Field.Field>
+							</div>
+						</Field.Group>
+					</Field.Set>
+
 					<!-- Client Details -->
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-3 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
 								<Field.Field>
+									<Field.Label>First Name</Field.Label>
 									<Input name="firstName" bind:value={firstName} placeholder="First Name" />
 									{#if errors.firstName}<Field.Error class="text-sm text-destructive"
 											>{errors.firstName}</Field.Error
 										>{/if}
 								</Field.Field>
 								<Field.Field>
+									<Field.Label>Last Name</Field.Label>
 									<Input name="lastName" bind:value={lastName} placeholder="Last Name" />
 									{#if errors.lastName}<Field.Error class="text-sm text-destructive"
 											>{errors.lastName}</Field.Error
 										>{/if}
 								</Field.Field>
 								<Field.Field>
+									<Field.Label>Client Email</Field.Label>
 									<Input
 										type="email"
 										name="clientEmail"
@@ -746,7 +789,7 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Agent & Reporting</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-2 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
 								<Field.Field>
 									<Field.Label>Agent Official Email</Field.Label>
 									<Input
@@ -769,7 +812,7 @@
 									<Field.Label>Reporting Manager</Field.Label>
 									<Popover.Root bind:open={managerPopoverOpen}>
 										<Popover.Trigger
-											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+											class="flex h-9 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											{#if reportingManager}
 												<Avatar.Root class="h-5 w-5">
@@ -836,7 +879,7 @@
 									<Field.Label>Senior Manager</Field.Label>
 									<Popover.Root bind:open={seniorManagerPopoverOpen}>
 										<Popover.Trigger
-											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+											class="flex h-9 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											{#if seniorManager}
 												<Avatar.Root class="h-5 w-5">
@@ -914,7 +957,7 @@
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Details</Field.Legend>
 						<Field.Group>
-							<div class="grid grid-cols-2 gap-4">
+							<div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
 								<Field.Field>
 									<Field.Label>Developer Name</Field.Label>
 									<Popover.Root bind:open={developerPopoverOpen}>
@@ -924,7 +967,7 @@
 												type="button"
 												role="combobox"
 												aria-expanded={developerPopoverOpen}
-												class="w-full justify-start gap-2"
+												class="h-9 w-full justify-start gap-2"
 											>
 												<Hammer class="h-4 w-4" />
 												<span class="truncate">{developerLabel}</span>
@@ -961,15 +1004,6 @@
 										>{/if}
 								</Field.Field>
 								<Field.Field>
-									<Field.Label
-										>Community <span class="text-muted-foreground">(Optional)</span></Field.Label
-									>
-									<InputGroup.Root id="community">
-										<InputGroup.Input bind:value={community} placeholder="Community (Optional)" />
-										<InputGroup.Addon><Home /></InputGroup.Addon>
-									</InputGroup.Root>
-								</Field.Field>
-								<Field.Field>
 									<Field.Label>Project Name</Field.Label>
 									<InputGroup.Root id="project">
 										<InputGroup.Input
@@ -997,7 +1031,7 @@
 									<Field.Label>Property Type</Field.Label>
 									<select
 										bind:value={propertyType}
-										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+										class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 									>
 										<option value="apartment">Apartment</option>
 										<option value="townhouse">Townhouse</option>
@@ -1012,7 +1046,7 @@
 										<select
 											name="commercialSubType"
 											bind:value={commercialSubType}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											<option value="office">Office</option>
 											<option value="warehouse">Warehouse</option>
@@ -1024,7 +1058,7 @@
 										<Field.Label>Bedroom Type</Field.Label>
 										<select
 											bind:value={bedroomType}
-											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+											class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-[#F04C06] focus-visible:ring-[3px] focus-visible:ring-[#FFD3A8]"
 										>
 											{#each propertyType === 'apartment' ? apartmentBedroomTypes : villaTownhouseBedroomTypes as bt (bt)}
 												<option value={bt}>{formatBedroomLabel(bt)}</option>
@@ -1238,39 +1272,6 @@
 											>{errors.dxbPrice}</Field.Error
 										>{/if}
 								</Field.Field>
-							</div>
-						</Field.Group>
-					</Field.Set>
-
-					<!-- Listed By -->
-					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Listed by</Field.Legend>
-						<Field.Group>
-							<div class="flex flex-col gap-3">
-								{#each listedByEmails as email, index (index)}
-									<div class="flex items-center gap-2">
-										<Input
-											type="email"
-											placeholder="agent@example.com"
-											value={email}
-											oninput={(event) => updateListedByEmail(index, event.currentTarget.value)}
-										/>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onclick={() => removeListedByEmail(index)}>Remove</Button
-										>
-									</div>
-								{/each}
-								<div>
-									<Button type="button" variant="outline" size="sm" onclick={addListedByEmail}
-										>+ Add Agent</Button
-									>
-								</div>
-								{#if errors.listedByEmails}<Field.Error class="text-sm text-destructive"
-										>{errors.listedByEmails}</Field.Error
-									>{/if}
 							</div>
 						</Field.Group>
 					</Field.Set>

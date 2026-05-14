@@ -38,8 +38,8 @@ Loads all listings from Firestore and filters/sorts in JS:
 const snap = await firestore.collection('listings').get();
 // ...map docs...
 const portalListings = listings
-  .filter((l) => l.listingType === 'portal')
-  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+	.filter((l) => l.listingType === 'portal')
+	.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 return { firestoreListings: portalListings };
 ```
 
@@ -99,7 +99,7 @@ return { firestoreListings: portalListings };
   sellingPrice: number;
 
   // Agent assignment
-  listedByEmails: string[];
+  agentEmail: string;
 
   // Full attachment metadata (for downloads / compliance)
   attachments: {
@@ -163,7 +163,7 @@ FormData field names used in the `<form>`:
 | `buyingPrice`            | number                     | coerced                                 |
 | `liquidityInvested`      | number                     | coerced                                 |
 | `sellingPrice`           | number                     | coerced                                 |
-| `listedByEmails`         | string[]                   | multiple hidden inputs with same name   |
+| `agentEmail`             | string                     | canonical listing agent email           |
 
 ### Validation Rules (superRefine)
 
@@ -230,9 +230,8 @@ try {
 
 ## Known Pre-existing Linting Warnings
 
-Three `Each block should have a key` compile warnings exist in `add-listing-sheet.svelte` at:
+Two `Each block should have a key` compile warnings exist in `add-listing-sheet.svelte` at:
 
-- Line ~348: `{#each listedByEmails.map(...)` — hidden inputs
 - Lines ~615, ~637: `{#each apartmentBedroomTypes}` and `{#each villaTownhouseBedroomTypes}` — `<option>` elements
 
 These are non-blocking but should be keyed when convenient.
