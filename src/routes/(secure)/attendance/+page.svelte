@@ -115,7 +115,6 @@
 	let selectedKpiFilter = $state<'all' | 'on-time' | 'present' | 'absent' | 'on-leave'>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
-	let syncing2 = $state(false);
 
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
 	const searchFilteredAttendanceRecords = $derived(
@@ -193,28 +192,16 @@
 	async function handleSync() {
 		syncing = true;
 		try {
-			const result = await reconcileAttendance({});
+			const syncResult = await syncUnprocessed({});
+			const reconcileResult = await reconcileAttendance({});
 			toast.success(
-				`Biometric reconcile complete. Processed ${result.reconciled ?? 0} employee(s).`
+				`Done — resolved ${syncResult.synced ?? 0} punch(es), reconciled ${reconcileResult.reconciled ?? 0} employee(s).`
 			);
 			await invalidateAll();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Unable to reconcile attendance');
+			toast.error(err instanceof Error ? err.message : 'Unable to sync attendance');
 		} finally {
 			syncing = false;
-		}
-	}
-
-	async function handleSyncUnprocessed() {
-		syncing2 = true;
-		try {
-			const result = await syncUnprocessed({});
-			toast.success(`Synced ${result.synced ?? 0} unprocessed punch(es).`);
-			await invalidateAll();
-		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Unable to sync unprocessed punches');
-		} finally {
-			syncing2 = false;
 		}
 	}
 
@@ -249,19 +236,11 @@
 				>Export Logs</Button
 			>
 			<Button
-				variant="outline"
-				class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
-				onclick={handleSyncUnprocessed}
-				disabled={syncing2}
-			>
-				{syncing2 ? 'Syncing...' : 'Sync Unprocessed'}
-			</Button>
-			<Button
 				class="h-8 border border-black/5 bg-[#222626] text-sm text-white"
 				onclick={handleSync}
 				disabled={syncing}
 			>
-				{syncing ? 'Reconciling...' : 'Reconcile Biometric'}
+				{syncing ? 'Syncing...' : 'Sync & Reconcile'}
 			</Button>
 		</div>
 	</div>

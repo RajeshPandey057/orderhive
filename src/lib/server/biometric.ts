@@ -154,6 +154,7 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 			inOutMode: punch.inOutMode,
 			verifyType: punch.verifyType,
 			rawLine: punch.rawLine ?? null,
+			processed: false,
 			receivedAt: FieldValue.serverTimestamp()
 		});
 		console.log(`[ZKTeco] processPunch: Firestore write OK for ${punchId}`);

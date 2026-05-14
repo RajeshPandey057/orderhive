@@ -417,27 +417,50 @@ export const reconcileAttendance = command(
  * Sync all biometricPunches docs where processed=false.
  * Resolves unlinked punches by employee code, reconciles attendance, marks processed.
  * Use the "Sync Unprocessed" button to catch punches that failed to process live.
+ *
+ * Strategy:
+ *  1. Query where('employeeEmail', '==', null) — Firestore can find explicit nulls,
+ *     and ALL unresolved punches store employeeEmail as null (not missing).
+ *     This reliably catches old punches that never had a `processed` field set.
+ *  2. Resolve each unresolved punch by employee code (now that employees are seeded).
+ *  3. Query where('processed', '==', false) for any remaining un-reconciled punches
+ *     (includes the ones just resolved above, now with processed:false).
+ *  4. Group by email+date, reconcile, mark processed:true.
  */
 export const syncUnprocessed = command(z.object({}), async () => {
 	requireHrAdmin();
-	const unprocessedSnap = await biometricPunchesCollection.where('processed', '==', false).get();
-	if (unprocessedSnap.empty) return { success: true, synced: 0 };
 
-	// Resolve any unlinked punches by employee code
-	for (const doc of unprocessedSnap.docs) {
-		if (doc.data().employeeEmail) continue;
-		const emp = await getEmployeeByCode(doc.data().deviceUserId as string);
+	// Step 1: find all unresolved punches (employeeEmail stored as explicit null)
+	const unresolvedSnap = await biometricPunchesCollection.where('employeeEmail', '==', null).get();
+
+	// Step 2: resolve each by employee code and stamp processed:false
+	let resolvedCount = 0;
+	for (const doc of unresolvedSnap.docs) {
+		const userId = doc.data().deviceUserId as string;
+		const emp = await getEmployeeByCode(userId);
 		if (!emp) continue;
-		await doc.ref.update({ employeeEmail: emp.email, employeeName: emp.name });
+		await doc.ref.update({
+			employeeEmail: emp.email,
+			employeeName: emp.name,
+			branch: emp.location ?? '',
+			processed: false
+		});
+		resolvedCount++;
 	}
+	console.log(
+		`[syncUnprocessed] resolved ${resolvedCount} / ${unresolvedSnap.size} unlinked punches`
+	);
 
-	// Re-fetch and group by email+date
-	const refreshed = await biometricPunchesCollection.where('processed', '==', false).get();
+	// Step 3: fetch all punches with processed:false (includes newly-resolved ones above)
+	const pendingSnap = await biometricPunchesCollection.where('processed', '==', false).get();
+	if (pendingSnap.empty) return { success: true, synced: 0 };
+
+	// Step 4: group by employee+date and reconcile
 	const groups = new Map<
 		string,
 		{ email: string; date: string; refs: FirebaseFirestore.DocumentReference[] }
 	>();
-	for (const doc of refreshed.docs) {
+	for (const doc of pendingSnap.docs) {
 		const email = doc.data().employeeEmail as string | null;
 		const date = doc.data().date as string;
 		if (!email || !date) continue;
