@@ -50,32 +50,39 @@ export interface RawPunch {
  *   userID \t YYYY-MM-DD HH:mm:ss \t inOutMode \t verifyType \t ...
  */
 export function parseIClockBody(body: string): Omit<RawPunch, 'deviceSn'>[] {
-	const lines = body.split('\n').map((l) => l.trim()).filter(Boolean);
+	const lines = body
+		.split('\n')
+		.map((l) => l.trim())
+		.filter(Boolean);
 	console.log(`[ZKTeco] parseIClockBody: ${lines.length} line(s) received`);
 
 	const results = lines.flatMap((line) => {
-			const parts = line.split('\t');
-			if (parts.length < 4) {
-				console.warn(`[ZKTeco] parseIClockBody: skipping line (< 4 tab-fields): ${JSON.stringify(line)}`);
-				return [];
+		const parts = line.split('\t');
+		if (parts.length < 4) {
+			console.warn(
+				`[ZKTeco] parseIClockBody: skipping line (< 4 tab-fields): ${JSON.stringify(line)}`
+			);
+			return [];
+		}
+		const userId = parts[0]?.trim();
+		const timestamp = parts[1]?.trim();
+		// Basic timestamp validation: YYYY-MM-DD HH:MM:SS
+		if (!userId || !timestamp || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+			console.warn(
+				`[ZKTeco] parseIClockBody: skipping line (bad userId/timestamp): userId=${JSON.stringify(userId)} timestamp=${JSON.stringify(timestamp)}`
+			);
+			return [];
+		}
+		return [
+			{
+				deviceUserId: userId,
+				timestamp,
+				inOutMode: parseInt(parts[2] ?? '0') || 0,
+				verifyType: parseInt(parts[3] ?? '0') || 0,
+				rawLine: line
 			}
-			const userId = parts[0]?.trim();
-			const timestamp = parts[1]?.trim();
-			// Basic timestamp validation: YYYY-MM-DD HH:MM:SS
-			if (!userId || !timestamp || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
-				console.warn(`[ZKTeco] parseIClockBody: skipping line (bad userId/timestamp): userId=${JSON.stringify(userId)} timestamp=${JSON.stringify(timestamp)}`);
-				return [];
-			}
-			return [
-				{
-					deviceUserId: userId,
-					timestamp,
-					inOutMode: parseInt(parts[2] ?? '0') || 0,
-					verifyType: parseInt(parts[3] ?? '0') || 0,
-					rawLine: line
-				}
-			];
-		});
+		];
+	});
 
 	console.log(`[ZKTeco] parseIClockBody: parsed ${results.length} valid punch(es)`);
 	return results;
@@ -94,7 +101,9 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 	const timeStr = punch.timestamp.substring(11, 16); // HH:MM
 	const numericId = parseInt(punch.deviceUserId);
 
-	console.log(`[ZKTeco] processPunch: deviceSn=${punch.deviceSn} userId=${punch.deviceUserId} timestamp=${punch.timestamp} numericId=${numericId}`);
+	console.log(
+		`[ZKTeco] processPunch: deviceSn=${punch.deviceSn} userId=${punch.deviceUserId} timestamp=${punch.timestamp} numericId=${numericId}`
+	);
 
 	// Resolve employee from biometricId
 	let employeeEmail: string | null = null;
@@ -104,12 +113,18 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 		if (emp) {
 			employeeEmail = emp.email;
 			employeeName = emp.name;
-			console.log(`[ZKTeco] processPunch: resolved employee email=${employeeEmail} name=${employeeName}`);
+			console.log(
+				`[ZKTeco] processPunch: resolved employee email=${employeeEmail} name=${employeeName}`
+			);
 		} else {
-			console.warn(`[ZKTeco] processPunch: NO employee found with biometricId=${numericId} — punch will be stored unresolved`);
+			console.warn(
+				`[ZKTeco] processPunch: NO employee found with biometricId=${numericId} — punch will be stored unresolved`
+			);
 		}
 	} else {
-		console.warn(`[ZKTeco] processPunch: invalid numericId (${punch.deviceUserId}) — skipping employee lookup`);
+		console.warn(
+			`[ZKTeco] processPunch: invalid numericId (${punch.deviceUserId}) — skipping employee lookup`
+		);
 	}
 
 	// Deduplicate using a deterministic ID: SN + userId + compact timestamp
@@ -137,7 +152,9 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 	}
 
 	if (employeeEmail) {
-		console.log(`[ZKTeco] processPunch: running reconcileAttendanceForDay for ${employeeEmail} on ${date}`);
+		console.log(
+			`[ZKTeco] processPunch: running reconcileAttendanceForDay for ${employeeEmail} on ${date}`
+		);
 		try {
 			await reconcileAttendanceForDay(employeeEmail, date);
 			console.log(`[ZKTeco] processPunch: reconcile OK for ${employeeEmail} on ${date}`);
@@ -146,7 +163,9 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 			throw err;
 		}
 	} else {
-		console.warn(`[ZKTeco] processPunch: skipping reconcile — no employee resolved for userId=${punch.deviceUserId}`);
+		console.warn(
+			`[ZKTeco] processPunch: skipping reconcile — no employee resolved for userId=${punch.deviceUserId}`
+		);
 	}
 
 	return employeeEmail;
