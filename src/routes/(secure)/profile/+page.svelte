@@ -93,6 +93,8 @@
 			const issues = uploadMyDocument.fields.allIssues();
 			if (!issues?.length) {
 				selectedFileName = '';
+				const input = document.getElementById('document-file') as HTMLInputElement | null;
+				if (input) input.value = '';
 				toast.success('Document uploaded');
 				await invalidateAll();
 			}
@@ -111,7 +113,6 @@
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		selectedFileName = file?.name ?? '';
-		uploadMyDocument.fields.file.set(file);
 	}
 </script>
 
@@ -303,7 +304,11 @@
 		<Tabs.Content value="document-details" class="mt-4">
 			<div class="space-y-4 rounded-md border border-[#EBEEEE] bg-white p-6">
 				<h3 class="mb-4 text-base font-medium">Document Metadata</h3>
-				<form {...uploadDocumentForm} class="rounded-md border border-[#EBEEEE] bg-[#FBF9F8] p-4">
+				<form
+					{...uploadDocumentForm}
+					enctype="multipart/form-data"
+					class="rounded-md border border-[#EBEEEE] bg-[#FBF9F8] p-4"
+				>
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 						<div class="space-y-1">
 							<Label>Document Type</Label>
@@ -322,7 +327,12 @@
 						</div>
 						<div class="space-y-1 md:col-span-2">
 							<Label for="document-file">Upload File</Label>
-							<Input id="document-file" type="file" onchange={handleDocumentFile} />
+							<Input
+								id="document-file"
+								{...uploadMyDocument.fields.file.as('file')}
+								files={undefined}
+								onchange={handleDocumentFile}
+							/>
 							{#if selectedFileName}
 								<p class="text-[13px] text-[#687976]">{selectedFileName}</p>
 							{/if}

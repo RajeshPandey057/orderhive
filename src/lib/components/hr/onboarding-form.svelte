@@ -33,12 +33,6 @@
 		{ value: 'reporting-manager', label: 'Reporting Manager' },
 		{ value: 'senior-manager', label: 'Senior Manager' }
 	];
-	const agentLevels = [
-		{ value: 'bronze', label: 'Bronze' },
-		{ value: 'silver', label: 'Silver' },
-		{ value: 'gold', label: 'Gold' },
-		{ value: 'platinum', label: 'Platinum' }
-	];
 	const departments = [
 		'Sales',
 		'Presales',
@@ -63,7 +57,6 @@
 		department: '',
 		accessType: 'agent',
 		agentRole: 'sales-agent',
-		agentLevel: '',
 		status: 'active',
 		reportingManagerEmail: '',
 		seniorManagerEmail: '',
@@ -85,7 +78,6 @@
 			department: employee?.department ?? '',
 			accessType: employee?.accessType ?? 'agent',
 			agentRole: employee?.agentRole || 'sales-agent',
-			agentLevel: employee?.agentLevel ?? '',
 			status: employee?.status ?? 'active',
 			reportingManagerEmail: employee?.reportingManagerEmail ?? '',
 			seniorManagerEmail: employee?.seniorManagerEmail ?? '',
@@ -103,9 +95,6 @@
 	const agentRoleLabel = $derived(
 		agentRoles.find((role) => role.value === formData.agentRole)?.label ?? 'Select agent role'
 	);
-	const agentLevelLabel = $derived(
-		agentLevels.find((level) => level.value === formData.agentLevel)?.label ?? 'Select agent level'
-	);
 
 	function toNumber(value: string) {
 		const n = Number(value);
@@ -122,7 +111,6 @@
 				| 'manager'
 				| 'senior-manager',
 			agentRole: formData.accessType === 'agent' ? formData.agentRole : '',
-			agentLevel: formData.accessType === 'agent' ? formData.agentLevel : '',
 			managedTeamIds:
 				formData.accessType === 'manager' || formData.accessType === 'senior-manager'
 					? managedTeamText
@@ -318,17 +306,6 @@
 							<Select.Content>
 								{#each agentRoles as role (role.value)}
 									<Select.Item value={role.value}>{role.label}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-					<div class="space-y-2">
-						<Label>Agent Level</Label>
-						<Select.Root type="single" bind:value={formData.agentLevel}>
-							<Select.Trigger class="h-8">{agentLevelLabel}</Select.Trigger>
-							<Select.Content>
-								{#each agentLevels as level (level.value)}
-									<Select.Item value={level.value}>{level.label}</Select.Item>
 								{/each}
 							</Select.Content>
 						</Select.Root>

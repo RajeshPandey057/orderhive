@@ -32,7 +32,6 @@ const emailSchema = z.email().transform((email) => normalizeEmail(email));
 const employeeAccessSchema = z.object({
 	accessType: accessTypeSchema,
 	agentRole: optionalString,
-	agentLevel: optionalString,
 	managedTeamIds: z.array(z.string()).optional().default([])
 });
 
@@ -426,16 +425,18 @@ export const uploadMyDocument = form(
 		await employeeCollection.doc(employeeIdForEmail(email)).set(
 			{
 				email,
-				[`documents.${kind}`]: {
-					...uploaded,
-					original: {
-						name: file.name,
-						size: file.size,
-						type: file.type,
-						lastModified: file.lastModified
-					},
-					uploadedAt: new Date().toISOString(),
-					uploadedByEmail: user.email
+				documents: {
+					[kind]: {
+						...uploaded,
+						original: {
+							name: file.name,
+							size: file.size,
+							type: file.type,
+							lastModified: file.lastModified
+						},
+						uploadedAt: new Date().toISOString(),
+						uploadedByEmail: user.email
+					}
 				},
 				updatedAt: FieldValue.serverTimestamp(),
 				updatedByEmail: user.email

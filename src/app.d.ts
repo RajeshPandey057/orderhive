@@ -92,7 +92,6 @@ declare global {
 		documents?: Partial<Record<EmployeeDocumentKind, EmployeeStoredFile>>;
 		accessType?: Role['accessType'];
 		agentRole?: string;
-		agentLevel?: string;
 		managedTeamIds?: string[];
 		accessStatus: EmployeeAccessStatus;
 		createdAt?: string;
