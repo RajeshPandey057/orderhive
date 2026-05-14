@@ -23,7 +23,11 @@ export default {
 		alias: {
 			'@': 'src/lib'
 		},
-		experimental: { remoteFunctions: true }
+		experimental: { remoteFunctions: true },
+		// ZKTeco SA40 is an embedded device that does not send an Origin header.
+		// CSRF is disabled globally; the /iclock/* routes are protected by
+		// the ZKTECO_DEVICE_SN serial-number check instead.
+		csrf: { checkOrigin: false }
 	},
 	compilerOptions: {
 		experimental: {
