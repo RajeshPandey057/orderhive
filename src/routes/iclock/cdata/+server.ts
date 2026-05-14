@@ -39,8 +39,10 @@ function isValidDevice(sn: string | null): boolean {
  */
 export const GET: RequestHandler = ({ url }) => {
 	const sn = url.searchParams.get('SN');
+	console.log(`[ZKTeco] GET /iclock/cdata — SN=${sn} options=${url.searchParams.get('options')}`);
 
 	if (!isValidDevice(sn)) {
+		console.warn(`[ZKTeco] GET rejected: SN=${sn} does not match ZKTECO_DEVICE_SN`);
 		return new Response('Unauthorized', { status: 401 });
 	}
 
@@ -73,23 +75,30 @@ export const GET: RequestHandler = ({ url }) => {
 export const POST: RequestHandler = async ({ url, request }) => {
 	const sn = url.searchParams.get('SN');
 	const table = url.searchParams.get('table');
+	console.log(`[ZKTeco] POST /iclock/cdata — SN=${sn} table=${table}`);
 
 	if (!isValidDevice(sn)) {
+		console.warn(`[ZKTeco] POST rejected: SN=${sn} does not match ZKTECO_DEVICE_SN`);
 		return new Response('Unauthorized', { status: 401 });
 	}
 
 	// Only process attendance log pushes; acknowledge all other tables gracefully
 	if (table !== 'ATTLOG') {
+		console.log(`[ZKTeco] POST: ignoring table=${table}`);
 		return new Response('OK', { headers: { 'Content-Type': 'text/plain' } });
 	}
 
 	const body = await request.text();
+	console.log(`[ZKTeco] POST body (${body.length} bytes):\n${body}`);
+
 	if (!body.trim()) {
+		console.log('[ZKTeco] POST: empty body, nothing to process');
 		return new Response('OK: 0', { headers: { 'Content-Type': 'text/plain' } });
 	}
 
 	const rawPunches = parseIClockBody(body);
 	if (rawPunches.length === 0) {
+		console.warn('[ZKTeco] POST: body received but 0 punches parsed — check format above');
 		return new Response('OK: 0', { headers: { 'Content-Type': 'text/plain' } });
 	}
 
@@ -104,6 +113,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
 	}
 
 	// ZKTeco devices expect "OK: <count>" to confirm receipt
+	console.log(`[ZKTeco] POST complete: ${processed}/${rawPunches.length} punches processed`);
 	return new Response(`OK: ${processed}`, {
 		headers: { 'Content-Type': 'text/plain' }
 	});
