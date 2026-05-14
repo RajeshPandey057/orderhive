@@ -1,5 +1,6 @@
 import { query } from '$app/server';
 import { firestore } from '$lib/server/firebase';
+import { employeeCollection, employeeIdForEmail, normalizeEmail } from '$lib/server/hr';
 import { z } from 'zod';
 
 const searchSchema = z.object({
@@ -18,6 +19,8 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 		email: string | null;
 		photoURL: string | null;
 		agentRole?: string | null;
+		reportingManagerEmail?: string | null;
+		seniorManagerEmail?: string | null;
 	};
 
 	const seen: Record<string, true> = {};
@@ -36,6 +39,44 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 		});
 	}
 
+	async function enrichHierarchy(users: UserResult[]) {
+		const emails = users
+			.map((user) => (user.email ? normalizeEmail(user.email) : ''))
+			.filter(Boolean);
+
+		if (emails.length === 0) return users;
+
+		const uniqueEmails = Array.from(new Set(emails));
+		const employeeRefs = uniqueEmails.map((email) =>
+			employeeCollection.doc(employeeIdForEmail(email))
+		);
+		const employeeDocs = await firestore.getAll(...employeeRefs);
+
+		const hierarchyByEmail = new Map<
+			string,
+			{ reportingManagerEmail: string; seniorManagerEmail: string }
+		>();
+		for (const doc of employeeDocs) {
+			if (!doc.exists) continue;
+			const data = doc.data() ?? {};
+			hierarchyByEmail.set(normalizeEmail(doc.id), {
+				reportingManagerEmail: (data.reportingManagerEmail ?? '').trim(),
+				seniorManagerEmail: (data.seniorManagerEmail ?? '').trim()
+			});
+		}
+
+		return users.map((user) => {
+			if (!user.email) return user;
+			const hierarchy = hierarchyByEmail.get(normalizeEmail(user.email));
+			if (!hierarchy) return user;
+			return {
+				...user,
+				reportingManagerEmail: hierarchy.reportingManagerEmail,
+				seniorManagerEmail: hierarchy.seniorManagerEmail
+			};
+		});
+	}
+
 	// --- Role-filtered mode: only search roles collection for matching agentRole + super-admins ---
 	if (roleFilter) {
 		const [byRoleSnap, superAdminSnap] = await Promise.all([
@@ -46,14 +87,15 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 			for (const doc of snap.docs) addDoc(doc);
 		}
 
+		let filtered = results;
 		if (term) {
-			return results.filter((r) => {
+			filtered = results.filter((r) => {
 				const name = (r.displayName ?? '').toLowerCase();
 				const email = (r.email ?? '').toLowerCase();
 				return name.includes(term) || email.includes(term);
 			});
 		}
-		return results;
+		return enrichHierarchy(filtered);
 	}
 
 	// --- Default mode: search all users + roles ---
@@ -92,7 +134,7 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 			}
 		}
 
-		return results;
+		return enrichHierarchy(results);
 	}
 
 	// No term — return all from both collections (up to 100 each)
@@ -103,5 +145,5 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 	for (const snap of [usersSnap, rolesSnap]) {
 		for (const doc of snap.docs) addDoc(doc);
 	}
-	return results;
+	return enrichHierarchy(results);
 });

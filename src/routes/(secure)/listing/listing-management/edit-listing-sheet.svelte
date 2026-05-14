@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -7,6 +8,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { getInitials } from '$lib/utils.js';
 	import { toast } from 'svelte-sonner';
 	import Building from '~icons/lucide/building';
 	import FileText from '~icons/lucide/file-text';
@@ -16,6 +18,8 @@
 	import Save from '~icons/lucide/save';
 	import Trash2 from '~icons/lucide/trash-2';
 	import Upload from '~icons/lucide/upload';
+	import UserRound from '~icons/lucide/user-round';
+	import { searchUsers as searchUsersRemote } from '../../users.remote';
 	import { updateListing } from './listing.remote';
 
 	type PropertyType = 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot';
@@ -45,7 +49,9 @@
 	let agentEmail = $state('');
 	let agentMobile = $state('');
 	let reportingManager = $state('');
+	let reportingManagerName = $state('');
 	let seniorManager = $state('');
+	let seniorManagerName = $state('');
 	let firstName = $state('');
 	let lastName = $state('');
 	let clientPhone = $state('');
@@ -117,8 +123,87 @@
 	let pictureInputRef: HTMLInputElement | undefined = $state(undefined);
 	let videoInputRef: HTMLInputElement | undefined = $state(undefined);
 	let developerSearchValue = $state('');
+	let managerPopoverOpen = $state(false);
+	let seniorManagerPopoverOpen = $state(false);
+	let managerSearchValue = $state('');
+	let seniorManagerSearchValue = $state('');
+	let managerSearchResults = $state<UserResult[]>([]);
+	let seniorManagerSearchResults = $state<UserResult[]>([]);
+	let managerSearchLoading = $state(false);
+	let seniorManagerSearchLoading = $state(false);
+	let managerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let seniorManagerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let activeTab = $state<'property-details' | 'property-photo-videos'>('property-details');
 	let initializedListingId = $state<string | null>(null);
+	let agentHierarchyDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let agentHierarchyRequest = 0;
+
+	type UserResult = {
+		id: string;
+		email: string | null;
+		displayName?: string | null;
+		photoURL?: string | null;
+		reportingManagerEmail?: string | null;
+		seniorManagerEmail?: string | null;
+	};
+
+	async function doUserSearch(
+		term: string,
+		roleFilter: 'manager' | 'senior-manager',
+		setLoading: (value: boolean) => void,
+		setResults: (value: UserResult[]) => void
+	) {
+		setLoading(true);
+		try {
+			setResults(await searchUsersRemote({ q: term.trim(), roleFilter }));
+		} catch {
+			setResults([]);
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	function handleManagerSearchInput(value: string) {
+		managerSearchValue = value;
+		if (managerDebounceTimer) clearTimeout(managerDebounceTimer);
+		managerDebounceTimer = setTimeout(
+			() =>
+				doUserSearch(
+					value,
+					'manager',
+					(next) => (managerSearchLoading = next),
+					(next) => (managerSearchResults = next)
+				),
+			300
+		);
+	}
+
+	function handleSeniorManagerSearchInput(value: string) {
+		seniorManagerSearchValue = value;
+		if (seniorManagerDebounceTimer) clearTimeout(seniorManagerDebounceTimer);
+		seniorManagerDebounceTimer = setTimeout(
+			() =>
+				doUserSearch(
+					value,
+					'senior-manager',
+					(next) => (seniorManagerSearchLoading = next),
+					(next) => (seniorManagerSearchResults = next)
+				),
+			300
+		);
+	}
+
+	function selectManager(user: UserResult) {
+		reportingManager = user.email ?? '';
+		reportingManagerName = user.displayName ?? reportingManager;
+		managerPopoverOpen = false;
+	}
+
+	function selectSeniorManager(user: UserResult) {
+		seniorManager = user.email ?? '';
+		seniorManagerName = user.displayName ?? seniorManager;
+		seniorManagerPopoverOpen = false;
+	}
 
 	$effect(() => {
 		if (!pictureInputRef) return;
@@ -132,6 +217,41 @@
 		const dt = new DataTransfer();
 		for (const a of mediaAssets.filter((a) => a.type === 'video')) dt.items.add(a.file);
 		videoInputRef.files = dt.files;
+	});
+
+	const normalizeEmail = (value: string) => value.trim().toLowerCase();
+	const isValidEmail = (value: string) => /.+@.+\..+/.test(value.trim());
+
+	async function autoPopulateManagersFromAgentEmail(email: string) {
+		const term = email.trim();
+		if (!isValidEmail(term)) return;
+		const requestId = ++agentHierarchyRequest;
+		try {
+			const users = await searchUsersRemote({ q: term });
+			if (requestId !== agentHierarchyRequest) return;
+			const match = users.find(
+				(user: UserResult) => normalizeEmail(user.email ?? '') === normalizeEmail(term)
+			);
+			if (!match) return;
+
+			if (!reportingManager.trim()) {
+				reportingManager = (match.reportingManagerEmail ?? '').trim();
+				reportingManagerName = reportingManager;
+			}
+			if (!seniorManager.trim()) {
+				seniorManager = (match.seniorManagerEmail ?? '').trim();
+				seniorManagerName = seniorManager;
+			}
+		} catch {
+			// Keep existing values on lookup failure.
+		}
+	}
+
+	$effect(() => {
+		if (agentHierarchyDebounceTimer) clearTimeout(agentHierarchyDebounceTimer);
+		agentHierarchyDebounceTimer = setTimeout(() => {
+			void autoPopulateManagersFromAgentEmail(agentEmail);
+		}, 300);
 	});
 
 	// Re-populate fields when opening or switching to another listing.
@@ -151,7 +271,9 @@
 		agentEmail = l.agentEmail ?? l.createdByEmail ?? '';
 		agentMobile = l.agentMobile ?? '';
 		reportingManager = l.reportingManager ?? '';
+		reportingManagerName = l.reportingManager ?? '';
 		seniorManager = l.seniorManager ?? '';
+		seniorManagerName = l.seniorManager ?? '';
 		firstName = fn;
 		lastName = ln;
 		clientPhone = l.clientPhone;
@@ -222,6 +344,12 @@
 			(asset): asset is { fileName: string; url: string } => !!asset?.url && !!asset?.fileName
 		);
 		mediaAssets = [];
+		managerSearchValue = '';
+		seniorManagerSearchValue = '';
+		managerSearchResults = [];
+		seniorManagerSearchResults = [];
+		managerPopoverOpen = false;
+		seniorManagerPopoverOpen = false;
 		activeTab = 'property-details';
 		errors = {};
 	});
@@ -238,13 +366,7 @@
 		'penthouse',
 		'podium-townhouse'
 	];
-	const villaTownhouseBedroomTypes: string[] = [
-		'2bed',
-		'3bed',
-		'4bed',
-		'5bed',
-		'6-7bed'
-	];
+	const villaTownhouseBedroomTypes: string[] = ['2bed', '3bed', '4bed', '5bed', '6-7bed'];
 	const developers = [
 		{ value: 'emaar', label: 'Emaar' },
 		{ value: 'damac', label: 'DAMAC' },
@@ -455,7 +577,11 @@
 			<input type="hidden" name="location" value={sampleLocation} />
 			<input type="hidden" name="agentEmail" value={agentEmail} />
 			<input type="hidden" name="agentMobile" value={agentMobile || clientPhone} />
-			<input type="hidden" name="reportingManager" value={reportingManager || listing.createdByEmail} />
+			<input
+				type="hidden"
+				name="reportingManager"
+				value={reportingManager || listing.createdByEmail}
+			/>
 			<input type="hidden" name="seniorManager" value={seniorManager || listing.createdByEmail} />
 			<input type="hidden" name="projectType" value={projectType} />
 			<input type="hidden" name="unitType" value={unitType} />
@@ -478,7 +604,11 @@
 			<input type="hidden" name="price" value={sellingPrice} />
 			<input type="hidden" name="listedByEmails" value={JSON.stringify(sanitizedListedByEmails)} />
 			<input type="hidden" name="retainedMediaUrls" value={JSON.stringify(retainedMediaUrls)} />
-			<input type="hidden" name="retainedFloorPlanUrls" value={JSON.stringify(retainedFloorPlanUrls)} />
+			<input
+				type="hidden"
+				name="retainedFloorPlanUrls"
+				value={JSON.stringify(retainedFloorPlanUrls)}
+			/>
 			<input
 				type="file"
 				name="pictureFiles[]"
@@ -612,6 +742,174 @@
 						</Field.Group>
 					</Field.Set>
 
+					<!-- Agent & Reporting -->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Agent & Reporting</Field.Legend>
+						<Field.Group>
+							<div class="grid grid-cols-2 gap-4">
+								<Field.Field>
+									<Field.Label>Agent Official Email</Field.Label>
+									<Input
+										type="email"
+										bind:value={agentEmail}
+										placeholder="agent@indglobalrealty.com"
+									/>
+									{#if errors.agentEmail}<Field.Error class="text-sm text-destructive"
+											>{errors.agentEmail}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Agent Mobile Number</Field.Label>
+									<Input bind:value={agentMobile} placeholder="+971 52 123 4567" />
+									{#if errors.agentMobile}<Field.Error class="text-sm text-destructive"
+											>{errors.agentMobile}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Reporting Manager</Field.Label>
+									<Popover.Root bind:open={managerPopoverOpen}>
+										<Popover.Trigger
+											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+										>
+											{#if reportingManager}
+												<Avatar.Root class="h-5 w-5">
+													<Avatar.Fallback class="text-[10px]">
+														{getInitials(reportingManagerName || reportingManager)}
+													</Avatar.Fallback>
+												</Avatar.Root>
+												<span class="truncate">{reportingManagerName || reportingManager}</span>
+											{:else}
+												<UserRound class="h-4 w-4 text-muted-foreground" />
+												<span class="text-muted-foreground">Select manager...</span>
+											{/if}
+										</Popover.Trigger>
+										<Popover.Content class="w-72 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search managers..."
+													value={managerSearchValue}
+													oninput={(event) =>
+														handleManagerSearchInput((event.target as HTMLInputElement).value)}
+												/>
+												<Command.List>
+													{#if managerSearchLoading}
+														<div class="flex items-center justify-center py-4">
+															<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+														</div>
+													{:else if managerSearchResults.length === 0}
+														<Command.Empty>
+															{managerSearchValue.trim() ? 'No users found.' : 'Type to search...'}
+														</Command.Empty>
+													{:else}
+														<Command.Group>
+															{#each managerSearchResults as user (user.id)}
+																<Command.Item value={user.id} onSelect={() => selectManager(user)}>
+																	<Avatar.Root class="h-5 w-5">
+																		{#if user.photoURL}
+																			<Avatar.Image src={user.photoURL} alt={user.displayName} />
+																		{/if}
+																		<Avatar.Fallback class="text-[10px]">
+																			{getInitials(user.displayName ?? user.email ?? 'User')}
+																		</Avatar.Fallback>
+																	</Avatar.Root>
+																	<div class="ml-2 min-w-0">
+																		<div class="truncate text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'User'}
+																		</div>
+																		<div class="truncate text-xs text-muted-foreground">
+																			{user.email}
+																		</div>
+																	</div>
+																</Command.Item>
+															{/each}
+														</Command.Group>
+													{/if}
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									{#if errors.reportingManager}<Field.Error class="text-sm text-destructive"
+											>{errors.reportingManager}</Field.Error
+										>{/if}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Senior Manager</Field.Label>
+									<Popover.Root bind:open={seniorManagerPopoverOpen}>
+										<Popover.Trigger
+											class="flex h-10 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+										>
+											{#if seniorManager}
+												<Avatar.Root class="h-5 w-5">
+													<Avatar.Fallback class="text-[10px]">
+														{getInitials(seniorManagerName || seniorManager)}
+													</Avatar.Fallback>
+												</Avatar.Root>
+												<span class="truncate">{seniorManagerName || seniorManager}</span>
+											{:else}
+												<UserRound class="h-4 w-4 text-muted-foreground" />
+												<span class="text-muted-foreground">Select senior manager...</span>
+											{/if}
+										</Popover.Trigger>
+										<Popover.Content class="w-72 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search senior managers..."
+													value={seniorManagerSearchValue}
+													oninput={(event) =>
+														handleSeniorManagerSearchInput(
+															(event.target as HTMLInputElement).value
+														)}
+												/>
+												<Command.List>
+													{#if seniorManagerSearchLoading}
+														<div class="flex items-center justify-center py-4">
+															<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+														</div>
+													{:else if seniorManagerSearchResults.length === 0}
+														<Command.Empty>
+															{seniorManagerSearchValue.trim()
+																? 'No users found.'
+																: 'Type to search...'}
+														</Command.Empty>
+													{:else}
+														<Command.Group>
+															{#each seniorManagerSearchResults as user (user.id)}
+																<Command.Item
+																	value={user.id}
+																	onSelect={() => selectSeniorManager(user)}
+																>
+																	<Avatar.Root class="h-5 w-5">
+																		{#if user.photoURL}
+																			<Avatar.Image src={user.photoURL} alt={user.displayName} />
+																		{/if}
+																		<Avatar.Fallback class="text-[10px]">
+																			{getInitials(user.displayName ?? user.email ?? 'User')}
+																		</Avatar.Fallback>
+																	</Avatar.Root>
+																	<div class="ml-2 min-w-0">
+																		<div class="truncate text-sm font-medium">
+																			{user.displayName ?? user.email ?? 'User'}
+																		</div>
+																		<div class="truncate text-xs text-muted-foreground">
+																			{user.email}
+																		</div>
+																	</div>
+																</Command.Item>
+															{/each}
+														</Command.Group>
+													{/if}
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									{#if errors.seniorManager}<Field.Error class="text-sm text-destructive"
+											>{errors.seniorManager}</Field.Error
+										>{/if}
+								</Field.Field>
+							</div>
+						</Field.Group>
+					</Field.Set>
+
 					<!-- Property Details -->
 					<Field.Set>
 						<Field.Legend class="text-lg font-medium">Property Details</Field.Legend>
@@ -667,11 +965,7 @@
 										>Community <span class="text-muted-foreground">(Optional)</span></Field.Label
 									>
 									<InputGroup.Root id="community">
-										<InputGroup.Input
-											
-											bind:value={community}
-											placeholder="Community (Optional)"
-										/>
+										<InputGroup.Input bind:value={community} placeholder="Community (Optional)" />
 										<InputGroup.Addon><Home /></InputGroup.Addon>
 									</InputGroup.Root>
 								</Field.Field>
@@ -702,7 +996,6 @@
 								<Field.Field>
 									<Field.Label>Property Type</Field.Label>
 									<select
-										
 										bind:value={propertyType}
 										class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 									>
@@ -730,7 +1023,6 @@
 									<Field.Field>
 										<Field.Label>Bedroom Type</Field.Label>
 										<select
-											
 											bind:value={bedroomType}
 											class="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
 										>
@@ -743,12 +1035,7 @@
 								{#if propertyType === 'apartment' || propertyType === 'commercial' || propertyType === 'plot'}
 									<Field.Field>
 										<Field.Label>Property Size (sqft)</Field.Label>
-										<Input
-											
-											type="number"
-											bind:value={propertySize}
-											placeholder="Property Size"
-										/>
+										<Input type="number" bind:value={propertySize} placeholder="Property Size" />
 										{#if errors.propertySize}<Field.Error class="text-sm text-destructive"
 												>{errors.propertySize}</Field.Error
 											>{/if}
@@ -757,12 +1044,7 @@
 								{#if propertyType === 'townhouse' || propertyType === 'villa' || propertyType === 'plot'}
 									<Field.Field>
 										<Field.Label>Plot Area (sqft)</Field.Label>
-										<Input
-											
-											type="number"
-											bind:value={plotArea}
-											placeholder="Plot Area"
-										/>
+										<Input type="number" bind:value={plotArea} placeholder="Plot Area" />
 										{#if errors.plotArea}<Field.Error class="text-sm text-destructive"
 												>{errors.plotArea}</Field.Error
 											>{/if}
@@ -786,7 +1068,6 @@
 									<Field.Field>
 										<Field.Label>Gross Floor Area (sqft)</Field.Label>
 										<Input
-											
 											type="number"
 											bind:value={grossFloorArea}
 											placeholder="Gross Floor Area"
@@ -902,7 +1183,11 @@
 												onchange={(event) => onFileSelect(event, doc.key)}
 											/>
 											<p class="text-xs text-muted-foreground">
-												{doc.key === 'emiratesId' ? 'Optional' : listingType === 'portal' ? 'Required for portal listing' : 'Optional'}
+												{doc.key === 'emiratesId'
+													? 'Optional'
+													: listingType === 'portal'
+														? 'Required for portal listing'
+														: 'Optional'}
 											</p>
 											{#if errors[doc.errorKey]}<Field.Error class="text-sm text-destructive"
 													>{errors[doc.errorKey]}</Field.Error
@@ -921,12 +1206,7 @@
 							<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
 								<Field.Field>
 									<Field.Label>Buying Price</Field.Label>
-									<Input
-										
-										type="number"
-										bind:value={buyingPrice}
-										placeholder="Buying Price"
-									/>
+									<Input type="number" bind:value={buyingPrice} placeholder="Buying Price" />
 									{#if errors.buyingPrice}<Field.Error class="text-sm text-destructive"
 											>{errors.buyingPrice}</Field.Error
 										>{/if}
@@ -934,7 +1214,6 @@
 								<Field.Field>
 									<Field.Label>Liquidity Invested</Field.Label>
 									<Input
-										
 										type="number"
 										bind:value={liquidityInvested}
 										placeholder="Liquidity Invested"
@@ -945,24 +1224,16 @@
 								</Field.Field>
 								<Field.Field>
 									<Field.Label>Selling Price</Field.Label>
-									<Input
-										
-										type="number"
-										bind:value={sellingPrice}
-										placeholder="Selling Price"
-									/>
+									<Input type="number" bind:value={sellingPrice} placeholder="Selling Price" />
 									{#if errors.sellingPrice}<Field.Error class="text-sm text-destructive"
 											>{errors.sellingPrice}</Field.Error
 										>{/if}
 								</Field.Field>
 								<Field.Field>
-									<Field.Label>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label>
-									<Input
-										
-										type="number"
-										bind:value={dxbPrice}
-										placeholder="DxB Price"
-									/>
+									<Field.Label
+										>DxB Price <span class="text-muted-foreground">(Optional)</span></Field.Label
+									>
+									<Input type="number" bind:value={dxbPrice} placeholder="DxB Price" />
 									{#if errors.dxbPrice}<Field.Error class="text-sm text-destructive"
 											>{errors.dxbPrice}</Field.Error
 										>{/if}

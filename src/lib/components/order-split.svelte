@@ -88,6 +88,8 @@
 		email: string | null;
 		displayName?: string | null;
 		photoURL?: string | null;
+		reportingManagerEmail?: string | null;
+		seniorManagerEmail?: string | null;
 	};
 
 	// --- Agent search state ---
@@ -183,6 +185,55 @@
 		);
 	}
 
+	const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+	async function findUserByEmail(email: string): Promise<UserResult | null> {
+		const term = email.trim();
+		if (!term) return null;
+		try {
+			const users = await searchUsersRemote({ q: term });
+			const match = users.find((user) => normalizeEmail(user.email ?? '') === normalizeEmail(term));
+			return match ?? null;
+		} catch {
+			return null;
+		}
+	}
+
+	function applyHierarchyDefaults(split: SplitEntry, user: UserResult): SplitEntry {
+		const managerEmail = (user.reportingManagerEmail ?? '').trim();
+		const seniorManagerEmail = (user.seniorManagerEmail ?? '').trim();
+		return {
+			...split,
+			managerEmail,
+			seniorManagerEmail,
+			managerName: managerEmail,
+			seniorManagerName: seniorManagerEmail
+		};
+	}
+
+	$effect(() => {
+		const missingHierarchyRows = splits.filter(
+			(split) =>
+				split.agentEmail && (!split.managerEmail?.trim() || !split.seniorManagerEmail?.trim())
+		);
+		if (missingHierarchyRows.length === 0) return;
+
+		void (async () => {
+			let nextSplits = splits;
+			for (const row of missingHierarchyRows) {
+				const user = await findUserByEmail(row.agentEmail);
+				if (!user) continue;
+				nextSplits = nextSplits.map((split) =>
+					split.key === row.key ? applyHierarchyDefaults(split, user) : split
+				);
+			}
+			if (nextSplits !== splits) {
+				splits = nextSplits;
+				onsplitschange?.(splits);
+			}
+		})();
+	});
+
 	function selectAgent(key: number, agent: UserResult) {
 		const email = agent.email ?? '';
 		const name = agent.displayName ?? email;
@@ -193,7 +244,11 @@
 						agentId: agent.id,
 						agentEmail: email,
 						agentName: name,
-						agentPhotoURL: agent.photoURL ?? undefined
+						agentPhotoURL: agent.photoURL ?? undefined,
+						managerEmail: (agent.reportingManagerEmail ?? '').trim(),
+						seniorManagerEmail: (agent.seniorManagerEmail ?? '').trim(),
+						managerName: (agent.reportingManagerEmail ?? '').trim(),
+						seniorManagerName: (agent.seniorManagerEmail ?? '').trim()
 					}
 				: s
 		);

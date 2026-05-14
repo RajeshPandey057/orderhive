@@ -148,6 +148,8 @@
 		email: string | null;
 		displayName?: string | null;
 		photoURL?: string | null;
+		reportingManagerEmail?: string | null;
+		seniorManagerEmail?: string | null;
 	};
 
 	let managerSearchResults = $state<UserResult[]>([]);
@@ -156,6 +158,8 @@
 	let seniorManagerSearchLoading = $state(false);
 	let managerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let seniorManagerDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let agentHierarchyDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let agentHierarchyRequest = 0;
 
 	const developers = LISTING_DEVELOPERS.map((label) => ({ value: label, label }));
 
@@ -238,6 +242,35 @@
 		seniorManagerName = user.displayName ?? seniorManager;
 		seniorManagerPopoverOpen = false;
 	}
+
+	const normalizeEmail = (value: string) => value.trim().toLowerCase();
+	const isValidEmail = (value: string) => /.+@.+\..+/.test(value.trim());
+
+	async function autoPopulateManagersFromAgentEmail(email: string) {
+		const term = email.trim();
+		if (!isValidEmail(term)) return;
+		const requestId = ++agentHierarchyRequest;
+		try {
+			const users = await searchUsersRemote({ q: term });
+			if (requestId !== agentHierarchyRequest) return;
+			const match = users.find((user) => normalizeEmail(user.email ?? '') === normalizeEmail(term));
+			if (!match) return;
+
+			reportingManager = (match.reportingManagerEmail ?? '').trim();
+			reportingManagerName = reportingManager;
+			seniorManager = (match.seniorManagerEmail ?? '').trim();
+			seniorManagerName = seniorManager;
+		} catch {
+			// Keep current manual values if profile lookup fails.
+		}
+	}
+
+	$effect(() => {
+		if (agentHierarchyDebounceTimer) clearTimeout(agentHierarchyDebounceTimer);
+		agentHierarchyDebounceTimer = setTimeout(() => {
+			void autoPopulateManagersFromAgentEmail(agentEmail);
+		}, 300);
+	});
 
 	function onFileSelect(event: Event, key: 'titleDeed' | 'passport' | 'emiratesId') {
 		const file = (event.currentTarget as HTMLInputElement).files?.[0];

@@ -1,16 +1,23 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button';
+	import * as Command from '$lib/components/ui/command/index.js';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as Select from '$lib/components/ui/select';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { getInitials } from '$lib/utils.js';
 	import { toast } from 'svelte-sonner';
+	import Loader2 from '~icons/lucide/loader-2';
+	import UserRound from '~icons/lucide/user-round';
 	import {
 		createEmployee,
 		updateEmployee,
 		updateEmployeeAccess
 	} from '../../../routes/(secure)/hr/hr.remote';
+	import { searchUsers as searchUsersRemote } from '../../../routes/(secure)/users.remote';
 
 	let {
 		employee = null,
@@ -95,6 +102,101 @@
 	const agentRoleLabel = $derived(
 		agentRoles.find((role) => role.value === formData.agentRole)?.label ?? 'Select agent role'
 	);
+	const hideReportingSection = $derived(
+		formData.accessType === 'senior-manager' ||
+			(formData.accessType === 'agent' && formData.agentRole === 'senior-manager')
+	);
+
+	type UserResult = {
+		id: string;
+		email: string | null;
+		displayName?: string | null;
+		photoURL?: string | null;
+	};
+
+	let reportingPopoverOpen = $state(false);
+	let reportingSearchValue = $state('');
+	let reportingSearchResults = $state<UserResult[]>([]);
+	let reportingSearchLoading = $state(false);
+	let reportingDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+	let seniorPopoverOpen = $state(false);
+	let seniorSearchValue = $state('');
+	let seniorSearchResults = $state<UserResult[]>([]);
+	let seniorSearchLoading = $state(false);
+	let seniorDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => {
+		if (!hideReportingSection) return;
+		reportingPopoverOpen = false;
+		reportingSearchValue = '';
+		reportingSearchResults = [];
+		reportingSearchLoading = false;
+		if (reportingDebounceTimer) clearTimeout(reportingDebounceTimer);
+		reportingDebounceTimer = undefined;
+
+		seniorPopoverOpen = false;
+		seniorSearchValue = '';
+		seniorSearchResults = [];
+		seniorSearchLoading = false;
+		if (seniorDebounceTimer) clearTimeout(seniorDebounceTimer);
+		seniorDebounceTimer = undefined;
+	});
+
+	async function doSearch(
+		setLoading: (value: boolean) => void,
+		setResults: (users: UserResult[]) => void,
+		term: string,
+		roleFilter: 'manager' | 'senior-manager'
+	) {
+		setLoading(true);
+		try {
+			const users = await searchUsersRemote({ q: term.trim(), roleFilter });
+			setResults(users);
+		} catch {
+			setResults([]);
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	function handleReportingManagerSearchInput(value: string) {
+		reportingSearchValue = value;
+		if (reportingDebounceTimer) clearTimeout(reportingDebounceTimer);
+		reportingDebounceTimer = setTimeout(() => {
+			doSearch(
+				(value) => (reportingSearchLoading = value),
+				(users) => (reportingSearchResults = users),
+				value,
+				'manager'
+			);
+		}, 300);
+	}
+
+	function handleSeniorManagerSearchInput(value: string) {
+		seniorSearchValue = value;
+		if (seniorDebounceTimer) clearTimeout(seniorDebounceTimer);
+		seniorDebounceTimer = setTimeout(() => {
+			doSearch(
+				(value) => (seniorSearchLoading = value),
+				(users) => (seniorSearchResults = users),
+				value,
+				'senior-manager'
+			);
+		}, 300);
+	}
+
+	function selectReportingManager(user: UserResult) {
+		const email = user.email ?? '';
+		formData.reportingManagerEmail = email;
+		reportingPopoverOpen = false;
+	}
+
+	function selectSeniorManager(user: UserResult) {
+		const email = user.email ?? '';
+		formData.seniorManagerEmail = email;
+		seniorPopoverOpen = false;
+	}
 
 	function toNumber(value: string) {
 		const n = Number(value);
@@ -325,29 +427,147 @@
 			</div>
 		</section>
 
-		<section class="space-y-4">
-			<h3 class="text-sm leading-5 font-medium">Reporting</h3>
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div class="space-y-2">
-					<Label for="reportingManagerEmail">Reporting Manager Email</Label>
-					<Input
-						id="reportingManagerEmail"
-						type="email"
-						bind:value={formData.reportingManagerEmail}
-						class="h-8"
-					/>
+		{#if !hideReportingSection}
+			<section class="space-y-4">
+				<h3 class="text-sm leading-5 font-medium">Reporting</h3>
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div class="space-y-2">
+						<Label>Reporting Manager</Label>
+						<Popover.Root bind:open={reportingPopoverOpen}>
+							<Popover.Trigger
+								class="flex h-8 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+							>
+								{#if formData.reportingManagerEmail}
+									<Avatar.Root class="h-5 w-5">
+										<Avatar.Fallback class="text-[10px]">
+											{getInitials(formData.reportingManagerEmail)}
+										</Avatar.Fallback>
+									</Avatar.Root>
+									<span class="truncate">{formData.reportingManagerEmail}</span>
+								{:else}
+									<UserRound class="h-4 w-4 text-muted-foreground" />
+									<span class="text-muted-foreground">Select reporting manager...</span>
+								{/if}
+							</Popover.Trigger>
+							<Popover.Content class="w-72 p-0" align="start">
+								<Command.Root>
+									<Command.Input
+										placeholder="Search managers..."
+										value={reportingSearchValue}
+										oninput={(e) =>
+											handleReportingManagerSearchInput((e.target as HTMLInputElement).value)}
+									/>
+									<Command.List>
+										{#if reportingSearchLoading}
+											<div class="flex items-center justify-center py-4">
+												<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+											</div>
+										{:else if reportingSearchResults.length === 0}
+											<Command.Empty>
+												{reportingSearchValue.trim() ? 'No users found.' : 'Type to search...'}
+											</Command.Empty>
+										{:else}
+											<Command.Group>
+												{#each reportingSearchResults as user (user.id)}
+													<Command.Item
+														value={user.id}
+														onSelect={() => selectReportingManager(user)}
+													>
+														<Avatar.Root class="h-5 w-5">
+															{#if user.photoURL}
+																<Avatar.Image
+																	src={user.photoURL}
+																	alt={user.displayName ?? 'User'}
+																/>
+															{/if}
+															<Avatar.Fallback class="text-[10px]">
+																{getInitials(user.displayName ?? user.email ?? 'User')}
+															</Avatar.Fallback>
+														</Avatar.Root>
+														<div class="ml-2 min-w-0">
+															<div class="truncate text-sm font-medium">
+																{user.displayName ?? user.email ?? 'User'}
+															</div>
+															<div class="truncate text-xs text-muted-foreground">{user.email}</div>
+														</div>
+													</Command.Item>
+												{/each}
+											</Command.Group>
+										{/if}
+									</Command.List>
+								</Command.Root>
+							</Popover.Content>
+						</Popover.Root>
+					</div>
+
+					<div class="space-y-2">
+						<Label>Senior Manager</Label>
+						<Popover.Root bind:open={seniorPopoverOpen}>
+							<Popover.Trigger
+								class="flex h-8 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-left text-sm hover:bg-accent"
+							>
+								{#if formData.seniorManagerEmail}
+									<Avatar.Root class="h-5 w-5">
+										<Avatar.Fallback class="text-[10px]">
+											{getInitials(formData.seniorManagerEmail)}
+										</Avatar.Fallback>
+									</Avatar.Root>
+									<span class="truncate">{formData.seniorManagerEmail}</span>
+								{:else}
+									<UserRound class="h-4 w-4 text-muted-foreground" />
+									<span class="text-muted-foreground">Select senior manager...</span>
+								{/if}
+							</Popover.Trigger>
+							<Popover.Content class="w-72 p-0" align="start">
+								<Command.Root>
+									<Command.Input
+										placeholder="Search senior managers..."
+										value={seniorSearchValue}
+										oninput={(e) =>
+											handleSeniorManagerSearchInput((e.target as HTMLInputElement).value)}
+									/>
+									<Command.List>
+										{#if seniorSearchLoading}
+											<div class="flex items-center justify-center py-4">
+												<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+											</div>
+										{:else if seniorSearchResults.length === 0}
+											<Command.Empty>
+												{seniorSearchValue.trim() ? 'No users found.' : 'Type to search...'}
+											</Command.Empty>
+										{:else}
+											<Command.Group>
+												{#each seniorSearchResults as user (user.id)}
+													<Command.Item value={user.id} onSelect={() => selectSeniorManager(user)}>
+														<Avatar.Root class="h-5 w-5">
+															{#if user.photoURL}
+																<Avatar.Image
+																	src={user.photoURL}
+																	alt={user.displayName ?? 'User'}
+																/>
+															{/if}
+															<Avatar.Fallback class="text-[10px]">
+																{getInitials(user.displayName ?? user.email ?? 'User')}
+															</Avatar.Fallback>
+														</Avatar.Root>
+														<div class="ml-2 min-w-0">
+															<div class="truncate text-sm font-medium">
+																{user.displayName ?? user.email ?? 'User'}
+															</div>
+															<div class="truncate text-xs text-muted-foreground">{user.email}</div>
+														</div>
+													</Command.Item>
+												{/each}
+											</Command.Group>
+										{/if}
+									</Command.List>
+								</Command.Root>
+							</Popover.Content>
+						</Popover.Root>
+					</div>
 				</div>
-				<div class="space-y-2">
-					<Label for="seniorManagerEmail">Senior Manager Email</Label>
-					<Input
-						id="seniorManagerEmail"
-						type="email"
-						bind:value={formData.seniorManagerEmail}
-						class="h-8"
-					/>
-				</div>
-			</div>
-		</section>
+			</section>
+		{/if}
 	</div>
 
 	<div class="mt-auto border-t border-[#EBEEEE] pt-4">
