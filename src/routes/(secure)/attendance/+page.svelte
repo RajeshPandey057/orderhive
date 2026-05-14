@@ -16,7 +16,7 @@
 	} from '$lib/components/ui/table';
 	import { Download, Search } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { correctAttendance, syncAttendance } from '../hr/hr.remote';
+	import { correctAttendance, reconcileAttendance } from '../hr/hr.remote';
 
 	let {
 		data
@@ -111,11 +111,13 @@
 	async function handleSync() {
 		syncing = true;
 		try {
-			const result = await syncAttendance({ rows: [] });
-			toast.success(`Biometric sync completed. Imported ${result.imported ?? 0} row(s).`);
+			const result = await reconcileAttendance({});
+			toast.success(
+				`Biometric reconcile complete. Processed ${result.reconciled ?? 0} employee(s).`
+			);
 			await invalidateAll();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Unable to sync attendance');
+			toast.error(err instanceof Error ? err.message : 'Unable to reconcile attendance');
 		} finally {
 			syncing = false;
 		}
@@ -156,7 +158,7 @@
 				onclick={handleSync}
 				disabled={syncing}
 			>
-				{syncing ? 'Syncing...' : 'Sync Biometric'}
+				{syncing ? 'Reconciling...' : 'Reconcile Biometric'}
 			</Button>
 		</div>
 	</div>
@@ -288,15 +290,25 @@
 							<TableCell class="text-[13px]">{record.punchOut || '-'}</TableCell>
 							<TableCell class="text-[13px]">{minutesToDuration(record.workingMinutes)}</TableCell>
 							<TableCell>
-								<Badge
-									variant={record.status === 'present'
-										? 'secondary'
-										: record.status === 'late' || record.status === 'on-leave'
-											? 'outline'
-											: 'destructive'}
-								>
-									{formatStatus(record.status)}
-								</Badge>
+								<div class="flex items-center gap-1.5">
+									<Badge
+										variant={record.status === 'present'
+											? 'secondary'
+											: record.status === 'late' || record.status === 'on-leave'
+												? 'outline'
+												: 'destructive'}
+									>
+										{formatStatus(record.status)}
+									</Badge>
+									{#if record.source === 'biometric'}
+										<Badge
+											variant="outline"
+											class="border-blue-200 bg-blue-50 text-[10px] text-blue-700"
+										>
+											Biometric
+										</Badge>
+									{/if}
+								</div>
 							</TableCell>
 							<TableCell class="text-right">
 								<Button

@@ -63,7 +63,8 @@
 		doj: '',
 		probationEndingDate: '',
 		location: '',
-		lastWorkingDay: ''
+		lastWorkingDay: '',
+		biometricId: ''
 	});
 
 	$effect(() => {
@@ -84,7 +85,8 @@
 			doj: employee?.doj ?? '',
 			probationEndingDate: employee?.probationEndingDate ?? '',
 			location: employee?.location ?? '',
-			lastWorkingDay: employee?.lastWorkingDay ?? ''
+			lastWorkingDay: employee?.lastWorkingDay ?? '',
+			biometricId: employee?.biometricId?.toString() ?? ''
 		};
 		managedTeamText = (employee?.managedTeamIds ?? []).join('\n');
 	});
@@ -145,6 +147,7 @@
 					lastWorkingDay: formData.lastWorkingDay,
 					compensationAED: toNumber(formData.compensationAED),
 					compensationINR: toNumber(formData.compensationINR),
+					biometricId: toNumber(formData.biometricId),
 					access: accessPayload()
 				};
 
@@ -278,6 +281,16 @@
 						id="compensationINR"
 						inputmode="decimal"
 						bind:value={formData.compensationINR}
+						class="h-8"
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="biometricId">Biometric ID (ZKTeco)</Label>
+					<Input
+						id="biometricId"
+						inputmode="numeric"
+						bind:value={formData.biometricId}
+						placeholder="Device User ID (e.g. 1, 2, 3…)"
 						class="h-8"
 					/>
 				</div>

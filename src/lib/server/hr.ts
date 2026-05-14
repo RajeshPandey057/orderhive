@@ -1,5 +1,5 @@
-import { firestore } from '$lib/server/firebase';
 import type { AccessType } from '$lib/constants';
+import { firestore } from '$lib/server/firebase';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 export const employeeCollection = firestore.collection('employees');
@@ -76,6 +76,7 @@ export function serializeEmployeeDoc(id: string, data: FirebaseFirestore.Documen
 		visaType: data.visaType ?? '',
 		visaEndingDate: data.visaEndingDate ?? '',
 		fresherOrExperienced: data.fresherOrExperienced ?? '',
+		biometricId: asNumber(data.biometricId),
 		documents: data.documents ?? {},
 		accessType: data.accessType,
 		agentRole: data.agentRole ?? '',
@@ -319,4 +320,15 @@ export function minutesToDuration(minutes?: number) {
 	const hours = Math.floor(safe / 60);
 	const mins = safe % 60;
 	return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
+/**
+ * Look up an employee by their ZKTeco device biometric ID.
+ * Returns null if no employee has been mapped to that ID.
+ */
+export async function getEmployeeByBiometricId(biometricId: number): Promise<Employee | null> {
+	const snap = await employeeCollection.where('biometricId', '==', biometricId).limit(1).get();
+	if (snap.empty) return null;
+	const doc = snap.docs[0];
+	return serializeEmployeeDoc(doc.id, doc.data());
 }

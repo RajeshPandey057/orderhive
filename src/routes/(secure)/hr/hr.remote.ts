@@ -1,5 +1,6 @@
 import { command, form, getRequestEvent } from '$app/server';
 import type { AccessType } from '$lib/constants';
+import { biometricPunchesCollection, reconcileAttendanceForDay } from '$lib/server/biometric';
 import { uploadFileWithLink } from '$lib/server/firebase';
 import {
 	attendanceLogId,
@@ -63,6 +64,7 @@ const employeeSchema = z.object({
 	lastWorkingDay: optionalString,
 	compensationAED: z.number().optional(),
 	compensationINR: z.number().optional(),
+	biometricId: z.number().int().min(1).optional(),
 	access: employeeAccessSchema
 });
 
@@ -120,6 +122,7 @@ export const createEmployee = command(employeeSchema, async (data) => {
 			lastWorkingDay: data.lastWorkingDay,
 			compensationAED: data.compensationAED ?? null,
 			compensationINR: data.compensationINR ?? null,
+			biometricId: data.biometricId ?? null,
 			createdAt: now,
 			updatedAt: now,
 			createdByEmail: user.email,
@@ -153,6 +156,7 @@ export const updateEmployee = command(updateEmployeeSchema, async (data) => {
 			lastWorkingDay: data.lastWorkingDay,
 			compensationAED: data.compensationAED ?? null,
 			compensationINR: data.compensationINR ?? null,
+			biometricId: data.biometricId ?? null,
 			updatedAt: FieldValue.serverTimestamp(),
 			updatedByEmail: user.email
 		},
@@ -370,6 +374,55 @@ export const syncAttendance = command(
 		}
 		await batch.commit();
 		return { success: true, imported: rows.length };
+	}
+);
+
+/**
+ * Update (or clear) the ZKTeco biometric device ID for a single employee.
+ * The biometricId must match the User ID enrolled on the SA40 device.
+ */
+export const updateBiometricId = command(
+	z.object({
+		employeeEmail: emailSchema,
+		biometricId: z.number().int().min(1).optional()
+	}),
+	async ({ employeeEmail, biometricId }) => {
+		requireHrAdmin();
+		await employeeCollection.doc(employeeIdForEmail(employeeEmail)).set(
+			{
+				biometricId: biometricId ?? null,
+				updatedAt: FieldValue.serverTimestamp()
+			},
+			{ merge: true }
+		);
+		return { success: true };
+	}
+);
+
+/**
+ * Re-run attendance reconciliation for all employees that have biometric punches
+ * on the given date (defaults to today). Idempotent — safe to call multiple times.
+ * Manually-corrected records are never overwritten.
+ */
+export const reconcileAttendance = command(
+	z.object({
+		date: z.string().optional()
+	}),
+	async ({ date: inputDate }) => {
+		requireHrAdmin();
+		const date = inputDate ?? new Date().toISOString().substring(0, 10);
+
+		const punchesSnap = await biometricPunchesCollection.where('date', '==', date).get();
+
+		const emails = new Set<string>();
+		for (const doc of punchesSnap.docs) {
+			const emp = doc.data().employeeEmail as string | null;
+			if (emp) emails.add(emp);
+		}
+
+		await Promise.all([...emails].map((email) => reconcileAttendanceForDay(email, date)));
+
+		return { success: true, reconciled: emails.size };
 	}
 );
 
