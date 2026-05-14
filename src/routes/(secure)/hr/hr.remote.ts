@@ -1,7 +1,7 @@
 import { command, form, getRequestEvent } from '$app/server';
 import type { AccessType } from '$lib/constants';
 import { biometricPunchesCollection, reconcileAttendanceForDay } from '$lib/server/biometric';
-import { uploadFileWithLink } from '$lib/server/firebase';
+import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import {
 	attendanceLogId,
 	attendanceLogsCollection,
@@ -9,6 +9,7 @@ import {
 	disableEmployeeAccess as disableAccess,
 	employeeCollection,
 	employeeIdForEmail,
+	getEmployeeByCode,
 	holidaysCollection,
 	leaveRequestsCollection,
 	normalizeEmail,
@@ -64,7 +65,6 @@ const employeeSchema = z.object({
 	lastWorkingDay: optionalString,
 	compensationAED: z.number().optional(),
 	compensationINR: z.number().optional(),
-	biometricId: z.number().int().min(1).optional(),
 	access: employeeAccessSchema
 });
 
@@ -122,7 +122,6 @@ export const createEmployee = command(employeeSchema, async (data) => {
 			lastWorkingDay: data.lastWorkingDay,
 			compensationAED: data.compensationAED ?? null,
 			compensationINR: data.compensationINR ?? null,
-			biometricId: data.biometricId ?? null,
 			createdAt: now,
 			updatedAt: now,
 			createdByEmail: user.email,
@@ -156,7 +155,6 @@ export const updateEmployee = command(updateEmployeeSchema, async (data) => {
 			lastWorkingDay: data.lastWorkingDay,
 			compensationAED: data.compensationAED ?? null,
 			compensationINR: data.compensationINR ?? null,
-			biometricId: data.biometricId ?? null,
 			updatedAt: FieldValue.serverTimestamp(),
 			updatedByEmail: user.email
 		},
@@ -378,28 +376,6 @@ export const syncAttendance = command(
 );
 
 /**
- * Update (or clear) the ZKTeco biometric device ID for a single employee.
- * The biometricId must match the User ID enrolled on the SA40 device.
- */
-export const updateBiometricId = command(
-	z.object({
-		employeeEmail: emailSchema,
-		biometricId: z.number().int().min(1).optional()
-	}),
-	async ({ employeeEmail, biometricId }) => {
-		requireHrAdmin();
-		await employeeCollection.doc(employeeIdForEmail(employeeEmail)).set(
-			{
-				biometricId: biometricId ?? null,
-				updatedAt: FieldValue.serverTimestamp()
-			},
-			{ merge: true }
-		);
-		return { success: true };
-	}
-);
-
-/**
  * Re-run attendance reconciliation for all employees that have biometric punches
  * on the given date (defaults to today). Idempotent — safe to call multiple times.
  * Manually-corrected records are never overwritten.
@@ -414,8 +390,19 @@ export const reconcileAttendance = command(
 
 		const punchesSnap = await biometricPunchesCollection.where('date', '==', date).get();
 
+		// Re-resolve any unlinked punches by employee code
+		const unresolvedDocs = punchesSnap.docs.filter((d) => !d.data().employeeEmail);
+		for (const doc of unresolvedDocs) {
+			const userId = doc.data().deviceUserId as string;
+			const emp = await getEmployeeByCode(userId);
+			if (!emp) continue;
+			await doc.ref.update({ employeeEmail: emp.email, employeeName: emp.name });
+		}
+
+		// Re-fetch after resolution
+		const refreshedSnap = await biometricPunchesCollection.where('date', '==', date).get();
 		const emails = new Set<string>();
-		for (const doc of punchesSnap.docs) {
+		for (const doc of refreshedSnap.docs) {
 			const emp = doc.data().employeeEmail as string | null;
 			if (emp) emails.add(emp);
 		}
@@ -425,6 +412,54 @@ export const reconcileAttendance = command(
 		return { success: true, reconciled: emails.size };
 	}
 );
+
+/**
+ * Sync all biometricPunches docs where processed=false.
+ * Resolves unlinked punches by employee code, reconciles attendance, marks processed.
+ * Use the "Sync Unprocessed" button to catch punches that failed to process live.
+ */
+export const syncUnprocessed = command(z.object({}), async () => {
+	requireHrAdmin();
+	const unprocessedSnap = await biometricPunchesCollection.where('processed', '==', false).get();
+	if (unprocessedSnap.empty) return { success: true, synced: 0 };
+
+	// Resolve any unlinked punches by employee code
+	for (const doc of unprocessedSnap.docs) {
+		if (doc.data().employeeEmail) continue;
+		const emp = await getEmployeeByCode(doc.data().deviceUserId as string);
+		if (!emp) continue;
+		await doc.ref.update({ employeeEmail: emp.email, employeeName: emp.name });
+	}
+
+	// Re-fetch and group by email+date
+	const refreshed = await biometricPunchesCollection.where('processed', '==', false).get();
+	const groups = new Map<
+		string,
+		{ email: string; date: string; refs: FirebaseFirestore.DocumentReference[] }
+	>();
+	for (const doc of refreshed.docs) {
+		const email = doc.data().employeeEmail as string | null;
+		const date = doc.data().date as string;
+		if (!email || !date) continue;
+		const key = `${email}__${date}`;
+		if (!groups.has(key)) groups.set(key, { email, date, refs: [] });
+		groups.get(key)!.refs.push(doc.ref);
+	}
+
+	let synced = 0;
+	for (const { email, date, refs } of groups.values()) {
+		try {
+			await reconcileAttendanceForDay(email, date);
+			const batch = firestore.batch();
+			for (const ref of refs) batch.update(ref, { processed: true });
+			await batch.commit();
+			synced += refs.length;
+		} catch (err) {
+			console.error('[ZKTeco] syncUnprocessed failed for', email, date, err);
+		}
+	}
+	return { success: true, synced };
+});
 
 export const updateMyProfile = command(
 	z.object({

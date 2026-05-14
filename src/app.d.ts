@@ -89,7 +89,6 @@ declare global {
 		visaType?: string;
 		visaEndingDate?: string;
 		fresherOrExperienced?: string;
-		biometricId?: number;
 		documents?: Partial<Record<EmployeeDocumentKind, EmployeeStoredFile>>;
 		accessType?: Role['accessType'];
 		agentRole?: string;

@@ -19,7 +19,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import {
 	attendanceLogId,
 	attendanceLogsCollection,
-	getEmployeeByBiometricId,
+	getEmployeeByCode,
 	getEmployeeByEmail
 } from './hr';
 
@@ -99,31 +99,24 @@ export function parseIClockBody(body: string): Omit<RawPunch, 'deviceSn'>[] {
 export async function processPunch(punch: RawPunch): Promise<string | null> {
 	const date = punch.timestamp.substring(0, 10); // YYYY-MM-DD
 	const timeStr = punch.timestamp.substring(11, 16); // HH:MM
-	const numericId = parseInt(punch.deviceUserId);
 
 	console.log(
-		`[ZKTeco] processPunch: deviceSn=${punch.deviceSn} userId=${punch.deviceUserId} timestamp=${punch.timestamp} numericId=${numericId}`
+		`[ZKTeco] processPunch: deviceSn=${punch.deviceSn} userId=${punch.deviceUserId} timestamp=${punch.timestamp}`
 	);
 
-	// Resolve employee from biometricId
+	// Resolve employee by matching deviceUserId to employee code (e.g. "INDGO194")
 	let employeeEmail: string | null = null;
 	let employeeName: string | null = null;
-	if (Number.isFinite(numericId) && numericId > 0) {
-		const emp = await getEmployeeByBiometricId(numericId);
-		if (emp) {
-			employeeEmail = emp.email;
-			employeeName = emp.name;
-			console.log(
-				`[ZKTeco] processPunch: resolved employee email=${employeeEmail} name=${employeeName}`
-			);
-		} else {
-			console.warn(
-				`[ZKTeco] processPunch: NO employee found with biometricId=${numericId} — punch will be stored unresolved`
-			);
-		}
+	const emp = await getEmployeeByCode(punch.deviceUserId);
+	if (emp) {
+		employeeEmail = emp.email;
+		employeeName = emp.name;
+		console.log(
+			`[ZKTeco] processPunch: resolved employee email=${employeeEmail} name=${employeeName}`
+		);
 	} else {
 		console.warn(
-			`[ZKTeco] processPunch: invalid numericId (${punch.deviceUserId}) — skipping employee lookup`
+			`[ZKTeco] processPunch: NO employee with code=${punch.deviceUserId} — punch stored unresolved`
 		);
 	}
 
@@ -158,6 +151,7 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 		try {
 			await reconcileAttendanceForDay(employeeEmail, date);
 			console.log(`[ZKTeco] processPunch: reconcile OK for ${employeeEmail} on ${date}`);
+			await biometricPunchesCollection.doc(punchId).update({ processed: true });
 		} catch (err) {
 			console.error(`[ZKTeco] processPunch: reconcile FAILED for ${employeeEmail} on ${date}`, err);
 			throw err;

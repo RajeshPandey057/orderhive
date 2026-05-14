@@ -16,7 +16,7 @@
 	} from '$lib/components/ui/table';
 	import { Download, Search } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { correctAttendance, reconcileAttendance } from '../hr/hr.remote';
+	import { correctAttendance, reconcileAttendance, syncUnprocessed } from '../hr/hr.remote';
 
 	let {
 		data
@@ -34,6 +34,7 @@
 	let selectedKpiFilter = $state<'all' | 'on-time' | 'present' | 'absent' | 'on-leave'>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
+	let syncing2 = $state(false);
 
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
 	const searchFilteredAttendanceRecords = $derived(
@@ -123,6 +124,19 @@
 		}
 	}
 
+	async function handleSyncUnprocessed() {
+		syncing2 = true;
+		try {
+			const result = await syncUnprocessed({});
+			toast.success(`Synced ${result.synced ?? 0} unprocessed punch(es).`);
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to sync unprocessed punches');
+		} finally {
+			syncing2 = false;
+		}
+	}
+
 	function getKpiCardClass(filter: 'on-time' | 'present' | 'absent' | 'on-leave') {
 		return selectedKpiFilter === filter
 			? 'rounded-md border border-[#F04C06] bg-[#FFF0DE] p-4 text-left'
@@ -153,6 +167,14 @@
 			<Button variant="outline" class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
 				>Export Logs</Button
 			>
+			<Button
+				variant="outline"
+				class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
+				onclick={handleSyncUnprocessed}
+				disabled={syncing2}
+			>
+				{syncing2 ? 'Syncing...' : 'Sync Unprocessed'}
+			</Button>
 			<Button
 				class="h-8 border border-black/5 bg-[#222626] text-sm text-white"
 				onclick={handleSync}

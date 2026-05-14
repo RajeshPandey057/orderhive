@@ -76,7 +76,6 @@ export function serializeEmployeeDoc(id: string, data: FirebaseFirestore.Documen
 		visaType: data.visaType ?? '',
 		visaEndingDate: data.visaEndingDate ?? '',
 		fresherOrExperienced: data.fresherOrExperienced ?? '',
-		biometricId: asNumber(data.biometricId),
 		documents: data.documents ?? {},
 		accessType: data.accessType,
 		agentRole: data.agentRole ?? '',
@@ -323,11 +322,11 @@ export function minutesToDuration(minutes?: number) {
 }
 
 /**
- * Look up an employee by their ZKTeco device biometric ID.
- * Returns null if no employee has been mapped to that ID.
+ * Look up an employee by their code — matches the ZKTeco deviceUserId (e.g. "INDGO194").
  */
-export async function getEmployeeByBiometricId(biometricId: number): Promise<Employee | null> {
-	const snap = await employeeCollection.where('biometricId', '==', biometricId).limit(1).get();
+export async function getEmployeeByCode(code: string): Promise<Employee | null> {
+	if (!code) return null;
+	const snap = await employeeCollection.where('code', '==', code).limit(1).get();
 	if (snap.empty) return null;
 	const doc = snap.docs[0];
 	return serializeEmployeeDoc(doc.id, doc.data());
