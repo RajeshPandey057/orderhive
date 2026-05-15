@@ -15,7 +15,7 @@
  * If ZKTECO_DEVICE_SN is not set, validation is skipped (useful during initial setup).
  *
  * Env vars:
- *   ZKTECO_DEVICE_SN    — serial number printed on back of device (e.g. "BBMNK123456789")
+ *   ZKTECO_DEVICE_SN    — comma-separated serial numbers (e.g. "JJA1253301000,CQZ7231961458")
  *   ZKTECO_TIMEZONE     — UTC offset for device clock sync (default "4.00" = Dubai UTC+4)
  *   LATE_THRESHOLD_TIME — HH:MM threshold for 'late' status (default "09:00")
  */
@@ -23,13 +23,18 @@
 import { parseIClockBody, processPunch } from '$lib/server/biometric';
 import type { RequestHandler } from './$types';
 
-const ZKTECO_DEVICE_SN = process.env.ZKTECO_DEVICE_SN ?? '';
+const ZKTECO_DEVICE_SNS: Set<string> = new Set(
+	(process.env.ZKTECO_DEVICE_SN ?? '')
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean)
+);
 const ZKTECO_TIMEZONE = process.env.ZKTECO_TIMEZONE ?? '4.00';
 
-/** Validate device serial number if one is configured. */
+/** Validate device serial number if any are configured. */
 function isValidDevice(sn: string | null): boolean {
-	if (!ZKTECO_DEVICE_SN) return true; // skip during initial setup / SN discovery
-	return sn === ZKTECO_DEVICE_SN;
+	if (ZKTECO_DEVICE_SNS.size === 0) return true; // skip during initial setup / SN discovery
+	return sn !== null && ZKTECO_DEVICE_SNS.has(sn);
 }
 
 /**
