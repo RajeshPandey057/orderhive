@@ -25,6 +25,20 @@ import {
 
 export const biometricPunchesCollection = firestore.collection('biometricPunches');
 
+/** Map of deviceSn → branch/office name, built from ZKTECO_DEVICE_BRANCHES env var.
+ *  Format: "SN1=Branch Name 1,SN2=Branch Name 2" (e.g. "JJA1253301000=Business Bay,CQZ7231961458=Al Barsha")
+ */
+const deviceBranchMap: Map<string, string> = new Map(
+	(process.env.ZKTECO_DEVICE_BRANCHES ?? '')
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean)
+		.map((pair) => {
+			const idx = pair.indexOf('=');
+			return [pair.substring(0, idx), pair.substring(idx + 1)] as [string, string];
+		})
+);
+
 /** Serialize a raw Firestore biometricPunches document to a plain BiometricPunch object. */
 export function serializePunch(id: string, data: FirebaseFirestore.DocumentData): BiometricPunch {
 	return {
@@ -143,6 +157,7 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 	console.log(`[ZKTeco] processPunch: writing Firestore doc id=${punchId}`);
 
 	try {
+		const deviceBranch = deviceBranchMap.get(punch.deviceSn) ?? null;
 		await biometricPunchesCollection.doc(punchId).set({
 			deviceSn: punch.deviceSn,
 			deviceUserId: punch.deviceUserId,
@@ -153,6 +168,7 @@ export async function processPunch(punch: RawPunch): Promise<string | null> {
 			timeStr,
 			inOutMode: punch.inOutMode,
 			verifyType: punch.verifyType,
+			branch: deviceBranch,
 			rawLine: punch.rawLine ?? null,
 			processed: false,
 			receivedAt: FieldValue.serverTimestamp()
