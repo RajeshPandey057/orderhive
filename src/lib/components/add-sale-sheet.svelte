@@ -253,7 +253,9 @@
 		if (event.key !== 'Enter') return;
 		const target = event.target;
 		if (!(target instanceof HTMLInputElement)) return;
-		if (['button', 'checkbox', 'file', 'hidden', 'radio', 'reset', 'submit'].includes(target.type)) {
+		if (
+			['button', 'checkbox', 'file', 'hidden', 'radio', 'reset', 'submit'].includes(target.type)
+		) {
 			return;
 		}
 		event.preventDefault();
@@ -479,7 +481,9 @@
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">AML Forms</Field.Legend>
 					<Field.Group class="space-y-4">
-						<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+						<div
+							class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4"
+						>
 							<div>
 								<p class="text-sm font-medium">{getBuyerName(savedSale.clientDetails)}</p>
 								<p class="text-xs text-muted-foreground">
@@ -504,7 +508,9 @@
 						</div>
 
 						{#each savedSale.jointBuyers as buyer, index (index)}
-							<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+							<div
+								class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4"
+							>
 								<div>
 									<p class="text-sm font-medium">{getBuyerName(buyer)}</p>
 									<p class="text-xs text-muted-foreground">
@@ -534,7 +540,9 @@
 				<Field.Set>
 					<Field.Legend class="text-lg font-medium">Referral Agreement</Field.Legend>
 					<Field.Group>
-						<div class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+						<div
+							class="flex items-center justify-between gap-4 rounded-lg border bg-background p-4"
+						>
 							<div>
 								<p class="text-sm font-medium">Referral Agreement</p>
 								<p class="text-xs text-muted-foreground">
@@ -561,339 +569,340 @@
 				</Field.Set>
 			</div>
 		{:else}
-		<form
-			enctype="multipart/form-data"
-			onkeydown={preventEnterSubmit}
-			{...createSale.enhance(async ({ form, submit }) => {
-				try {
-					await submit();
+			<form
+				enctype="multipart/form-data"
+				onkeydown={preventEnterSubmit}
+				{...createSale.enhance(async ({ form, submit }) => {
+					try {
+						await submit();
 
-					// Only reset and close if submission was successful (no validation errors)
-					const issues = createSale.fields.allIssues();
-					if (!issues?.length && createSale.result?.success) {
-						savedSale = createSale.result.sale as SavedSaleSummary;
-						form.reset();
-						resetDraftState();
-						toast.success(`Sale ${createSale.result.saleId} created successfully!`);
+						// Only reset and close if submission was successful (no validation errors)
+						const issues = createSale.fields.allIssues();
+						if (!issues?.length && createSale.result?.success) {
+							savedSale = createSale.result.sale as SavedSaleSummary;
+							form.reset();
+							resetDraftState();
+							toast.success(`Sale ${createSale.result.saleId} created successfully!`);
+						}
+					} catch {
+						toast.error('Failed to create sale');
 					}
-				} catch {
-					toast.error('Failed to create sale');
-				}
-			})}
-		>
-			<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
-				<Sheet.Title class="text-2xl font-medium">Add Sale</Sheet.Title>
-				<div class="flex flex-row gap-2">
-					<Button
-						type="submit"
-						size="sm"
-						disabled={!!createSale.pending || splitRemaining !== 0}
-						title={splitRemaining !== 0 ? 'Owner split must total 100%' : undefined}
-					>
-						<Save class="mr-2 h-4 w-4" />
-						{createSale.pending ? 'Saving...' : 'Save'}
-					</Button>
+				})}
+			>
+				<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
+					<Sheet.Title class="text-2xl font-medium">Add Sale</Sheet.Title>
+					<div class="flex flex-row gap-2">
+						<Button
+							type="submit"
+							size="sm"
+							disabled={!!createSale.pending || splitRemaining !== 0}
+							title={splitRemaining !== 0 ? 'Owner split must total 100%' : undefined}
+						>
+							<Save class="mr-2 h-4 w-4" />
+							{createSale.pending ? 'Saving...' : 'Save'}
+						</Button>
+					</div>
 				</div>
-			</div>
-			{#each createSale.fields.allIssues() as issue, i (i)}
-				<Field.Error class="text-sm text-destructive">
-					{issue.message}
-				</Field.Error>
-			{/each}
-			<div class="flex flex-col gap-8 p-6">
-				<!-- Client Details Section -->
-				<Field.Set>
+				{#each createSale.fields.allIssues() as issue, i (i)}
+					<Field.Error class="text-sm text-destructive">
+						{issue.message}
+					</Field.Error>
+				{/each}
+				<div class="flex flex-col gap-8 p-6">
+					<!-- Client Details Section -->
 					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
-						<Field.Group>
-							<div class="grid grid-cols-3 gap-4">
-								<Field.Field>
-									<Input {...createSale.fields.firstName.as('text')} placeholder="First Name" />
-									{#each createSale.fields.firstName.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<Input {...createSale.fields.lastName.as('text')} placeholder="Last Name" />
-									{#each createSale.fields.lastName.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<Input {...createSale.fields.email.as('email')} placeholder="Email" />
-									{#each createSale.fields.email.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-							</div>
-							<Field.Field>
-								<PhoneInput
-									bind:value={clientPhoneValue}
-									bind:country={clientPhoneCountry}
-									showCountrySelect={true}
-								/>
-							</Field.Field>
-							<input
-								type="hidden"
-								name="phone"
-								value={getE164number(clientPhoneValue, clientPhoneCountry) || ''}
-							/>
-							<!-- Sale Date + Nationality + Resident Status -->
-							<div class="grid grid-cols-3 gap-4">
-								<Field.Field>
-									<Field.Label for="sale-date">Sale Date</Field.Label>
-									<Popover.Root bind:open={saleDatePickerOpen}>
-										<Popover.Trigger class="w-full">
-											<Button
-												variant="outline"
-												class="w-full justify-start text-left font-normal"
-												id="sale-date"
-												type="button"
-											>
-												{#if saleDateValue}
-													{new Date(
-														saleDateValue.year,
-														saleDateValue.month - 1,
-														saleDateValue.day
-													).toLocaleDateString('en-GB', {
-														day: '2-digit',
-														month: 'short',
-														year: 'numeric'
-													})}
-												{:else}
-													<span class="text-muted-foreground">Pick sale date</span>
-												{/if}
-											</Button>
-										</Popover.Trigger>
-										<Popover.Content class="w-auto p-0" align="start">
-											<CalendarComponent
-												type="single"
-												bind:value={saleDateValue}
-												onValueChange={(value) => {
-													saleDateValue = value;
-													if (value) {
-														const d = new Date(value.year, value.month - 1, value.day);
-														createSale.fields.saleDate?.set(d.toISOString().split('T')[0]);
-													}
-													saleDatePickerOpen = false;
-												}}
-											/>
-										</Popover.Content>
-									</Popover.Root>
-									<input
-										type="hidden"
-										{...createSale.fields.saleDate?.as('text')}
-										value={saleDateValue
-											? new Date(saleDateValue.year, saleDateValue.month - 1, saleDateValue.day)
-													.toISOString()
-													.split('T')[0]
-											: ''}
-									/>
-									{#each createSale.fields.saleDate?.issues() ?? [] as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label for="nationality"
-										>Nationality <span class="text-muted-foreground">(Optional)</span></Field.Label
-									>
-									<Input
-										id="nationality"
-										{...createSale.fields.nationality?.as('text')}
-										placeholder="e.g. Indian"
-									/>
-								</Field.Field>
-								<Field.Field>
-									<Field.Label
-										>Resident Status <span class="text-muted-foreground">(Optional)</span
-										></Field.Label
-									>
-									<Select.Root
-										type="single"
-										value={createSale.fields.residentStatus?.value() ?? ''}
-										onValueChange={(v) =>
-											createSale.fields.residentStatus?.set(
-												(v || undefined) as 'resident' | 'non-resident' | undefined
-											)}
-									>
-										<Select.Trigger>
-											{#if createSale.fields.residentStatus?.value() === 'resident'}
-												Resident
-											{:else if createSale.fields.residentStatus?.value() === 'non-resident'}
-												Non-Resident
-											{:else}
-												<span class="text-muted-foreground">Select status</span>
-											{/if}
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="resident">Resident</Select.Item>
-											<Select.Item value="non-resident">Non-Resident</Select.Item>
-										</Select.Content>
-									</Select.Root>
-									<input type="hidden" {...createSale.fields.residentStatus?.as('text')} />
-								</Field.Field>
-							</div>
-						</Field.Group>
-					</Field.Set>
-					<Field.Set>
-						<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-							<div
-								class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
-							>
-								<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
-							</div>
-							Client KYC Documents
-						</Field.Legend>
-						<Field.Group class="space-y-4">
-							<div class="grid gap-4 xl:grid-cols-2">
-								<div class="flex items-center gap-4">
-									<span
-										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-									>
-										1
-									</span>
-
-									<Field.Field class="w-full">
-										{#if uploadedFiles.passportFile}
-											<h3 class="text-sm font-medium">Passport</h3>
-
-											<div
-												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-											>
-												<div class="flex items-center gap-3">
-													<FileText class="h-10 w-10 text-orange-500" />
-													<div class="flex flex-col">
-														<span class="text-sm font-medium"
-															>{uploadedFiles.passportFile.name}</span
-														>
-														<span class="text-xs text-muted-foreground"
-															>{formatFileSize(uploadedFiles.passportFile.size)}</span
-														>
-													</div>
-												</div>
-												<button
-													type="button"
-													onclick={() => removeFile('passportFile')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
-											</div>
-										{:else}
-											<label
-												for="passportFile"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload Passport</span>
-											</label>
-										{/if}
-										<Input
-											id="passportFile"
-											class="sr-only"
-											{...createSale.fields.passportFile.as('file')}
-											files={undefined}
-											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-											onchange={(e) => handleFileUpload('passportFile', e)}
-										/>
-										{#each createSale.fields.passportFile.issues() as issue, i (i)}
-											<Field.Error class="text-sm text-destructive">
-												{issue.message}
-											</Field.Error>
+						<Field.Set>
+							<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
+							<Field.Group>
+								<div class="grid grid-cols-3 gap-4">
+									<Field.Field>
+										<Input {...createSale.fields.firstName.as('text')} placeholder="First Name" />
+										{#each createSale.fields.firstName.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
 									</Field.Field>
-								</div>
-
-								<div class="flex items-center gap-4">
-									<span
-										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-									>
-										2
-									</span>
-									<Field.Field class="w-full">
-										{#if uploadedFiles.nationalIdFile}
-											<h3 class="text-sm font-medium">National ID</h3>
-
-											<div
-												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-											>
-												<div class="flex items-center gap-3">
-													<FileText class="h-10 w-10 text-orange-500" />
-													<div class="flex flex-col">
-														<span class="text-sm font-medium"
-															>{uploadedFiles.nationalIdFile.name}</span
-														>
-														<span class="text-xs text-muted-foreground"
-															>{formatFileSize(uploadedFiles.nationalIdFile.size)}</span
-														>
-													</div>
-												</div>
-												<button
-													type="button"
-													onclick={() => removeFile('nationalIdFile')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
-											</div>
-										{:else}
-											<label
-												for="nationalIdFile"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">
-													Upload National ID <br />(Emirates ID)
-												</span>
-											</label>
-										{/if}
-										<Input
-											id="nationalIdFile"
-											class="sr-only"
-											{...createSale.fields.nationalIdFile.as('file')}
-											files={undefined}
-											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-											onchange={(e) => handleFileUpload('nationalIdFile', e)}
-										/>
-										{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
+									<Field.Field>
+										<Input {...createSale.fields.lastName.as('text')} placeholder="Last Name" />
+										{#each createSale.fields.lastName.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									<Field.Field>
+										<Input {...createSale.fields.email.as('email')} placeholder="Email" />
+										{#each createSale.fields.email.issues() as issue, i (i)}
 											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
 									</Field.Field>
 								</div>
-
-								<div class="col-span-2 flex w-full flex-col items-center gap-4">
-									<div class="flex w-full flex-row gap-4">
+								<Field.Field>
+									<PhoneInput
+										bind:value={clientPhoneValue}
+										bind:country={clientPhoneCountry}
+										showCountrySelect={true}
+									/>
+								</Field.Field>
+								<input
+									type="hidden"
+									name="phone"
+									value={getE164number(clientPhoneValue, clientPhoneCountry) || ''}
+								/>
+								<!-- Sale Date + Nationality + Resident Status -->
+								<div class="grid grid-cols-3 gap-4">
+									<Field.Field>
+										<Field.Label for="sale-date">Sale Date</Field.Label>
+										<Popover.Root bind:open={saleDatePickerOpen}>
+											<Popover.Trigger class="w-full">
+												<Button
+													variant="outline"
+													class="w-full justify-start text-left font-normal"
+													id="sale-date"
+													type="button"
+												>
+													{#if saleDateValue}
+														{new Date(
+															saleDateValue.year,
+															saleDateValue.month - 1,
+															saleDateValue.day
+														).toLocaleDateString('en-GB', {
+															day: '2-digit',
+															month: 'short',
+															year: 'numeric'
+														})}
+													{:else}
+														<span class="text-muted-foreground">Pick sale date</span>
+													{/if}
+												</Button>
+											</Popover.Trigger>
+											<Popover.Content class="w-auto p-0" align="start">
+												<CalendarComponent
+													type="single"
+													bind:value={saleDateValue}
+													onValueChange={(value) => {
+														saleDateValue = value;
+														if (value) {
+															const d = new Date(value.year, value.month - 1, value.day);
+															createSale.fields.saleDate?.set(d.toISOString().split('T')[0]);
+														}
+														saleDatePickerOpen = false;
+													}}
+												/>
+											</Popover.Content>
+										</Popover.Root>
+										<input
+											type="hidden"
+											{...createSale.fields.saleDate?.as('text')}
+											value={saleDateValue
+												? new Date(saleDateValue.year, saleDateValue.month - 1, saleDateValue.day)
+														.toISOString()
+														.split('T')[0]
+												: ''}
+										/>
+										{#each createSale.fields.saleDate?.issues() ?? [] as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label for="nationality"
+											>Nationality <span class="text-muted-foreground">(Optional)</span
+											></Field.Label
+										>
+										<Input
+											id="nationality"
+											{...createSale.fields.nationality?.as('text')}
+											placeholder="e.g. Indian"
+										/>
+									</Field.Field>
+									<Field.Field>
+										<Field.Label
+											>Resident Status <span class="text-muted-foreground">(Optional)</span
+											></Field.Label
+										>
+										<Select.Root
+											type="single"
+											value={createSale.fields.residentStatus?.value() ?? ''}
+											onValueChange={(v) =>
+												createSale.fields.residentStatus?.set(
+													(v || undefined) as 'resident' | 'non-resident' | undefined
+												)}
+										>
+											<Select.Trigger>
+												{#if createSale.fields.residentStatus?.value() === 'resident'}
+													Resident
+												{:else if createSale.fields.residentStatus?.value() === 'non-resident'}
+													Non-Resident
+												{:else}
+													<span class="text-muted-foreground">Select status</span>
+												{/if}
+											</Select.Trigger>
+											<Select.Content>
+												<Select.Item value="resident">Resident</Select.Item>
+												<Select.Item value="non-resident">Non-Resident</Select.Item>
+											</Select.Content>
+										</Select.Root>
+										<input type="hidden" {...createSale.fields.residentStatus?.as('text')} />
+									</Field.Field>
+								</div>
+							</Field.Group>
+						</Field.Set>
+						<Field.Set>
+							<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+								<div
+									class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+								>
+									<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
+								</div>
+								Client KYC Documents
+							</Field.Legend>
+							<Field.Group class="space-y-4">
+								<div class="grid gap-4 xl:grid-cols-2">
+									<div class="flex items-center gap-4">
 										<span
 											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
 										>
-											3
+											1
 										</span>
-										<p class="text-sm font-medium">AML Form</p>
+
+										<Field.Field class="w-full">
+											{#if uploadedFiles.passportFile}
+												<h3 class="text-sm font-medium">Passport</h3>
+
+												<div
+													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<div class="flex items-center gap-3">
+														<FileText class="h-10 w-10 text-orange-500" />
+														<div class="flex flex-col">
+															<span class="text-sm font-medium"
+																>{uploadedFiles.passportFile.name}</span
+															>
+															<span class="text-xs text-muted-foreground"
+																>{formatFileSize(uploadedFiles.passportFile.size)}</span
+															>
+														</div>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeFile('passportFile')}
+														class="text-destructive hover:text-destructive/80"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{:else}
+												<label
+													for="passportFile"
+													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 text-gray-600" />
+													<span class="text-sm font-medium">Upload Passport</span>
+												</label>
+											{/if}
+											<Input
+												id="passportFile"
+												class="sr-only"
+												{...createSale.fields.passportFile.as('file')}
+												files={undefined}
+												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+												onchange={(e) => handleFileUpload('passportFile', e)}
+											/>
+											{#each createSale.fields.passportFile.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">
+													{issue.message}
+												</Field.Error>
+											{/each}
+										</Field.Field>
 									</div>
 
-									{#if uploadedFiles.amlFormFile}
-										<div
-											class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+									<div class="flex items-center gap-4">
+										<span
+											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
 										>
-											<div class="flex items-center gap-3">
-												<FileText class="h-10 w-10 text-orange-500" />
-												<div class="flex flex-col">
-													<span class="text-sm font-medium">{uploadedFiles.amlFormFile.name}</span>
-													<span class="text-xs text-muted-foreground"
-														>{formatFileSize(uploadedFiles.amlFormFile.size)}</span
+											2
+										</span>
+										<Field.Field class="w-full">
+											{#if uploadedFiles.nationalIdFile}
+												<h3 class="text-sm font-medium">National ID</h3>
+
+												<div
+													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<div class="flex items-center gap-3">
+														<FileText class="h-10 w-10 text-orange-500" />
+														<div class="flex flex-col">
+															<span class="text-sm font-medium"
+																>{uploadedFiles.nationalIdFile.name}</span
+															>
+															<span class="text-xs text-muted-foreground"
+																>{formatFileSize(uploadedFiles.nationalIdFile.size)}</span
+															>
+														</div>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeFile('nationalIdFile')}
+														class="text-destructive hover:text-destructive/80"
 													>
+														<Trash2 class="h-5 w-5" />
+													</button>
 												</div>
-											</div>
-											<button
-												type="button"
-												onclick={() => removeFile('amlFormFile')}
-												class="text-destructive hover:text-destructive/80"
+											{:else}
+												<label
+													for="nationalIdFile"
+													class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 text-gray-600" />
+													<span class="text-sm font-medium">
+														Upload National ID <br />(Emirates ID)
+													</span>
+												</label>
+											{/if}
+											<Input
+												id="nationalIdFile"
+												class="sr-only"
+												{...createSale.fields.nationalIdFile.as('file')}
+												files={undefined}
+												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+												onchange={(e) => handleFileUpload('nationalIdFile', e)}
+											/>
+											{#each createSale.fields.nationalIdFile.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+									</div>
+
+									<div class="col-span-2 flex w-full flex-col items-center gap-4">
+										<div class="flex w-full flex-row gap-4">
+											<span
+												class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
 											>
-												<Trash2 class="h-5 w-5" />
-											</button>
+												3
+											</span>
+											<p class="text-sm font-medium">AML Form</p>
 										</div>
-									{:else}
-										{#if canUploadManually}
+
+										{#if uploadedFiles.amlFormFile}
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium">{uploadedFiles.amlFormFile.name}</span
+														>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(uploadedFiles.amlFormFile.size)}</span
+														>
+													</div>
+												</div>
+												<button
+													type="button"
+													onclick={() => removeFile('amlFormFile')}
+													class="text-destructive hover:text-destructive/80"
+												>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											</div>
+										{:else if canUploadManually}
 											<label
 												for="amlFormFile"
 												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
@@ -908,686 +917,698 @@
 												AML can be generated after the sale is saved
 											</div>
 										{/if}
-									{/if}
-									<Input
-										id="amlFormFile"
-										class="sr-only"
-										{...createSale.fields.amlFormFile.as('file')}
-										files={undefined}
-										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-										onchange={(e) => handleFileUpload('amlFormFile', e)}
-										disabled={!canUploadManually}
-									/>
+										<Input
+											id="amlFormFile"
+											class="sr-only"
+											{...createSale.fields.amlFormFile.as('file')}
+											files={undefined}
+											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+											onchange={(e) => handleFileUpload('amlFormFile', e)}
+											disabled={!canUploadManually}
+										/>
+									</div>
 								</div>
+							</Field.Group>
+						</Field.Set>
+					</Field.Set>
+					<Field.Separator />
+
+					<!-- Project Details Section -->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
+
+						<Field.Group>
+							<div class="grid grid-cols-3 gap-4">
+								<Field.Field id="saleType">
+									<Select.Root
+										type="single"
+										value={createSale.fields.saleType.value() ?? ''}
+										onValueChange={(v) =>
+											createSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
+									>
+										<Select.Trigger id="dealype">
+											<div class="flex items-center gap-2">
+												<Traffic />
+												{saleTypeLabel}
+											</div>
+										</Select.Trigger>
+										<Select.Content>
+											{#each saleTypes as saleType (saleType.value)}
+												<Select.Item {...saleType} />
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<input type="hidden" {...createSale.fields.saleType.as('text')} />
+									{#each createSale.fields.saleType.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field id="developer">
+									<Popover.Root bind:open={developerPopoverOpen}>
+										<Popover.Trigger class="w-full">
+											<Button
+												variant="outline"
+												type="button"
+												role="combobox"
+												aria-expanded={developerPopoverOpen}
+												class="w-full justify-start gap-2"
+											>
+												<Hammer class="h-4 w-4" />
+												<span class="truncate">{developerLabel}</span>
+											</Button>
+										</Popover.Trigger>
+										<Popover.Content class="w-50 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search developer..."
+													bind:value={developerSearchValue}
+												/>
+												<Command.List>
+													<Command.Empty>No developer found.</Command.Empty>
+													<Command.Group>
+														{#each filteredDevelopers as developer (developer.value)}
+															<Command.Item
+																value={developer.value}
+																onSelect={() => {
+																	createSale.fields.developer.set(developer.value);
+																	developerPopoverOpen = false;
+																	developerSearchValue = '';
+																}}
+															>
+																{developer.label}
+															</Command.Item>
+														{/each}
+													</Command.Group>
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									<input type="hidden" {...createSale.fields.developer.as('text')} />
+									{#each createSale.fields.developer.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+
+								<Field.Field id="community">
+									<Popover.Root bind:open={communityPopoverOpen}>
+										<Popover.Trigger class="w-full">
+											<Button
+												variant="outline"
+												type="button"
+												role="combobox"
+												aria-expanded={communityPopoverOpen}
+												class="w-full justify-start gap-2"
+											>
+												<Home class="h-4 w-4" />
+												<span class="truncate">{communityLabel}</span>
+											</Button>
+										</Popover.Trigger>
+										<Popover.Content class="w-50 p-0" align="start">
+											<Command.Root>
+												<Command.Input
+													placeholder="Search community..."
+													bind:value={communitySearchValue}
+												/>
+												<Command.List>
+													<Command.Empty>No community found.</Command.Empty>
+													<Command.Group>
+														{#each filteredCommunities as community (community.value)}
+															<Command.Item
+																value={community.value}
+																onSelect={() => {
+																	createSale.fields.community?.set(community.value);
+																	communityPopoverOpen = false;
+																	communitySearchValue = '';
+																}}
+															>
+																{community.label}
+															</Command.Item>
+														{/each}
+													</Command.Group>
+												</Command.List>
+											</Command.Root>
+										</Popover.Content>
+									</Popover.Root>
+									<input type="hidden" {...createSale.fields.community?.as('text')} />
+									{#each createSale.fields.community?.issues() ?? [] as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
 							</div>
 						</Field.Group>
-					</Field.Set>
-				</Field.Set>
-				<Field.Separator />
 
-				<!-- Project Details Section -->
-				<Field.Set>
-					<Field.Legend class="text-lg font-medium">Project Details</Field.Legend>
-
-					<Field.Group>
-						<div class="grid grid-cols-3 gap-4">
-							<Field.Field id="saleType">
-								<Select.Root
-									type="single"
-									value={createSale.fields.saleType.value() ?? ''}
-									onValueChange={(v) =>
-										createSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
-								>
-									<Select.Trigger id="dealype">
-										<div class="flex items-center gap-2">
-											<Traffic />
-											{saleTypeLabel}
-										</div>
-									</Select.Trigger>
-									<Select.Content>
-										{#each saleTypes as saleType (saleType.value)}
-											<Select.Item {...saleType} />
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.saleType.as('text')} />
-								{#each createSale.fields.saleType.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field id="developer">
-								<Popover.Root bind:open={developerPopoverOpen}>
-									<Popover.Trigger class="w-full">
-										<Button
-											variant="outline"
-											type="button"
-											role="combobox"
-											aria-expanded={developerPopoverOpen}
-											class="w-full justify-start gap-2"
-										>
-											<Hammer class="h-4 w-4" />
-											<span class="truncate">{developerLabel}</span>
-										</Button>
-									</Popover.Trigger>
-									<Popover.Content class="w-50 p-0" align="start">
-										<Command.Root>
-											<Command.Input
-												placeholder="Search developer..."
-												bind:value={developerSearchValue}
-											/>
-											<Command.List>
-												<Command.Empty>No developer found.</Command.Empty>
-												<Command.Group>
-													{#each filteredDevelopers as developer (developer.value)}
-														<Command.Item
-															value={developer.value}
-															onSelect={() => {
-																createSale.fields.developer.set(developer.value);
-																developerPopoverOpen = false;
-																developerSearchValue = '';
-															}}
-														>
-															{developer.label}
-														</Command.Item>
-													{/each}
-												</Command.Group>
-											</Command.List>
-										</Command.Root>
-									</Popover.Content>
-								</Popover.Root>
-								<input type="hidden" {...createSale.fields.developer.as('text')} />
-								{#each createSale.fields.developer.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-
-							<Field.Field id="community">
-								<Popover.Root bind:open={communityPopoverOpen}>
-									<Popover.Trigger class="w-full">
-										<Button
-											variant="outline"
-											type="button"
-											role="combobox"
-											aria-expanded={communityPopoverOpen}
-											class="w-full justify-start gap-2"
-										>
-											<Home class="h-4 w-4" />
-											<span class="truncate">{communityLabel}</span>
-										</Button>
-									</Popover.Trigger>
-									<Popover.Content class="w-50 p-0" align="start">
-										<Command.Root>
-											<Command.Input
-												placeholder="Search community..."
-												bind:value={communitySearchValue}
-											/>
-											<Command.List>
-												<Command.Empty>No community found.</Command.Empty>
-												<Command.Group>
-													{#each filteredCommunities as community (community.value)}
-														<Command.Item
-															value={community.value}
-															onSelect={() => {
-																createSale.fields.community?.set(community.value);
-																communityPopoverOpen = false;
-																communitySearchValue = '';
-															}}
-														>
-															{community.label}
-														</Command.Item>
-													{/each}
-												</Command.Group>
-											</Command.List>
-										</Command.Root>
-									</Popover.Content>
-								</Popover.Root>
-								<input type="hidden" {...createSale.fields.community?.as('text')} />
-								{#each createSale.fields.community?.issues() ?? [] as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						</div>
-					</Field.Group>
-
-					<Field.Group>
-						<div class="grid grid-cols-2 gap-4">
-							<Field.Field id="propertyType">
-								<Select.Root
-									type="single"
-									value={createSale.fields.propertyType.value() ?? ''}
-									onValueChange={(v) =>
-										createSale.fields.propertyType.set(
-											v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
-										)}
-								>
-									<Select.Trigger id="propertyType">
-										<div class="flex items-center gap-2">
-											<Building />
-											{propertyTypeLabel}
-										</div>
-									</Select.Trigger>
-									<Select.Content>
-										{#each propertyTypes as propertyType (propertyType.value)}
-											<Select.Item {...propertyType} />
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...createSale.fields.propertyType.as('text')} />
-								{#each createSale.fields.propertyType.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						</div>
-
-						<!-- Conditional Fields Based on Property Type -->
-						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-							<!-- Apartment Fields -->
-							{#if createSale.fields.propertyType.value() === 'apartment'}
-								<Field.Field id="bedroomType">
+						<Field.Group>
+							<div class="grid grid-cols-2 gap-4">
+								<Field.Field id="propertyType">
 									<Select.Root
 										type="single"
-										value={createSale.fields.bedroomType.value() ?? ''}
+										value={createSale.fields.propertyType.value() ?? ''}
 										onValueChange={(v) =>
-											createSale.fields.bedroomType.set(
-												v as unknown as NonNullable<
-													Parameters<typeof createSale.fields.bedroomType.set>[0]
-												>
+											createSale.fields.propertyType.set(
+												v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
 											)}
 									>
-										<Select.Trigger id="bedroomType">
-											<div class="flex items-center gap-2">
-												<Home />
-												{bedroomTypeLabel}
-											</div>
-										</Select.Trigger>
-										<Select.Content>
-											{#each apartmentBedrooms as bedroom (bedroom.value)}
-												<Select.Item {...bedroom} />
-											{/each}
-										</Select.Content>
-									</Select.Root>
-									<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
-									{#each createSale.fields.bedroomType.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<InputGroup.Root id="propertySize">
-										<InputGroup.Input
-											{...createSale.fields.propertySize.as('number')}
-											placeholder="Property Size"
-										/>
-										<InputGroup.Addon>
-											<span class="text-xs">Sqft</span>
-										</InputGroup.Addon>
-									</InputGroup.Root>
-									{#each createSale.fields.propertySize.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-							{/if}
-
-							<!-- Townhouse/Villa Fields -->
-							{#if createSale.fields.propertyType.value() === 'townhouse' || createSale.fields.propertyType.value() === 'villa'}
-								<Field.Field id="bedroomType">
-									<Select.Root
-										type="single"
-										value={createSale.fields.bedroomType.value() ?? ''}
-										onValueChange={(v) =>
-											createSale.fields.bedroomType.set(
-												v as unknown as NonNullable<
-													Parameters<typeof createSale.fields.bedroomType.set>[0]
-												>
-											)}
-									>
-										<Select.Trigger id="bedroomType">
-											<div class="flex items-center gap-2">
-												<Home />
-												{bedroomTypeLabel}
-											</div>
-										</Select.Trigger>
-										<Select.Content>
-											{#each townhouseVillaBedrooms as bedroom (bedroom.value)}
-												<Select.Item {...bedroom} />
-											{/each}
-										</Select.Content>
-									</Select.Root>
-									<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
-									{#each createSale.fields.bedroomType.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<InputGroup.Root id="plotArea">
-										<InputGroup.Input
-											{...createSale.fields.plotArea.as('number')}
-											placeholder="Plot Area"
-										/>
-										<InputGroup.Addon>
-											<span class="text-xs">Sqft</span>
-										</InputGroup.Addon>
-									</InputGroup.Root>
-									{#each createSale.fields.plotArea.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								<Field.Field>
-									<InputGroup.Root id="builtUpArea">
-										<InputGroup.Input
-											{...createSale.fields.builtUpArea.as('number')}
-											placeholder="Built Up Area"
-										/>
-										<InputGroup.Addon>
-											<span class="text-xs">Sqft</span>
-										</InputGroup.Addon>
-									</InputGroup.Root>
-									{#each createSale.fields.builtUpArea.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-							{/if}
-
-							<!-- Commercial Fields -->
-							{#if createSale.fields.propertyType.value() === 'commercial'}
-								<Field.Field id="commercialSubType">
-									<Select.Root
-										type="single"
-										value={createSale.fields.commercialSubType.value() ?? ''}
-										onValueChange={(v) =>
-											createSale.fields.commercialSubType.set(v as 'office' | 'warehouse')}
-									>
-										<Select.Trigger id="commercialSubType">
+										<Select.Trigger id="propertyType">
 											<div class="flex items-center gap-2">
 												<Building />
-												{commercialSubTypeLabel}
+												{propertyTypeLabel}
 											</div>
 										</Select.Trigger>
 										<Select.Content>
-											{#each commercialSubTypes as subType (subType.value)}
-												<Select.Item {...subType} />
+											{#each propertyTypes as propertyType (propertyType.value)}
+												<Select.Item {...propertyType} />
 											{/each}
 										</Select.Content>
 									</Select.Root>
-									<input type="hidden" {...createSale.fields.commercialSubType.as('text')} />
-									{#each createSale.fields.commercialSubType.issues() as issue, i (i)}
+									<input type="hidden" {...createSale.fields.propertyType.as('text')} />
+									{#each createSale.fields.propertyType.issues() as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
 								</Field.Field>
-								<Field.Field>
-									<InputGroup.Root id="propertySize">
-										<InputGroup.Input
-											{...createSale.fields.propertySize.as('number')}
-											placeholder="Property Size"
-										/>
-										<InputGroup.Addon>
-											<span class="text-xs">Sqft</span>
-										</InputGroup.Addon>
-									</InputGroup.Root>
-									{#each createSale.fields.propertySize.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-									{/each}
-								</Field.Field>
-								{#if createSale.fields.commercialSubType.value() === 'warehouse'}
+							</div>
+
+							<!-- Conditional Fields Based on Property Type -->
+							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+								<!-- Apartment Fields -->
+								{#if createSale.fields.propertyType.value() === 'apartment'}
+									<Field.Field id="bedroomType">
+										<Select.Root
+											type="single"
+											value={createSale.fields.bedroomType.value() ?? ''}
+											onValueChange={(v) =>
+												createSale.fields.bedroomType.set(
+													v as unknown as NonNullable<
+														Parameters<typeof createSale.fields.bedroomType.set>[0]
+													>
+												)}
+										>
+											<Select.Trigger id="bedroomType">
+												<div class="flex items-center gap-2">
+													<Home />
+													{bedroomTypeLabel}
+												</div>
+											</Select.Trigger>
+											<Select.Content>
+												{#each apartmentBedrooms as bedroom (bedroom.value)}
+													<Select.Item {...bedroom} />
+												{/each}
+											</Select.Content>
+										</Select.Root>
+										<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
+										{#each createSale.fields.bedroomType.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
 									<Field.Field>
-										<InputGroup.Root id="grossFloorArea">
+										<InputGroup.Root id="propertySize">
 											<InputGroup.Input
-												{...createSale.fields.grossFloorArea.as('number')}
-												placeholder="Gross Floor Area"
+												{...createSale.fields.propertySize.as('number')}
+												placeholder="Property Size"
 											/>
 											<InputGroup.Addon>
 												<span class="text-xs">Sqft</span>
 											</InputGroup.Addon>
 										</InputGroup.Root>
-										{#each createSale.fields.grossFloorArea.issues() as issue, i (i)}
+										{#each createSale.fields.propertySize.issues() as issue, i (i)}
 											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 										{/each}
 									</Field.Field>
 								{/if}
-							{/if}
 
-							<!-- Plot Fields -->
-							{#if createSale.fields.propertyType.value() === 'plot'}
+								<!-- Townhouse/Villa Fields -->
+								{#if createSale.fields.propertyType.value() === 'townhouse' || createSale.fields.propertyType.value() === 'villa'}
+									<Field.Field id="bedroomType">
+										<Select.Root
+											type="single"
+											value={createSale.fields.bedroomType.value() ?? ''}
+											onValueChange={(v) =>
+												createSale.fields.bedroomType.set(
+													v as unknown as NonNullable<
+														Parameters<typeof createSale.fields.bedroomType.set>[0]
+													>
+												)}
+										>
+											<Select.Trigger id="bedroomType">
+												<div class="flex items-center gap-2">
+													<Home />
+													{bedroomTypeLabel}
+												</div>
+											</Select.Trigger>
+											<Select.Content>
+												{#each townhouseVillaBedrooms as bedroom (bedroom.value)}
+													<Select.Item {...bedroom} />
+												{/each}
+											</Select.Content>
+										</Select.Root>
+										<input type="hidden" {...createSale.fields.bedroomType.as('text')} />
+										{#each createSale.fields.bedroomType.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									<Field.Field>
+										<InputGroup.Root id="plotArea">
+											<InputGroup.Input
+												{...createSale.fields.plotArea.as('number')}
+												placeholder="Plot Area"
+											/>
+											<InputGroup.Addon>
+												<span class="text-xs">Sqft</span>
+											</InputGroup.Addon>
+										</InputGroup.Root>
+										{#each createSale.fields.plotArea.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									<Field.Field>
+										<InputGroup.Root id="builtUpArea">
+											<InputGroup.Input
+												{...createSale.fields.builtUpArea.as('number')}
+												placeholder="Built Up Area"
+											/>
+											<InputGroup.Addon>
+												<span class="text-xs">Sqft</span>
+											</InputGroup.Addon>
+										</InputGroup.Root>
+										{#each createSale.fields.builtUpArea.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+								{/if}
+
+								<!-- Commercial Fields -->
+								{#if createSale.fields.propertyType.value() === 'commercial'}
+									<Field.Field id="commercialSubType">
+										<Select.Root
+											type="single"
+											value={createSale.fields.commercialSubType.value() ?? ''}
+											onValueChange={(v) =>
+												createSale.fields.commercialSubType.set(v as 'office' | 'warehouse')}
+										>
+											<Select.Trigger id="commercialSubType">
+												<div class="flex items-center gap-2">
+													<Building />
+													{commercialSubTypeLabel}
+												</div>
+											</Select.Trigger>
+											<Select.Content>
+												{#each commercialSubTypes as subType (subType.value)}
+													<Select.Item {...subType} />
+												{/each}
+											</Select.Content>
+										</Select.Root>
+										<input type="hidden" {...createSale.fields.commercialSubType.as('text')} />
+										{#each createSale.fields.commercialSubType.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									<Field.Field>
+										<InputGroup.Root id="propertySize">
+											<InputGroup.Input
+												{...createSale.fields.propertySize.as('number')}
+												placeholder="Property Size"
+											/>
+											<InputGroup.Addon>
+												<span class="text-xs">Sqft</span>
+											</InputGroup.Addon>
+										</InputGroup.Root>
+										{#each createSale.fields.propertySize.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+									{#if createSale.fields.commercialSubType.value() === 'warehouse'}
+										<Field.Field>
+											<InputGroup.Root id="grossFloorArea">
+												<InputGroup.Input
+													{...createSale.fields.grossFloorArea.as('number')}
+													placeholder="Gross Floor Area"
+												/>
+												<InputGroup.Addon>
+													<span class="text-xs">Sqft</span>
+												</InputGroup.Addon>
+											</InputGroup.Root>
+											{#each createSale.fields.grossFloorArea.issues() as issue, i (i)}
+												<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+											{/each}
+										</Field.Field>
+									{/if}
+								{/if}
+
+								<!-- Plot Fields -->
+								{#if createSale.fields.propertyType.value() === 'plot'}
+									<Field.Field>
+										<InputGroup.Root id="propertySize">
+											<InputGroup.Input
+												{...createSale.fields.propertySize.as('number')}
+												placeholder="Property Size"
+											/>
+											<InputGroup.Addon>
+												<span class="text-xs">Sqft</span>
+											</InputGroup.Addon>
+										</InputGroup.Root>
+										{#each createSale.fields.propertySize.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+								{/if}
+							</div>
+							<div class="grid grid-cols-3 gap-4">
 								<Field.Field>
-									<InputGroup.Root id="propertySize">
+									<InputGroup.Root id="project">
 										<InputGroup.Input
-											{...createSale.fields.propertySize.as('number')}
-											placeholder="Property Size"
+											{...createSale.fields.project.as('text')}
+											placeholder="Select Project"
 										/>
 										<InputGroup.Addon>
-											<span class="text-xs">Sqft</span>
+											<Building />
 										</InputGroup.Addon>
 									</InputGroup.Root>
-									{#each createSale.fields.propertySize.issues() as issue, i (i)}
+									{#each createSale.fields.project.issues() as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
-								</Field.Field>
-							{/if}
-						</div>
-						<div class="grid grid-cols-3 gap-4">
-							<Field.Field>
-								<InputGroup.Root id="project">
-									<InputGroup.Input
-										{...createSale.fields.project.as('text')}
-										placeholder="Select Project"
-									/>
-									<InputGroup.Addon>
-										<Building />
-									</InputGroup.Addon>
-								</InputGroup.Root>
-								{#each createSale.fields.project.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field>
-								<InputGroup.Root id="unitNo">
-									<InputGroup.Input
-										{...createSale.fields.unitNo.as('text')}
-										placeholder="Unit No"
-									/>
-									<InputGroup.Addon>
-										<Home />
-									</InputGroup.Addon>
-								</InputGroup.Root>
-								{#each createSale.fields.unitNo.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field>
-								<InputGroup.Root id="unitValue">
-									<InputGroup.Input
-										{...createSale.fields.unitValue.as('text')}
-										placeholder="Unit Value"
-									/>
-									<InputGroup.Addon>
-										<PriceTag />
-									</InputGroup.Addon>
-								</InputGroup.Root>
-								{#each createSale.fields.unitValue.issues() as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-							<Field.Field>
-								<Field.Label for="commissionPercentage">Commission %</Field.Label>
-								<InputGroup.Root id="commissionPercentage">
-									<InputGroup.Input
-										{...createSale.fields.commissionPercentage?.as('number')}
-										type="number"
-										min="0"
-										max="100"
-										step="0.01"
-										placeholder="e.g. 5"
-									/>
-									<InputGroup.Addon>%</InputGroup.Addon>
-								</InputGroup.Root>
-								{#each createSale.fields.commissionPercentage?.issues() ?? [] as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						</div>
-
-						{@const commissionPct = createSale.fields.commissionPercentage?.value()}
-						{@const rawUnitValue = parseFloat(
-							(createSale.fields.unitValue.value() ?? '').replace(/,/g, '')
-						)}
-						{@const revenueAchieved =
-							commissionPct && !isNaN(rawUnitValue)
-								? Math.round((rawUnitValue * commissionPct) / 100)
-								: null}
-						{@const passback = createSale.fields.passbackAmount?.value()}
-						{@const revenueAfterPassback =
-							revenueAchieved !== null ? Math.round(revenueAchieved - (passback ?? 0)) : null}
-
-						{#if revenueAchieved !== null}
-							<div class="grid grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4">
-								<div class="space-y-1">
-									<p class="text-xs text-muted-foreground">Revenue Achieved</p>
-									<p class="font-semibold">
-										AED {new Intl.NumberFormat('en-US').format(revenueAchieved)}
-									</p>
-								</div>
-								<div class="space-y-1">
-									<p class="text-xs text-muted-foreground">Revenue After Passback</p>
-									<p class="font-semibold">
-										{#if revenueAfterPassback !== null}
-											AED {new Intl.NumberFormat('en-US').format(revenueAfterPassback)}
-										{:else}
-											—
-										{/if}
-									</p>
-								</div>
-							</div>
-						{/if}
-
-						<div class="grid grid-cols-2 gap-4">
-							<Field.Field>
-								<Field.Label for="passbackAmount"
-									>Passback Amount <span class="text-muted-foreground">(Optional)</span
-									></Field.Label
-								>
-								<InputGroup.Root id="passbackAmount">
-									<InputGroup.Addon>AED</InputGroup.Addon>
-									<InputGroup.Input
-										{...createSale.fields.passbackAmount?.as('number')}
-										type="number"
-										min="0"
-										step="0.01"
-										placeholder="e.g. 55500"
-									/>
-								</InputGroup.Root>
-								{#each createSale.fields.passbackAmount?.issues() ?? [] as issue, i (i)}
-									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						</div>
-					</Field.Group>
-				</Field.Set>
-				<Field.Separator />
-
-				<!-- Deal Status Section -->
-				<Field.Set>
-					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Deal Status
-					</Field.Legend>
-					{#each createSale.fields.dealStage.issues() as issue, i (i)}
-						<Field.Error class="text-sm text-destructive">
-							{issue.message}
-						</Field.Error>
-					{/each}
-					<Field.Group class="space-y-4">
-						<RadioGroup.Root
-							bind:value={
-								() => createSale.fields.dealStage.value() ?? '',
-								(v) => createSale.fields.dealStage.set(v || undefined)
-							}
-							class="flex w-full flex-row gap-4"
-						>
-							<div class="flex w-full flex-col gap-2">
-								<Field.Field orientation="horizontal">
-									<RadioGroup.Item value="eoi" id="deal-eoi" />
-									<Field.Label for="deal-eoi" class="font-normal">EOI</Field.Label>
 								</Field.Field>
 								<Field.Field>
-									<DealPercentage
-										bind:value={
-											() => createSale.fields.paymentValue.value() ?? 0,
-											(v) => createSale.fields.paymentValue.set(Number(v) || 0)
-										}
-										disabled={createSale.fields.dealStage.value() !== 'eoi'}
-									/>
-									<input class="sr-only" {...createSale.fields.paymentValue.as('number')} />
-									{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+									<InputGroup.Root id="unitNo">
+										<InputGroup.Input
+											{...createSale.fields.unitNo.as('text')}
+											placeholder="Unit No"
+										/>
+										<InputGroup.Addon>
+											<Home />
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.unitNo.issues() as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
-								</Field.Field>
-							</div>
-							<HorizontalSeparator text="OR" class="mx-4" />
-							<div class="flex w-full flex-col gap-2">
-								<Field.Field orientation="horizontal">
-									<RadioGroup.Item value="booking" id="deal-booking" />
-									<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label>
 								</Field.Field>
 								<Field.Field>
-									<DealPercentage
-										bind:value={
-											() => createSale.fields.paymentValue.value() ?? 0,
-											(v) => createSale.fields.paymentValue.set(Number(v) || 0)
-										}
-										disabled={createSale.fields.dealStage.value() !== 'booking'}
-									/>
-									{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+									<InputGroup.Root id="unitValue">
+										<InputGroup.Input
+											{...createSale.fields.unitValue.as('text')}
+											placeholder="Unit Value"
+										/>
+										<InputGroup.Addon>
+											<PriceTag />
+										</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.unitValue.issues() as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="commissionPercentage">Commission %</Field.Label>
+									<InputGroup.Root id="commissionPercentage">
+										<InputGroup.Input
+											{...createSale.fields.commissionPercentage?.as('number')}
+											type="number"
+											min="0"
+											max="100"
+											step="0.01"
+											placeholder="e.g. 5"
+										/>
+										<InputGroup.Addon>%</InputGroup.Addon>
+									</InputGroup.Root>
+									{#each createSale.fields.commissionPercentage?.issues() ?? [] as issue, i (i)}
 										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 									{/each}
 								</Field.Field>
 							</div>
-						</RadioGroup.Root>
-						<input class="sr-only" {...createSale.fields.dealStage.as('text')} />
 
-						<!-- File Uploads - Only show when a stage is selected -->
-						{#if createSale.fields.dealStage.value()}
-							<div class="space-y-4 pt-2">
-								<Field.Field class="w-full">
-									{#if uploadedFiles.bookingFormFile}
-										<h3 class="text-sm font-medium">
-											{createSale.fields.dealStage.value() === 'eoi' ? 'EOI Form' : 'Booking Form'}
-										</h3>
+							{@const commissionPct = createSale.fields.commissionPercentage?.value()}
+							{@const rawUnitValue = parseFloat(
+								(createSale.fields.unitValue.value() ?? '').replace(/,/g, '')
+							)}
+							{@const revenueAchieved =
+								commissionPct && !isNaN(rawUnitValue)
+									? Math.round((rawUnitValue * commissionPct) / 100)
+									: null}
+							{@const passback = createSale.fields.passbackAmount?.value()}
+							{@const revenueAfterPassback =
+								revenueAchieved !== null ? Math.round(revenueAchieved - (passback ?? 0)) : null}
 
-										<div
-											class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-										>
-											<div class="flex items-center gap-3">
-												<FileText class="h-10 w-10 text-orange-500" />
-												<div class="flex flex-col">
-													<span class="text-sm font-medium"
-														>{uploadedFiles.bookingFormFile.name}</span
-													>
-													<span class="text-xs text-muted-foreground"
-														>{formatFileSize(uploadedFiles.bookingFormFile.size)}</span
-													>
-												</div>
-											</div>
-											<button
-												type="button"
-												onclick={() => removeFile('bookingFormFile')}
-												class="text-destructive hover:text-destructive/80"
-											>
-												<Trash2 class="h-5 w-5" />
-											</button>
-										</div>
-									{:else}
-										<label
-											for="bookingFormFile"
-											class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-										>
-											<Upload class="h-5 w-5 text-gray-600" />
-											<span class="text-sm font-medium">
-												{createSale.fields.dealStage.value() === 'eoi'
-													? 'Upload EOI form'
-													: 'Upload booking form'}
-											</span>
-										</label>
-									{/if}
-									<Input
-										id="bookingFormFile"
-										class="sr-only"
-										{...createSale.fields.bookingFormFile.as('file')}
-										files={undefined}
-										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-										onchange={(e) => handleFileUpload('bookingFormFile', e)}
-									/>
-									{#each createSale.fields.bookingFormFile.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">
-											{issue.message}
-										</Field.Error>
-									{/each}
-								</Field.Field>
-
-								<Field.Field class="w-full">
-									{#if uploadedFiles.paymentReceiptFile}
-										<h3 class="text-sm font-medium">Payment Receipt</h3>
-
-										<div
-											class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-										>
-											<div class="flex items-center gap-3">
-												<FileText class="h-10 w-10 text-orange-500" />
-												<div class="flex flex-col">
-													<span class="text-sm font-medium"
-														>{uploadedFiles.paymentReceiptFile.name}</span
-													>
-													<span class="text-xs text-muted-foreground"
-														>{formatFileSize(uploadedFiles.paymentReceiptFile.size)}</span
-													>
-												</div>
-											</div>
-											<button
-												type="button"
-												onclick={() => removeFile('paymentReceiptFile')}
-												class="text-destructive hover:text-destructive/80"
-											>
-												<Trash2 class="h-5 w-5" />
-											</button>
-										</div>
-									{:else}
-										<label
-											for="paymentReceiptFile"
-											class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-										>
-											<Upload class="h-5 w-5 text-gray-600" />
-											<span class="text-sm font-medium">Upload payment receipt</span>
-										</label>
-									{/if}
-									<Input
-										id="paymentReceiptFile"
-										class="sr-only"
-										{...createSale.fields.paymentReceiptFile.as('file')}
-										files={undefined}
-										accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-										onchange={(e) => handleFileUpload('paymentReceiptFile', e)}
-									/>
-									{#each createSale.fields.paymentReceiptFile.issues() as issue, i (i)}
-										<Field.Error class="text-sm text-destructive">
-											{issue.message}
-										</Field.Error>
-									{/each}
-								</Field.Field>
-							</div>
-						{/if}
-					</Field.Group>
-				</Field.Set>
-				<Field.Separator />
-
-				<!-- Refferal Agreement Section -->
-				<Field.Set>
-					<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-						Refferal Agreement
-					</Field.Legend>
-					<Field.Group class="space-y-4">
-						{#if uploadedFiles.refferalAgreementFile}
-							<h3 class="text-sm font-medium">Referral Agreement</h3>
-							<div
-								class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-							>
-								<div class="flex items-center gap-3">
-									<FileText class="h-10 w-10 text-orange-500" />
-									<div class="flex flex-col">
-										<span class="text-sm font-medium"
-											>{uploadedFiles.refferalAgreementFile.name}</span
-										>
-										<span class="text-xs text-muted-foreground"
-											>{formatFileSize(uploadedFiles.refferalAgreementFile.size)}</span
-										>
+							{#if revenueAchieved !== null}
+								<div class="grid grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4">
+									<div class="space-y-1">
+										<p class="text-xs text-muted-foreground">Revenue Achieved</p>
+										<p class="font-semibold">
+											AED {new Intl.NumberFormat('en-US').format(revenueAchieved)}
+										</p>
+									</div>
+									<div class="space-y-1">
+										<p class="text-xs text-muted-foreground">Revenue After Passback</p>
+										<p class="font-semibold">
+											{#if revenueAfterPassback !== null}
+												AED {new Intl.NumberFormat('en-US').format(revenueAfterPassback)}
+											{:else}
+												—
+											{/if}
+										</p>
 									</div>
 								</div>
-								<button
-									type="button"
-									onclick={() => removeFile('refferalAgreementFile')}
-									class="text-destructive hover:text-destructive/80"
-								>
-									<Trash2 class="h-5 w-5" />
-								</button>
+							{/if}
+
+							<div class="grid grid-cols-2 gap-4">
+								<Field.Field>
+									<Field.Label for="passbackAmount"
+										>Passback Amount <span class="text-muted-foreground">(Optional)</span
+										></Field.Label
+									>
+									<InputGroup.Root id="passbackAmount">
+										<InputGroup.Addon>AED</InputGroup.Addon>
+										<InputGroup.Input
+											{...createSale.fields.passbackAmount?.as('number')}
+											type="number"
+											min="0"
+											step="0.01"
+											placeholder="e.g. 55500"
+										/>
+									</InputGroup.Root>
+									{#each createSale.fields.passbackAmount?.issues() ?? [] as issue, i (i)}
+										<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+									{/each}
+								</Field.Field>
 							</div>
-						{:else}
-							{#if canUploadManually}
+						</Field.Group>
+					</Field.Set>
+					<Field.Separator />
+
+					<!-- Deal Status Section -->
+					<Field.Set>
+						<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+							Deal Status
+						</Field.Legend>
+						{#each createSale.fields.dealStage.issues() as issue, i (i)}
+							<Field.Error class="text-sm text-destructive">
+								{issue.message}
+							</Field.Error>
+						{/each}
+						<Field.Group class="space-y-4">
+							<RadioGroup.Root
+								bind:value={
+									() => createSale.fields.dealStage.value() ?? '',
+									(v) => {
+										createSale.fields.dealStage.set(v || undefined);
+										if (v === 'cancelled') createSale.fields.paymentValue.set(0);
+									}
+								}
+								class="flex w-full flex-row gap-4"
+							>
+								<div class="flex w-full flex-col gap-2">
+									<Field.Field orientation="horizontal">
+										<RadioGroup.Item value="eoi" id="deal-eoi" />
+										<Field.Label for="deal-eoi" class="font-normal">EOI</Field.Label>
+									</Field.Field>
+									<Field.Field>
+										<DealPercentage
+											bind:value={
+												() => createSale.fields.paymentValue.value() ?? 0,
+												(v) => createSale.fields.paymentValue.set(Number(v) || 0)
+											}
+											disabled={createSale.fields.dealStage.value() !== 'eoi'}
+										/>
+										<input class="sr-only" {...createSale.fields.paymentValue.as('number')} />
+										{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+								</div>
+								<HorizontalSeparator text="OR" class="mx-4" />
+								<div class="flex w-full flex-col gap-2">
+									<Field.Field orientation="horizontal">
+										<RadioGroup.Item value="booking" id="deal-booking" />
+										<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label>
+									</Field.Field>
+									<Field.Field>
+										<DealPercentage
+											bind:value={
+												() => createSale.fields.paymentValue.value() ?? 0,
+												(v) => createSale.fields.paymentValue.set(Number(v) || 0)
+											}
+											disabled={createSale.fields.dealStage.value() !== 'booking'}
+										/>
+										{#each createSale.fields.paymentValue.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+										{/each}
+									</Field.Field>
+								</div>
+								<HorizontalSeparator text="OR" class="mx-4" />
+								<div class="flex w-full flex-col gap-2">
+									<Field.Field orientation="horizontal">
+										<RadioGroup.Item value="cancelled" id="deal-cancelled" />
+										<Field.Label for="deal-cancelled" class="font-normal"
+											>Cancelled Deal</Field.Label
+										>
+									</Field.Field>
+								</div>
+							</RadioGroup.Root>
+							<input class="sr-only" {...createSale.fields.dealStage.as('text')} />
+
+							<!-- File Uploads - Only show when a stage is selected -->
+							{#if createSale.fields.dealStage.value() && createSale.fields.dealStage.value() !== 'cancelled'}
+								<div class="space-y-4 pt-2">
+									<Field.Field class="w-full">
+										{#if uploadedFiles.bookingFormFile}
+											<h3 class="text-sm font-medium">
+												{createSale.fields.dealStage.value() === 'eoi'
+													? 'EOI Form'
+													: 'Booking Form'}
+											</h3>
+
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium"
+															>{uploadedFiles.bookingFormFile.name}</span
+														>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(uploadedFiles.bookingFormFile.size)}</span
+														>
+													</div>
+												</div>
+												<button
+													type="button"
+													onclick={() => removeFile('bookingFormFile')}
+													class="text-destructive hover:text-destructive/80"
+												>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											</div>
+										{:else}
+											<label
+												for="bookingFormFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">
+													{createSale.fields.dealStage.value() === 'eoi'
+														? 'Upload EOI form'
+														: 'Upload booking form'}
+												</span>
+											</label>
+										{/if}
+										<Input
+											id="bookingFormFile"
+											class="sr-only"
+											{...createSale.fields.bookingFormFile.as('file')}
+											files={undefined}
+											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+											onchange={(e) => handleFileUpload('bookingFormFile', e)}
+										/>
+										{#each createSale.fields.bookingFormFile.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">
+												{issue.message}
+											</Field.Error>
+										{/each}
+									</Field.Field>
+
+									<Field.Field class="w-full">
+										{#if uploadedFiles.paymentReceiptFile}
+											<h3 class="text-sm font-medium">Payment Receipt</h3>
+
+											<div
+												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+											>
+												<div class="flex items-center gap-3">
+													<FileText class="h-10 w-10 text-orange-500" />
+													<div class="flex flex-col">
+														<span class="text-sm font-medium"
+															>{uploadedFiles.paymentReceiptFile.name}</span
+														>
+														<span class="text-xs text-muted-foreground"
+															>{formatFileSize(uploadedFiles.paymentReceiptFile.size)}</span
+														>
+													</div>
+												</div>
+												<button
+													type="button"
+													onclick={() => removeFile('paymentReceiptFile')}
+													class="text-destructive hover:text-destructive/80"
+												>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											</div>
+										{:else}
+											<label
+												for="paymentReceiptFile"
+												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+											>
+												<Upload class="h-5 w-5 text-gray-600" />
+												<span class="text-sm font-medium">Upload payment receipt</span>
+											</label>
+										{/if}
+										<Input
+											id="paymentReceiptFile"
+											class="sr-only"
+											{...createSale.fields.paymentReceiptFile.as('file')}
+											files={undefined}
+											accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+											onchange={(e) => handleFileUpload('paymentReceiptFile', e)}
+										/>
+										{#each createSale.fields.paymentReceiptFile.issues() as issue, i (i)}
+											<Field.Error class="text-sm text-destructive">
+												{issue.message}
+											</Field.Error>
+										{/each}
+									</Field.Field>
+								</div>
+							{/if}
+						</Field.Group>
+					</Field.Set>
+					<Field.Separator />
+
+					<!-- Refferal Agreement Section -->
+					<Field.Set>
+						<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+							Refferal Agreement
+						</Field.Legend>
+						<Field.Group class="space-y-4">
+							{#if uploadedFiles.refferalAgreementFile}
+								<h3 class="text-sm font-medium">Referral Agreement</h3>
+								<div
+									class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+								>
+									<div class="flex items-center gap-3">
+										<FileText class="h-10 w-10 text-orange-500" />
+										<div class="flex flex-col">
+											<span class="text-sm font-medium"
+												>{uploadedFiles.refferalAgreementFile.name}</span
+											>
+											<span class="text-xs text-muted-foreground"
+												>{formatFileSize(uploadedFiles.refferalAgreementFile.size)}</span
+											>
+										</div>
+									</div>
+									<button
+										type="button"
+										onclick={() => removeFile('refferalAgreementFile')}
+										class="text-destructive hover:text-destructive/80"
+									>
+										<Trash2 class="h-5 w-5" />
+									</button>
+								</div>
+							{:else if canUploadManually}
 								<label
 									for="refferalAgreementFile"
 									class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
@@ -1602,410 +1623,413 @@
 									Referral agreement can be generated after the sale is saved
 								</div>
 							{/if}
-						{/if}
-						<Input
-							id="refferalAgreementFile"
-							class="sr-only"
-							{...createSale.fields.refferalAgreementFile.as('file')}
-							files={undefined}
-							accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-							onchange={(e) => handleFileUpload('refferalAgreementFile', e)}
-							disabled={!canUploadManually}
-						/>
-					</Field.Group>
-				</Field.Set>
-				<Field.Separator />
+							<Input
+								id="refferalAgreementFile"
+								class="sr-only"
+								{...createSale.fields.refferalAgreementFile.as('file')}
+								files={undefined}
+								accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+								onchange={(e) => handleFileUpload('refferalAgreementFile', e)}
+								disabled={!canUploadManually}
+							/>
+						</Field.Group>
+					</Field.Set>
+					<Field.Separator />
 
-				<!-- Invoicing Stage Section -->
-				<Field.Set>
-					<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
-					{#each createSale.fields.invoiceStage.issues() as issue, i (i)}
-						<Field.Error class="text-sm text-destructive">
-							{issue.message}
-						</Field.Error>
-					{/each}
+					<!-- Invoicing Stage Section -->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Invoicing Stage</Field.Legend>
+						{#each createSale.fields.invoiceStage.issues() as issue, i (i)}
+							<Field.Error class="text-sm text-destructive">
+								{issue.message}
+							</Field.Error>
+						{/each}
 
-					<div class="flex w-full flex-row items-start gap-4">
-						<div class="flex w-full flex-col gap-4">
-							<Field.Field orientation="horizontal" class="items-start space-x-3">
-								<Checkbox
-									id="eligible-first-half"
-									bind:checked={firstHalfChecked}
-									onCheckedChange={handleHalfChange}
-								/>
-								<div class="flex flex-col gap-1">
-									<Field.Label for="eligible-first-half" class="text-sm font-normal">
-										Eligible for first half
-									</Field.Label>
-									<span class="text-sm text-muted-foreground">10 + 4% paid</span>
-								</div>
-							</Field.Field>
-							<Field.Field orientation="horizontal" class="items-start space-x-3">
-								<Checkbox
-									id="eligible-second-half"
-									bind:checked={secondHalfChecked}
-									onCheckedChange={handleHalfChange}
-								/>
-								<div class="flex flex-col gap-1">
-									<Field.Label for="eligible-second-half" class="text-sm font-normal">
-										Eligible for second half
-									</Field.Label>
-									<span class="text-sm text-muted-foreground">20 + 4% paid</span>
-								</div>
-							</Field.Field>
+						<div class="flex w-full flex-row items-start gap-4">
+							<div class="flex w-full flex-col gap-4">
+								<Field.Field orientation="horizontal" class="items-start space-x-3">
+									<Checkbox
+										id="eligible-first-half"
+										bind:checked={firstHalfChecked}
+										onCheckedChange={handleHalfChange}
+									/>
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-first-half" class="text-sm font-normal">
+											Eligible for first half
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">10 + 4% paid</span>
+									</div>
+								</Field.Field>
+								<Field.Field orientation="horizontal" class="items-start space-x-3">
+									<Checkbox
+										id="eligible-second-half"
+										bind:checked={secondHalfChecked}
+										onCheckedChange={handleHalfChange}
+									/>
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-second-half" class="text-sm font-normal">
+											Eligible for second half
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+									</div>
+								</Field.Field>
+							</div>
+
+							<HorizontalSeparator text="OR" class="mx-4" />
+
+							<div class="flex w-full flex-col gap-4">
+								<Field.Field orientation="horizontal" class="items-start space-x-3">
+									<Checkbox
+										id="eligible-full"
+										bind:checked={fullChecked}
+										onCheckedChange={handleFullChange}
+									/>
+									<div class="flex flex-col gap-1">
+										<Field.Label for="eligible-full" class="text-sm font-normal">
+											Eligible for full
+										</Field.Label>
+										<span class="text-sm text-muted-foreground">20 + 4% paid</span>
+									</div>
+								</Field.Field>
+							</div>
+
+							<HorizontalSeparator text="OR" class="mx-4" />
+
+							<div class="flex w-full flex-col gap-4">
+								<Field.Field orientation="horizontal" class="items-start space-x-3">
+									<Checkbox
+										id="not-yet-eligible"
+										bind:checked={notEligibleChecked}
+										onCheckedChange={handleNotEligibleChange}
+									/>
+									<div class="flex flex-col gap-1">
+										<Field.Label for="not-yet-eligible" class="text-sm font-normal">
+											Not Eligible
+										</Field.Label>
+									</div>
+								</Field.Field>
+							</div>
 						</div>
 
-						<HorizontalSeparator text="OR" class="mx-4" />
-
-						<div class="flex w-full flex-col gap-4">
-							<Field.Field orientation="horizontal" class="items-start space-x-3">
-								<Checkbox
-									id="eligible-full"
-									bind:checked={fullChecked}
-									onCheckedChange={handleFullChange}
-								/>
-								<div class="flex flex-col gap-1">
-									<Field.Label for="eligible-full" class="text-sm font-normal">
-										Eligible for full
+						{#if createSale.fields.invoiceStage.value()?.includes('not-yet-eligible')}
+							<div class="col-span-2 mt-4 rounded-lg border border-border/60 bg-background/60 p-4">
+								<Field.Field>
+									<Field.Label for="tentative-date" class="mb-2 text-sm font-medium">
+										Tentative Eligibility Date
 									</Field.Label>
-									<span class="text-sm text-muted-foreground">20 + 4% paid</span>
-								</div>
-							</Field.Field>
-						</div>
-
-						<HorizontalSeparator text="OR" class="mx-4" />
-
-						<div class="flex w-full flex-col gap-4">
-							<Field.Field orientation="horizontal" class="items-start space-x-3">
-								<Checkbox
-									id="not-yet-eligible"
-									bind:checked={notEligibleChecked}
-									onCheckedChange={handleNotEligibleChange}
-								/>
-								<div class="flex flex-col gap-1">
-									<Field.Label for="not-yet-eligible" class="text-sm font-normal">
-										Not Eligible
-									</Field.Label>
-								</div>
-							</Field.Field>
-						</div>
-					</div>
-
-					{#if createSale.fields.invoiceStage.value()?.includes('not-yet-eligible')}
-						<div class="col-span-2 mt-4 rounded-lg border border-border/60 bg-background/60 p-4">
-							<Field.Field>
-								<Field.Label for="tentative-date" class="mb-2 text-sm font-medium">
-									Tentative Eligibility Date
-								</Field.Label>
-								<Popover.Root bind:open={popoverOpen}>
-									<Popover.Trigger class="w-full">
-										<Button
-											variant="outline"
-											class="w-full justify-start text-left font-normal"
-											id="tentative-date"
-											type="button"
-										>
-											{#if tentativeEligibilityDate}
-												{new Date(
+									<Popover.Root bind:open={popoverOpen}>
+										<Popover.Trigger class="w-full">
+											<Button
+												variant="outline"
+												class="w-full justify-start text-left font-normal"
+												id="tentative-date"
+												type="button"
+											>
+												{#if tentativeEligibilityDate}
+													{new Date(
+														tentativeEligibilityDate.year,
+														tentativeEligibilityDate.month - 1,
+														tentativeEligibilityDate.day
+													).toLocaleDateString('en-US', {
+														year: 'numeric',
+														month: 'long',
+														day: 'numeric'
+													})}
+												{:else}
+													<span class="text-muted-foreground">Pick a date</span>
+												{/if}
+											</Button>
+										</Popover.Trigger>
+										<Popover.Content class="w-auto p-0" align="start">
+											<CalendarComponent
+												type="single"
+												bind:value={tentativeEligibilityDate}
+												onValueChange={(value) => {
+													tentativeEligibilityDate = value;
+													// Update hidden input for form submission
+													const hiddenInput = document.querySelector(
+														'input[name="tentativeEligibilityDate"]'
+													) as HTMLInputElement;
+													if (hiddenInput && value) {
+														const date = new Date(value.year, value.month - 1, value.day);
+														hiddenInput.value = date.toISOString().split('T')[0];
+													}
+													popoverOpen = false;
+												}}
+											/>
+										</Popover.Content>
+									</Popover.Root>
+									<input
+										type="hidden"
+										name="tentativeEligibilityDate"
+										value={tentativeEligibilityDate
+											? new Date(
 													tentativeEligibilityDate.year,
 													tentativeEligibilityDate.month - 1,
 													tentativeEligibilityDate.day
-												).toLocaleDateString('en-US', {
-													year: 'numeric',
-													month: 'long',
-													day: 'numeric'
-												})}
-											{:else}
-												<span class="text-muted-foreground">Pick a date</span>
-											{/if}
-										</Button>
-									</Popover.Trigger>
-									<Popover.Content class="w-auto p-0" align="start">
-										<CalendarComponent
-											type="single"
-											bind:value={tentativeEligibilityDate}
-											onValueChange={(value) => {
-												tentativeEligibilityDate = value;
-												// Update hidden input for form submission
-												const hiddenInput = document.querySelector(
-													'input[name="tentativeEligibilityDate"]'
-												) as HTMLInputElement;
-												if (hiddenInput && value) {
-													const date = new Date(value.year, value.month - 1, value.day);
-													hiddenInput.value = date.toISOString().split('T')[0];
-												}
-												popoverOpen = false;
-											}}
-										/>
-									</Popover.Content>
-								</Popover.Root>
-								<input
-									type="hidden"
-									name="tentativeEligibilityDate"
-									value={tentativeEligibilityDate
-										? new Date(
-												tentativeEligibilityDate.year,
-												tentativeEligibilityDate.month - 1,
-												tentativeEligibilityDate.day
-											)
-												.toISOString()
-												.split('T')[0]
-										: ''}
-								/>
-							</Field.Field>
-						</div>
-					{/if}
-
-					{#each createSale.fields.invoiceStage.value() ?? [] as stage (stage)}
-						<input type="hidden" name="invoiceStage[]" value={stage} />
-					{/each}
-				</Field.Set>
-				<Field.Separator />
-
-				<!-- Deal Owners Section -->
-				<Field.Set>
-					<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
-					<OrderSplit bind:splits={dealSplits} onsplitschange={(s) => syncSplits(s)} />
-					{#each dealSplits as split, index (split.key)}
-						<input type="hidden" name="splits[{index}].agentId" value={split.agentId} />
-						<input type="hidden" name="splits[{index}].agentEmail" value={split.agentEmail} />
-						<input type="hidden" name="splits[{index}].agentName" value={split.agentName} />
-						<input
-							type="hidden"
-							name="splits[{index}].agentPhotoURL"
-							value={split.agentPhotoURL ?? ''}
-						/>
-						<input type="hidden" name="splits[{index}].ownerRole" value={split.ownerRole} />
-						<input type="hidden" name="n:splits[{index}].percentage" value={split.percentage} />
-						<input
-							type="hidden"
-							name="splits[{index}].managerEmail"
-							value={split.managerEmail ?? ''}
-						/>
-						<input
-							type="hidden"
-							name="splits[{index}].seniorManagerEmail"
-							value={split.seniorManagerEmail ?? ''}
-						/>
-					{/each}
-				</Field.Set>
-				<Field.Separator />
-
-				<!-- Joint Buyers Sections-->
-				<Field.Set>
-					<Field.Legend class="text-lg font-medium">Joint Buyers</Field.Legend>
-
-					{#each jointBuyers as buyer, index (buyer.key)}
-						<div
-							class="flex flex-col gap-4 rounded-xl border border-border/60 bg-background/80 p-4"
-						>
-							<div class="flex items-center justify-between">
-								<p class="text-base font-semibold">Buyer {index + 2} details</p>
-								<Button
-									variant="ghost"
-									size="icon"
-									onclick={() => removeJointBuyer(buyer.key)}
-									aria-label="Remove joint buyer"
-								>
-									<X class="h-4 w-4" />
-								</Button>
-							</div>
-							<Field.Group>
-								<div class="grid grid-cols-3 gap-4">
-									<Field.Field>
-										<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" />
-									</Field.Field>
-									<Field.Field>
-										<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" />
-									</Field.Field>
-									<Field.Field>
-										<Input name={`jointBuyers[${index}].email`} placeholder="Email" type="email" />
-									</Field.Field>
-								</div>
-
-								<Field.Field>
-									<PhoneInput
-										bind:value={jointBuyerPhoneValues[buyer.key]}
-										bind:country={jointBuyerPhoneCountries[buyer.key]}
-										showCountrySelect={true}
-									></PhoneInput>
+												)
+													.toISOString()
+													.split('T')[0]
+											: ''}
+									/>
 								</Field.Field>
-								<input
-									type="hidden"
-									name={`jointBuyers[${index}].phone`}
-									value={getE164number(
-										jointBuyerPhoneValues[buyer.key] || '',
-										jointBuyerPhoneCountries[buyer.key] || ''
-									)}
-								/>
-							</Field.Group>
+							</div>
+						{/if}
 
-							<Field.Set>
-								<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-									<div
-										class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+						{#each createSale.fields.invoiceStage.value() ?? [] as stage (stage)}
+							<input type="hidden" name="invoiceStage[]" value={stage} />
+						{/each}
+					</Field.Set>
+					<Field.Separator />
+
+					<!-- Deal Owners Section -->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
+						<OrderSplit bind:splits={dealSplits} onsplitschange={(s) => syncSplits(s)} />
+						{#each dealSplits as split, index (split.key)}
+							<input type="hidden" name="splits[{index}].agentId" value={split.agentId} />
+							<input type="hidden" name="splits[{index}].agentEmail" value={split.agentEmail} />
+							<input type="hidden" name="splits[{index}].agentName" value={split.agentName} />
+							<input
+								type="hidden"
+								name="splits[{index}].agentPhotoURL"
+								value={split.agentPhotoURL ?? ''}
+							/>
+							<input type="hidden" name="splits[{index}].ownerRole" value={split.ownerRole} />
+							<input type="hidden" name="n:splits[{index}].percentage" value={split.percentage} />
+							<input
+								type="hidden"
+								name="splits[{index}].managerEmail"
+								value={split.managerEmail ?? ''}
+							/>
+							<input
+								type="hidden"
+								name="splits[{index}].seniorManagerEmail"
+								value={split.seniorManagerEmail ?? ''}
+							/>
+						{/each}
+					</Field.Set>
+					<Field.Separator />
+
+					<!-- Joint Buyers Sections-->
+					<Field.Set>
+						<Field.Legend class="text-lg font-medium">Joint Buyers</Field.Legend>
+
+						{#each jointBuyers as buyer, index (buyer.key)}
+							<div
+								class="flex flex-col gap-4 rounded-xl border border-border/60 bg-background/80 p-4"
+							>
+								<div class="flex items-center justify-between">
+									<p class="text-base font-semibold">Buyer {index + 2} details</p>
+									<Button
+										variant="ghost"
+										size="icon"
+										onclick={() => removeJointBuyer(buyer.key)}
+										aria-label="Remove joint buyer"
 									>
-										<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
+										<X class="h-4 w-4" />
+									</Button>
+								</div>
+								<Field.Group>
+									<div class="grid grid-cols-3 gap-4">
+										<Field.Field>
+											<Input name={`jointBuyers[${index}].firstName`} placeholder="First Name" />
+										</Field.Field>
+										<Field.Field>
+											<Input name={`jointBuyers[${index}].lastName`} placeholder="Last Name" />
+										</Field.Field>
+										<Field.Field>
+											<Input
+												name={`jointBuyers[${index}].email`}
+												placeholder="Email"
+												type="email"
+											/>
+										</Field.Field>
 									</div>
-									Client KYC Document
-								</Field.Legend>
-								<Field.Group class="space-y-4">
-									<div class="grid gap-4 xl:grid-cols-2">
-										<div class="space-y-4">
-											<div class="flex items-center gap-4">
-												<span
-													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-												>
-													1
-												</span>
-												<Field.Field class="w-full">
-													{#if jointBuyerFiles[buyer.key]?.passportFile}
-														<h3 class="text-sm font-medium">Passport</h3>
-														<div
-															class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-														>
-															<div class="flex items-center gap-3">
-																<FileText class="h-10 w-10 text-orange-500" />
-																<div class="flex flex-col">
-																	<span class="text-sm font-medium"
-																		>{jointBuyerFiles[buyer.key]?.passportFile?.name ?? ''}</span
-																	>
-																	<span class="text-xs text-muted-foreground"
-																		>{jointBuyerFiles[buyer.key]?.passportFile
-																			? formatFileSize(
-																					jointBuyerFiles[buyer.key]?.passportFile?.size ?? 0
-																				)
-																			: ''}</span
-																	>
-																</div>
-															</div>
-															<button
-																type="button"
-																onclick={() => removeJointBuyerFile(buyer.key, 'passportFile')}
-																class="text-destructive hover:text-destructive/80"
-															>
-																<Trash2 class="h-5 w-5" />
-															</button>
-														</div>
-													{:else}
-														<label
-															for={`joint-passportFile-${buyer.key}`}
-															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-														>
-															<Upload class="h-5 w-5 text-gray-600" />
-															<span class="text-sm font-medium">Upload Passport</span>
-														</label>
-													{/if}
-													<Input
-														id={`joint-passportFile-${buyer.key}`}
-														name={`jointBuyers[${index}].passportFile`}
-														class="sr-only"
-														type="file"
-														accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-														onchange={(e) =>
-															handleJointBuyerFileUpload(buyer.key, 'passportFile', e)}
-													/>
-												</Field.Field>
-											</div>
 
-											<div class="flex items-center gap-4">
-												<span
-													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-												>
-													2
-												</span>
-												<Field.Field class="w-full">
-													{#if jointBuyerFiles[buyer.key]?.nationalIdFile}
-														<h3 class="text-sm font-medium">National ID</h3>
-														<div
-															class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-														>
-															<div class="flex items-center gap-3">
-																<FileText class="h-10 w-10 text-orange-500" />
-																<div class="flex flex-col">
-																	<span class="text-sm font-medium"
-																		>{jointBuyerFiles[buyer.key]?.nationalIdFile?.name ?? ''}</span
-																	>
-																	<span class="text-xs text-muted-foreground"
-																		>{jointBuyerFiles[buyer.key]?.nationalIdFile
-																			? formatFileSize(
-																					jointBuyerFiles[buyer.key]?.nationalIdFile?.size ?? 0
-																				)
-																			: ''}</span
-																	>
-																</div>
-															</div>
-															<button
-																type="button"
-																onclick={() => removeJointBuyerFile(buyer.key, 'nationalIdFile')}
-																class="text-destructive hover:text-destructive/80"
-															>
-																<Trash2 class="h-5 w-5" />
-															</button>
-														</div>
-													{:else}
-														<label
-															for={`joint-nationalIdFile-${buyer.key}`}
-															class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-														>
-															<Upload class="h-5 w-5 text-gray-600" />
-															<span class="text-sm font-medium">
-																Upload National ID <br />(Emirates ID)
-															</span>
-														</label>
-													{/if}
-													<Input
-														id={`joint-nationalIdFile-${buyer.key}`}
-														name={`jointBuyers[${index}].nationalIdFile`}
-														class="sr-only"
-														type="file"
-														accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-														onchange={(e) =>
-															handleJointBuyerFileUpload(buyer.key, 'nationalIdFile', e)}
-													/>
-												</Field.Field>
-											</div>
+									<Field.Field>
+										<PhoneInput
+											bind:value={jointBuyerPhoneValues[buyer.key]}
+											bind:country={jointBuyerPhoneCountries[buyer.key]}
+											showCountrySelect={true}
+										></PhoneInput>
+									</Field.Field>
+									<input
+										type="hidden"
+										name={`jointBuyers[${index}].phone`}
+										value={getE164number(
+											jointBuyerPhoneValues[buyer.key] || '',
+											jointBuyerPhoneCountries[buyer.key] || ''
+										)}
+									/>
+								</Field.Group>
+
+								<Field.Set>
+									<Field.Legend class="flex items-center gap-4 text-lg font-medium">
+										<div
+											class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
+										>
+											<Upload class="h-4 w-4 text-orange-500 " stroke-width="4" />
 										</div>
+										Client KYC Document
+									</Field.Legend>
+									<Field.Group class="space-y-4">
+										<div class="grid gap-4 xl:grid-cols-2">
+											<div class="space-y-4">
+												<div class="flex items-center gap-4">
+													<span
+														class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+													>
+														1
+													</span>
+													<Field.Field class="w-full">
+														{#if jointBuyerFiles[buyer.key]?.passportFile}
+															<h3 class="text-sm font-medium">Passport</h3>
+															<div
+																class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+															>
+																<div class="flex items-center gap-3">
+																	<FileText class="h-10 w-10 text-orange-500" />
+																	<div class="flex flex-col">
+																		<span class="text-sm font-medium"
+																			>{jointBuyerFiles[buyer.key]?.passportFile?.name ?? ''}</span
+																		>
+																		<span class="text-xs text-muted-foreground"
+																			>{jointBuyerFiles[buyer.key]?.passportFile
+																				? formatFileSize(
+																						jointBuyerFiles[buyer.key]?.passportFile?.size ?? 0
+																					)
+																				: ''}</span
+																		>
+																	</div>
+																</div>
+																<button
+																	type="button"
+																	onclick={() => removeJointBuyerFile(buyer.key, 'passportFile')}
+																	class="text-destructive hover:text-destructive/80"
+																>
+																	<Trash2 class="h-5 w-5" />
+																</button>
+															</div>
+														{:else}
+															<label
+																for={`joint-passportFile-${buyer.key}`}
+																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+															>
+																<Upload class="h-5 w-5 text-gray-600" />
+																<span class="text-sm font-medium">Upload Passport</span>
+															</label>
+														{/if}
+														<Input
+															id={`joint-passportFile-${buyer.key}`}
+															name={`jointBuyers[${index}].passportFile`}
+															class="sr-only"
+															type="file"
+															accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+															onchange={(e) =>
+																handleJointBuyerFileUpload(buyer.key, 'passportFile', e)}
+														/>
+													</Field.Field>
+												</div>
 
-										<div class="flex w-full flex-col items-center gap-4">
-											<div class="flex w-full flex-row gap-4">
-												<span
-													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-												>
-													3
-												</span>
-												<p class="text-sm font-medium">AML Form</p>
+												<div class="flex items-center gap-4">
+													<span
+														class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+													>
+														2
+													</span>
+													<Field.Field class="w-full">
+														{#if jointBuyerFiles[buyer.key]?.nationalIdFile}
+															<h3 class="text-sm font-medium">National ID</h3>
+															<div
+																class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+															>
+																<div class="flex items-center gap-3">
+																	<FileText class="h-10 w-10 text-orange-500" />
+																	<div class="flex flex-col">
+																		<span class="text-sm font-medium"
+																			>{jointBuyerFiles[buyer.key]?.nationalIdFile?.name ??
+																				''}</span
+																		>
+																		<span class="text-xs text-muted-foreground"
+																			>{jointBuyerFiles[buyer.key]?.nationalIdFile
+																				? formatFileSize(
+																						jointBuyerFiles[buyer.key]?.nationalIdFile?.size ?? 0
+																					)
+																				: ''}</span
+																		>
+																	</div>
+																</div>
+																<button
+																	type="button"
+																	onclick={() => removeJointBuyerFile(buyer.key, 'nationalIdFile')}
+																	class="text-destructive hover:text-destructive/80"
+																>
+																	<Trash2 class="h-5 w-5" />
+																</button>
+															</div>
+														{:else}
+															<label
+																for={`joint-nationalIdFile-${buyer.key}`}
+																class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+															>
+																<Upload class="h-5 w-5 text-gray-600" />
+																<span class="text-sm font-medium">
+																	Upload National ID <br />(Emirates ID)
+																</span>
+															</label>
+														{/if}
+														<Input
+															id={`joint-nationalIdFile-${buyer.key}`}
+															name={`jointBuyers[${index}].nationalIdFile`}
+															class="sr-only"
+															type="file"
+															accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+															onchange={(e) =>
+																handleJointBuyerFileUpload(buyer.key, 'nationalIdFile', e)}
+														/>
+													</Field.Field>
+												</div>
 											</div>
 
-											{#if jointBuyerFiles[buyer.key]?.amlFormFile}
-												<div
-													class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-												>
-													<div class="flex items-center gap-3">
-														<FileText class="h-10 w-10 text-orange-500" />
-														<div class="flex flex-col">
-															<span class="text-sm font-medium"
-																>{jointBuyerFiles[buyer.key]?.amlFormFile?.name ?? ''}</span
-															>
-															<span class="text-xs text-muted-foreground"
-																>{jointBuyerFiles[buyer.key]?.amlFormFile
-																	? formatFileSize(
-																			jointBuyerFiles[buyer.key]?.amlFormFile?.size ?? 0
-																		)
-																	: ''}</span
-															>
-														</div>
-													</div>
-													<button
-														type="button"
-														onclick={() => removeJointBuyerFile(buyer.key, 'amlFormFile')}
-														class="text-destructive hover:text-destructive/80"
+											<div class="flex w-full flex-col items-center gap-4">
+												<div class="flex w-full flex-row gap-4">
+													<span
+														class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
 													>
-														<Trash2 class="h-5 w-5" />
-													</button>
+														3
+													</span>
+													<p class="text-sm font-medium">AML Form</p>
 												</div>
-											{:else}
-												{#if canUploadManually}
+
+												{#if jointBuyerFiles[buyer.key]?.amlFormFile}
+													<div
+														class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+													>
+														<div class="flex items-center gap-3">
+															<FileText class="h-10 w-10 text-orange-500" />
+															<div class="flex flex-col">
+																<span class="text-sm font-medium"
+																	>{jointBuyerFiles[buyer.key]?.amlFormFile?.name ?? ''}</span
+																>
+																<span class="text-xs text-muted-foreground"
+																	>{jointBuyerFiles[buyer.key]?.amlFormFile
+																		? formatFileSize(
+																				jointBuyerFiles[buyer.key]?.amlFormFile?.size ?? 0
+																			)
+																		: ''}</span
+																>
+															</div>
+														</div>
+														<button
+															type="button"
+															onclick={() => removeJointBuyerFile(buyer.key, 'amlFormFile')}
+															class="text-destructive hover:text-destructive/80"
+														>
+															<Trash2 class="h-5 w-5" />
+														</button>
+													</div>
+												{:else if canUploadManually}
 													<label
 														for={`joint-amlFormFile-${buyer.key}`}
 														class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
@@ -2020,46 +2044,45 @@
 														AML can be generated after the sale is saved
 													</div>
 												{/if}
-											{/if}
-											<Input
-												id={`joint-amlFormFile-${buyer.key}`}
-												name={`jointBuyers[${index}].amlFormFile`}
-												class="sr-only"
-												type="file"
-												accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
-												onchange={(e) => handleJointBuyerFileUpload(buyer.key, 'amlFormFile', e)}
-												disabled={!canUploadManually}
-											/>
+												<Input
+													id={`joint-amlFormFile-${buyer.key}`}
+													name={`jointBuyers[${index}].amlFormFile`}
+													class="sr-only"
+													type="file"
+													accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
+													onchange={(e) => handleJointBuyerFileUpload(buyer.key, 'amlFormFile', e)}
+													disabled={!canUploadManually}
+												/>
+											</div>
 										</div>
-									</div>
-								</Field.Group>
-							</Field.Set>
-						</div>
-					{/each}
+									</Field.Group>
+								</Field.Set>
+							</div>
+						{/each}
 
-					<button
-						type="button"
-						class="flex w-full items-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 px-4 py-3 text-sm font-semibold text-foreground hover:border-foreground/60"
-						onclick={addJointBuyer}
-					>
-						<Plus class="h-4 w-4" /> Add joint buyer
-					</button>
-				</Field.Set>
-			</div>
-		</form>
-
-		<!-- Saving Overlay -->
-		{#if createSale.pending}
-			<div
-				class="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
-				style="pointer-events: all;"
-			>
-				<div class="flex flex-col items-center gap-3 rounded-lg border bg-card p-6 shadow-lg">
-					<Loader2 class="h-8 w-8 animate-spin text-primary" />
-					<p class="text-sm font-medium text-foreground">Saving sale...</p>
+						<button
+							type="button"
+							class="flex w-full items-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 px-4 py-3 text-sm font-semibold text-foreground hover:border-foreground/60"
+							onclick={addJointBuyer}
+						>
+							<Plus class="h-4 w-4" /> Add joint buyer
+						</button>
+					</Field.Set>
 				</div>
-			</div>
-		{/if}
+			</form>
+
+			<!-- Saving Overlay -->
+			{#if createSale.pending}
+				<div
+					class="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
+					style="pointer-events: all;"
+				>
+					<div class="flex flex-col items-center gap-3 rounded-lg border bg-card p-6 shadow-lg">
+						<Loader2 class="h-8 w-8 animate-spin text-primary" />
+						<p class="text-sm font-medium text-foreground">Saving sale...</p>
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</Sheet.Content>
 </Sheet.Root>

@@ -49,7 +49,7 @@
 		{ value: 'offerLetter', label: 'Offer Letter' },
 		{ value: 'passport', label: 'Passport' },
 		{ value: 'visitOrResidenceVisa', label: 'Visit/Residence Visa' },
-		{ value: 'nationalId', label: 'National ID' },
+		{ value: 'nationalId', label: 'National / Emirates ID' },
 		{ value: 'educationalCertificates', label: 'Educational Certificates' },
 		{ value: 'passportSizePhoto', label: 'Passport Size Photo' },
 		{ value: 'lastThreeMonthsSalarySlips', label: 'Last 3 Months Salary Slips' },

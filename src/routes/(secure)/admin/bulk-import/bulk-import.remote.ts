@@ -138,11 +138,11 @@ function buildPrimaryRowSchema(lenient: boolean) {
 				path: ['caller_email'],
 				message: 'caller_email must be a valid email'
 			});
-		if (!data.deal_stage || !['eoi', 'booking'].includes(data.deal_stage))
+		if (!data.deal_stage || !['eoi', 'booking', 'cancelled'].includes(data.deal_stage))
 			ctx.addIssue({
 				code: 'custom',
 				path: ['deal_stage'],
-				message: 'deal_stage must be eoi or booking'
+				message: 'deal_stage must be eoi, booking, or cancelled'
 			});
 		if (typeof data.payment_value !== 'number')
 			ctx.addIssue({
@@ -150,8 +150,10 @@ function buildPrimaryRowSchema(lenient: boolean) {
 				path: ['payment_value'],
 				message: 'payment_value must be a number ≥ 0'
 			});
-		req(data.booking_form_url, 'booking_form_url', 'booking_form_url is required');
-		req(data.payment_receipt_url, 'payment_receipt_url', 'payment_receipt_url is required');
+		if (data.deal_stage !== 'cancelled') {
+			req(data.booking_form_url, 'booking_form_url', 'booking_form_url is required');
+			req(data.payment_receipt_url, 'payment_receipt_url', 'payment_receipt_url is required');
+		}
 		if (!data.sale_type || !['off-plan', 'secondary'].includes(data.sale_type))
 			ctx.addIssue({
 				code: 'custom',
@@ -587,6 +589,10 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 				const passback = typeof primary.passback_amount === 'number' ? primary.passback_amount : 0;
 				revenueAfterPassback = Math.round(revenueAchieved - passback);
 			}
+		}
+		if (primary.deal_stage === 'cancelled') {
+			revenueAchieved = 0;
+			revenueAfterPassback = 0;
 		}
 
 		const now = FieldValue.serverTimestamp();

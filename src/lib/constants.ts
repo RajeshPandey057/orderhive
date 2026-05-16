@@ -53,8 +53,16 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/leave',
 		'/holidays'
 	],
-	compliance: ['/compliance', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
-	finance: ['/finance', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
+	compliance: [
+		'/compliance',
+		'/listing',
+		'/dashboard',
+		'/profile',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
+	],
+	finance: ['/finance', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave'],
 	'super-admin': [
 		'/admin',
 		'/agent',
@@ -118,6 +126,8 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	],
 	compliance: [
 		{ title: 'Compliance Dashboard', url: '/compliance/dashboard' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Pending Sales', url: '/compliance/pending-sales' },
 		{ title: 'Approved Sales', url: '/compliance/approved-sales' },
 		{ title: 'Invoices', url: '/compliance/invoices' },
@@ -128,13 +138,14 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	],
 	finance: [
 		{ title: 'Finance Dashboard', url: '/finance/dashboard' },
+		{ title: 'Listing Management', url: '/listing/listing-management' },
+		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Pending Sales', url: '/finance/pending-sales' },
 		{ title: 'Approved Sales', url: '/finance/approved-sales' },
 		{ title: 'Invoices', url: '/finance/invoices' },
 		{ title: "Next Month's Sales", url: '/finance/next-months-sales' },
 		{ title: 'My Attendance', url: '/my-attendance' },
-		{ title: 'My Leaves', url: '/leave' },
-		{ title: 'Holiday Calendar', url: '/holidays' }
+		{ title: 'My Leaves', url: '/leave' }
 	],
 	'super-admin': [
 		{ title: 'Dashboard', url: '/admin/dashboard' },

@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import EmployeeProfileView from '$lib/components/hr/employee-profile-view.svelte';
 	import OnboardingForm from '$lib/components/hr/onboarding-form.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
+	import { Separator } from '$lib/components/ui/separator';
 	import * as Sheet from '$lib/components/ui/sheet';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import {
 		Table,
 		TableBody,
@@ -21,7 +24,9 @@
 	let { data } = $props<{ data: { employees: Employee[] } }>();
 
 	let employeeSheetOpen = $state(false);
+	let profileSheetOpen = $state(false);
 	let selectedEmployee = $state<Employee | null>(null);
+	let profileEmployee = $state<Employee | null>(null);
 	let searchQuery = $state('');
 	let selectedFilter = $state<
 		| 'all'
@@ -97,6 +102,11 @@
 		employeeSheetOpen = true;
 	}
 
+	function openProfile(employee: Employee) {
+		profileEmployee = employee;
+		profileSheetOpen = true;
+	}
+
 	async function handleArchive(employee: Employee) {
 		busyEmail = employee.email;
 		try {
@@ -136,11 +146,15 @@
 <Sheet.Root bind:open={employeeSheetOpen}>
 	<div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
 		<div class="flex items-center justify-between gap-4">
-			<div>
-				<h1 class="text-2xl leading-8 font-medium">Employees & Access Mgmt</h1>
-				<p class="text-[13px] leading-5 text-[#687976]">
-					Manage HR profiles and platform access from one backend-driven view.
-				</p>
+			<div class="flex items-center gap-2">
+				<Sidebar.Trigger class="-ms-1" />
+				<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
+				<div>
+					<h1 class="text-2xl leading-8 font-medium">Employees & Access Mgmt</h1>
+					<p class="text-[13px] leading-5 text-[#687976]">
+						Manage HR profiles and platform access from one backend-driven view.
+					</p>
+				</div>
 			</div>
 			<Button
 				class="h-8 border border-black/5 bg-[#222626] px-3 text-sm font-normal text-white"
@@ -237,7 +251,10 @@
 						</TableRow>
 					{:else}
 						{#each filteredEmployees as employee (employee.email)}
-							<TableRow class="h-[52px]">
+							<TableRow
+								class="h-13 cursor-pointer hover:bg-[#FBF9F8]"
+								onclick={() => openProfile(employee)}
+							>
 								<TableCell>
 									<div class="flex flex-col">
 										<span class="text-[13px] font-medium text-[#222626]">{employee.name}</span>
@@ -270,12 +287,15 @@
 										{accessLabel(employee)}
 									</Badge>
 								</TableCell>
-								<TableCell class="text-right">
+								<TableCell class="text-right" onclick={(event) => event.stopPropagation()}>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 border border-[#EBEEEE] text-xs"
-										onclick={() => openEdit(employee)}
+										onclick={(event) => {
+											event.stopPropagation();
+											openEdit(employee);
+										}}
 									>
 										{employee.code ? 'Edit' : 'Complete Profile'}
 									</Button>
@@ -284,7 +304,10 @@
 										size="sm"
 										class="h-6 border border-[#EBEEEE] text-xs text-[#DC2626]"
 										disabled={busyEmail === employee.email || employee.status === 'archived'}
-										onclick={() => handleArchive(employee)}
+										onclick={(event) => {
+											event.stopPropagation();
+											handleArchive(employee);
+										}}
 									>
 										Archive
 									</Button>
@@ -293,7 +316,10 @@
 										size="sm"
 										class="h-6 border border-[#EBEEEE] text-xs text-[#DC2626]"
 										disabled={busyEmail === employee.email || employee.accessStatus !== 'enabled'}
-										onclick={() => handleDisableAccess(employee)}
+										onclick={(event) => {
+											event.stopPropagation();
+											handleDisableAccess(employee);
+										}}
 									>
 										<ShieldOff class="mr-1 h-3 w-3" />
 										Disable
@@ -309,5 +335,11 @@
 
 	<Sheet.Content side="right" class="w-[60vw] max-w-[60vw] overflow-y-auto p-0 sm:max-w-[60vw]">
 		<OnboardingForm employee={selectedEmployee} onSaved={() => (employeeSheetOpen = false)} />
+	</Sheet.Content>
+</Sheet.Root>
+
+<Sheet.Root bind:open={profileSheetOpen}>
+	<Sheet.Content side="right" class="w-[70vw] max-w-[70vw] overflow-y-auto p-0 sm:max-w-[70vw]">
+		<EmployeeProfileView employee={profileEmployee} />
 	</Sheet.Content>
 </Sheet.Root>

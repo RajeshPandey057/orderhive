@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import EditSaleSheet from '$lib/components/edit-sale-sheet.svelte';
+	import SecurePageHeader from '$lib/components/secure-page-header.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { isActiveSale } from '$lib/sales';
 	import { firekitCollection } from 'svelte-firekit';
@@ -15,6 +16,8 @@
 		salesCollection.data?.find((sale) => sale.id === data.saleId && isActiveSale(sale)) ?? null
 	);
 </script>
+
+<SecurePageHeader title="Edit Sale" />
 
 {#if salesCollection.loading}
 	<div class="flex min-h-[70vh] items-center justify-center rounded-xl bg-muted/50 p-6">

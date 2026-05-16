@@ -68,14 +68,6 @@ const splitSchema = z.object({
 	seniorManagerEmail: z.string().optional()
 });
 
-// Keep the legacy schema for backward-compat reads
-const dealOwnerSchema = z.object({
-	userId: z.string().min(1, 'Owner is required'),
-	email: z.email('Owner email is required'),
-	ownerRole: z.enum(['caller', 'closer']),
-	split: z.number().min(0, 'Split must be at least 0').max(100, 'Split cannot exceed 100')
-});
-
 const saleSchema = z
 	.object({
 		// Primary Buyer (marked as primary)
@@ -119,17 +111,13 @@ const saleSchema = z
 		// Joint Buyers (unlimited)
 		jointBuyers: z.array(buyerSchema).default([]),
 		// Deal Status
-		dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
+		dealStage: z.enum(['eoi', 'booking', 'cancelled'], 'Deal stage is required'),
 		paymentValue: z
 			.number()
 			.min(0, 'Payment value must be at least 0')
 			.max(100, 'Payment value cannot exceed 100'),
-		bookingFormFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
-			message: 'EOI/Booking form upload is required'
-		}),
-		paymentReceiptFile: z.custom<File>((file) => file instanceof File && file.size > 0, {
-			message: 'Payment receipt upload is required'
-		}),
+		bookingFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		paymentReceiptFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 
 		// Optional files (can be generated or uploaded)
 		amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
@@ -295,6 +283,23 @@ const saleSchema = z
 				}
 			}
 		}
+
+		if (data.dealStage !== 'cancelled') {
+			if (!data.bookingFormFile || data.bookingFormFile.size <= 0) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['bookingFormFile'],
+					message: 'EOI/Booking form upload is required'
+				});
+			}
+			if (!data.paymentReceiptFile || data.paymentReceiptFile.size <= 0) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['paymentReceiptFile'],
+					message: 'Payment receipt upload is required'
+				});
+			}
+		}
 	});
 
 const toUploadedFile = async (file: File | null | undefined, path: string) => {
@@ -403,6 +408,10 @@ export const createSale = form(saleSchema, async (data) => {
 			revenueAchieved = Math.round((unitValueNum * data.commissionPercentage) / 100);
 			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
 		}
+	}
+	if (data.dealStage === 'cancelled') {
+		revenueAchieved = 0;
+		revenueAfterPassback = 0;
 	}
 
 	// Ensure role documents exist for any manager/SM emails in splits
@@ -555,7 +564,7 @@ const updateSaleSchema = z
 				});
 			}),
 		jointBuyers: z.array(buyerUpdateSchema).default([]),
-		dealStage: z.enum(['eoi', 'booking'], 'Deal stage is required'),
+		dealStage: z.enum(['eoi', 'booking', 'cancelled'], 'Deal stage is required'),
 		paymentValue: z
 			.number()
 			.min(0, 'Payment value must be at least 0')
@@ -838,6 +847,10 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 			revenueAchieved = Math.round((unitValueNum * data.commissionPercentage) / 100);
 			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
 		}
+	}
+	if (data.dealStage === 'cancelled') {
+		revenueAchieved = 0;
+		revenueAfterPassback = 0;
 	}
 
 	await Promise.all(

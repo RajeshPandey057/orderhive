@@ -12,6 +12,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+	import { getEffectiveSaleRevenue } from '$lib/sales';
 	import { Calendar, ChevronDown, Search } from '@lucide/svelte';
 	import {
 		type ColumnDef,
@@ -187,7 +188,8 @@
 			accessorKey: 'dealStatus',
 			header: 'Deal Status',
 			cell: ({ row }) => {
-				const status = row.original.dealStage;
+				const status =
+					row.original.dealStage === 'cancelled' ? 'Cancelled Deal' : row.original.dealStage;
 				const payment = row.original.paymentValue;
 
 				const getStatusBadgeColor = (s: string) => {
@@ -284,7 +286,7 @@
 					};
 				});
 				return renderSnippet(cellSnippet, {
-					value: row.original.revenueAfterPassback ?? row.original.revenueAchieved ?? 0
+					value: getEffectiveSaleRevenue(row.original)
 				});
 			}
 		}

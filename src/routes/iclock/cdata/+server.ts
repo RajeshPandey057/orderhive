@@ -17,7 +17,7 @@
  * Env vars:
  *   ZKTECO_DEVICE_SN    — comma-separated serial numbers (e.g. "JJA1253301000,CQZ7231961458")
  *   ZKTECO_TIMEZONE     — UTC offset for device clock sync (default "4.00" = Dubai UTC+4)
- *   LATE_THRESHOLD_TIME — HH:MM threshold for 'late' status (default "09:00")
+ *   LATE_THRESHOLD_TIME — HH:MM threshold for 'late' status (default "10:00")
  */
 
 import { parseIClockBody, processPunch } from '$lib/server/biometric';

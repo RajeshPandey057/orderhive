@@ -85,6 +85,18 @@ const stringArrayFromForm = z.preprocess(
 	z.array(z.string().min(1)).optional().default([])
 );
 
+function normalizeListingFormData(rawData: unknown) {
+	if (!rawData || typeof rawData !== 'object') return rawData;
+	const data = { ...(rawData as Record<string, unknown>) };
+	for (const key of ['pictureFiles', 'videoFiles', 'floorPlanFiles'] as const) {
+		const bracketKey = `${key}[]`;
+		if (data[key] === undefined && data[bracketKey] !== undefined) {
+			data[key] = data[bracketKey];
+		}
+	}
+	return data;
+}
+
 // Shared shape (all fields except createdByUid/createdByEmail)
 // Extracted so both listingSchema and updateListingSchema can be built without .omit()
 // (Zod v4 forbids .omit() on schemas containing refinements)
@@ -268,7 +280,7 @@ const listingSchema = z
 	});
 
 export const createListing = form('unchecked', async (rawData, issue) => {
-	const result = listingSchema.safeParse(rawData);
+	const result = listingSchema.safeParse(normalizeListingFormData(rawData));
 	if (!result.success) {
 		for (const err of result.error.issues) {
 			const key = err.path.join('.') || '_form';
@@ -414,7 +426,7 @@ const updateListingSchema = z.object({
 });
 
 export const updateListing = form('unchecked', async (rawData, issue) => {
-	const result = updateListingSchema.safeParse(rawData);
+	const result = updateListingSchema.safeParse(normalizeListingFormData(rawData));
 	if (!result.success) {
 		for (const err of result.error.issues) {
 			const key = err.path.join('.') || '_form';

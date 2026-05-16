@@ -260,7 +260,7 @@ declare global {
 			seniorManagerEmail?: string;
 		}[];
 		splitAgentIds?: string[];
-		dealStage: 'eoi' | 'booking';
+		dealStage: 'eoi' | 'booking' | 'cancelled';
 		paymentValue: number;
 		bookingFormFile: SaleDocumentFile | null;
 		paymentReceiptFile: SaleDocumentFile | null;

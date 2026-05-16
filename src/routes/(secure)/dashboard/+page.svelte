@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import SecurePageHeader from '$lib/components/secure-page-header.svelte';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import { getDefaultRoute } from '@/constants';
 	import { onMount } from 'svelte';
@@ -16,6 +17,8 @@
 		}
 	});
 </script>
+
+<SecurePageHeader title="Dashboard" />
 
 <div class="flex min-h-svh items-center justify-center">
 	<div class="flex flex-col items-center gap-4">

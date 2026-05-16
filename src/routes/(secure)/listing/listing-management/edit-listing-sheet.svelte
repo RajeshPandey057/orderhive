@@ -111,6 +111,9 @@
 	let mediaAssets = $state<
 		{ id: number; type: 'photo' | 'video'; file: File; fileName: string; previewUrl?: string }[]
 	>([]);
+	let floorPlanAssets = $state<{ id: number; file: File; fileName: string; previewUrl?: string }[]>(
+		[]
+	);
 	let existingMediaAssets = $state<{ type: 'photo' | 'video'; fileName: string; url: string }[]>(
 		[]
 	);
@@ -121,6 +124,7 @@
 	let developerPopoverOpen = $state(false);
 	let pictureInputRef: HTMLInputElement | undefined = $state(undefined);
 	let videoInputRef: HTMLInputElement | undefined = $state(undefined);
+	let floorPlanInputRef: HTMLInputElement | undefined = $state(undefined);
 	let developerSearchValue = $state('');
 	let managerPopoverOpen = $state(false);
 	let seniorManagerPopoverOpen = $state(false);
@@ -216,6 +220,13 @@
 		const dt = new DataTransfer();
 		for (const a of mediaAssets.filter((a) => a.type === 'video')) dt.items.add(a.file);
 		videoInputRef.files = dt.files;
+	});
+
+	$effect(() => {
+		if (!floorPlanInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of floorPlanAssets) dt.items.add(a.file);
+		floorPlanInputRef.files = dt.files;
 	});
 
 	const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -341,6 +352,7 @@
 			(asset): asset is { fileName: string; url: string } => !!asset?.url && !!asset?.fileName
 		);
 		mediaAssets = [];
+		floorPlanAssets = [];
 		managerSearchValue = '';
 		seniorManagerSearchValue = '';
 		managerSearchResults = [];
@@ -472,8 +484,33 @@
 		mediaAssets = mediaAssets.filter((asset) => asset.id !== id);
 	}
 
+	function addFloorPlanFiles(files: FileList | null) {
+		if (!files || files.length === 0) return;
+		const incoming = Array.from(files).map((file) => ({
+			id: nextAssetId++,
+			file,
+			fileName: file.name,
+			previewUrl: URL.createObjectURL(file)
+		}));
+		floorPlanAssets = [...floorPlanAssets, ...incoming];
+	}
+
+	function onFloorPlanInputChange(event: Event) {
+		addFloorPlanFiles((event.currentTarget as HTMLInputElement).files);
+	}
+
+	function removeFloorPlanAsset(id: number) {
+		const assetToRemove = floorPlanAssets.find((asset) => asset.id === id);
+		revokePreviewUrl(assetToRemove?.previewUrl);
+		floorPlanAssets = floorPlanAssets.filter((asset) => asset.id !== id);
+	}
+
 	function removeExistingMediaAsset(url: string) {
 		existingMediaAssets = existingMediaAssets.filter((asset) => asset.url !== url);
+	}
+
+	function removeExistingFloorPlanAsset(url: string) {
+		existingFloorPlanAssets = existingFloorPlanAssets.filter((asset) => asset.url !== url);
 	}
 
 	function validate() {
@@ -599,6 +636,15 @@
 				name="videoFiles[]"
 				multiple
 				bind:this={videoInputRef}
+				class="sr-only"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
+			<input
+				type="file"
+				name="floorPlanFiles[]"
+				multiple
+				bind:this={floorPlanInputRef}
 				class="sr-only"
 				tabindex="-1"
 				aria-hidden="true"
@@ -1369,6 +1415,82 @@
 													type="button"
 													class="text-destructive hover:text-destructive/80"
 													onclick={() => removeMediaAsset(asset.id)}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+
+							<div class="border-t border-border/60 pt-4">
+								<h3 class="text-sm font-medium">Floor Plans</h3>
+							</div>
+
+							{#if existingFloorPlanAssets.length}
+								<div class="grid grid-cols-2 gap-3">
+									{#each existingFloorPlanAssets as asset (asset.url)}
+										<div class="rounded-lg border border-border/60 bg-muted/30 p-2">
+											<div class="flex items-center justify-between gap-3">
+												<div class="min-w-0">
+													<p class="truncate text-sm font-medium">{asset.fileName}</p>
+													<a
+														href={asset.url}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="text-xs text-muted-foreground hover:text-foreground"
+													>
+														View existing file
+													</a>
+												</div>
+												<button
+													type="button"
+													class="text-destructive hover:text-destructive/80"
+													onclick={() => removeExistingFloorPlanAsset(asset.url)}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+
+							<div
+								role="region"
+								aria-label="Floor plan upload area"
+								class="rounded-xl border-2 border-dashed border-muted-foreground/40 bg-muted/10 p-8 text-center"
+							>
+								<label for="edit-floor-plan-input" class="cursor-pointer">
+									<div
+										class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted"
+									>
+										<Upload class="h-6 w-6 text-muted-foreground" />
+									</div>
+									<p class="text-sm font-semibold">Upload floor plans</p>
+									<p class="mt-1 text-xs text-muted-foreground">PDF or image files</p>
+								</label>
+								<Input
+									id="edit-floor-plan-input"
+									class="sr-only"
+									type="file"
+									accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+									multiple
+									onchange={onFloorPlanInputChange}
+								/>
+							</div>
+
+							{#if floorPlanAssets.length > 0}
+								<div class="grid grid-cols-2 gap-3">
+									{#each floorPlanAssets as asset (asset.id)}
+										<div class="rounded-lg border border-border/60 bg-background/60 p-2">
+											<div class="flex items-center justify-between gap-3">
+												<p class="truncate text-xs text-muted-foreground">{asset.fileName}</p>
+												<button
+													type="button"
+													class="text-destructive hover:text-destructive/80"
+													onclick={() => removeFloorPlanAsset(asset.id)}
 												>
 													<Trash2 class="h-4 w-4" />
 												</button>

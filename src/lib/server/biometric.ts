@@ -60,9 +60,9 @@ export function serializePunch(id: string, data: FirebaseFirestore.DocumentData)
 /** Standard workday target in minutes (8 hours). */
 const STANDARD_WORKDAY_MINUTES = 480;
 
-/** Parse the configured late-threshold from env var (default 09:00, format HH:MM). */
+/** Parse the configured late-threshold from env var (default 10:00, format HH:MM). */
 function getLateThresholdMinutes(): number {
-	const raw = process.env.LATE_THRESHOLD_TIME ?? '09:00';
+	const raw = process.env.LATE_THRESHOLD_TIME ?? '10:00';
 	const [h, m] = raw.split(':').map(Number);
 	return (Number.isFinite(h) ? h : 9) * 60 + (Number.isFinite(m) ? m : 0);
 }

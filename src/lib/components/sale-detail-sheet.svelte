@@ -1126,7 +1126,11 @@
 									Status
 								</Table.Cell>
 								<Table.Cell class="font-medium capitalize">
-									{sale?.dealStage === 'eoi' ? 'EOI Received' : (sale?.dealStage ?? '-')}
+									{sale?.dealStage === 'eoi'
+										? 'EOI Received'
+										: sale?.dealStage === 'cancelled'
+											? 'Cancelled Deal'
+											: (sale?.dealStage ?? '-')}
 								</Table.Cell>
 								<Table.Cell class="w-48 bg-muted/50 font-medium text-muted-foreground">
 									% Amount
@@ -2000,10 +2004,10 @@
 				<span class="font-semibold">{sale?.id ?? ''}</span>
 				for
 				<span class="font-semibold">
-					{sale?.clientDetails.firstName ?? ''} {sale?.clientDetails.lastName ?? ''}
+					{sale?.clientDetails.firstName ?? ''}
+					{sale?.clientDetails.lastName ?? ''}
 				</span>
-				? This will hide the sale from normal sales views, but keep its documents and audit
-				history.
+				? This will hide the sale from normal sales views, but keep its documents and audit history.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

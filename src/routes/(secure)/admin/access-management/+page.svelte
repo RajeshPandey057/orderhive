@@ -4,8 +4,10 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Separator } from '$lib/components/ui/separator';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
@@ -230,7 +232,11 @@
 <div class="flex flex-col gap-6 p-6">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
-		<h1 class="text-3xl font-bold">Access Management</h1>
+		<div class="flex items-center gap-2">
+			<Sidebar.Trigger class="-ms-1" />
+			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
+			<h1 class="text-3xl font-bold">Access Management</h1>
+		</div>
 		<Dialog.Root bind:open={dialogOpen}>
 			<Dialog.Trigger>
 				{#snippet child({ props })}

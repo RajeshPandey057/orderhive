@@ -1507,7 +1507,10 @@
 					<RadioGroup.Root
 						bind:value={
 							() => updateSale.fields.dealStage.value() ?? '',
-							(v) => updateSale.fields.dealStage.set(v || undefined)
+							(v) => {
+								updateSale.fields.dealStage.set(v || undefined);
+								if (v === 'cancelled') updateSale.fields.paymentValue.set(0);
+							}
 						}
 						class="flex w-full flex-row gap-4"
 					>
@@ -1549,11 +1552,18 @@
 								{/each}
 							</Field.Field>
 						</div>
+						<HorizontalSeparator text="OR" class="mx-4" />
+						<div class="flex w-full flex-col gap-2">
+							<Field.Field orientation="horizontal">
+								<RadioGroup.Item value="cancelled" id="deal-cancelled" />
+								<Field.Label for="deal-cancelled" class="font-normal">Cancelled Deal</Field.Label>
+							</Field.Field>
+						</div>
 					</RadioGroup.Root>
 					<input class="sr-only" {...updateSale.fields.dealStage.as('text')} />
 
 					<!-- File Uploads - Only show when a stage is selected -->
-					{#if updateSale.fields.dealStage.value()}
+					{#if updateSale.fields.dealStage.value() && updateSale.fields.dealStage.value() !== 'cancelled'}
 						<div class="space-y-4 pt-2">
 							<Field.Field class="w-full">
 								{#if uploadedFiles.bookingFormFile}

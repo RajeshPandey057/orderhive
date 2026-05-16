@@ -13,6 +13,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Separator } from '$lib/components/ui/separator';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Calendar as CalendarIcon, Plus, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { createHoliday, deleteHoliday } from '../hr/hr.remote';
@@ -73,11 +75,15 @@
 
 <div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
 	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl leading-8 font-medium">Holiday Management {data.currentYear}</h1>
-			<p class="text-[13px] leading-5 text-[#687976]">
-				Manage company holidays and keep leave/attendance calendars aligned.
-			</p>
+		<div class="flex items-center gap-2">
+			<Sidebar.Trigger class="-ms-1" />
+			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
+			<div>
+				<h1 class="text-2xl leading-8 font-medium">Holiday Management {data.currentYear}</h1>
+				<p class="text-[13px] leading-5 text-[#687976]">
+					Manage company holidays and keep leave/attendance calendars aligned.
+				</p>
+			</div>
 		</div>
 		<Button
 			onclick={() => (isAddDialogOpen = true)}

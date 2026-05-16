@@ -5,6 +5,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Separator } from '$lib/components/ui/separator';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Select from '$lib/components/ui/select';
 	import {
 		Table,
@@ -112,6 +114,7 @@
 	let correctionReason = $state('');
 	let filterPeriod = $state('monthly');
 	let searchQuery = $state('');
+	let selectedAttendanceDate = $state('');
 	let selectedKpiFilter = $state<'all' | 'on-time' | 'present' | 'absent' | 'on-leave'>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
@@ -129,27 +132,32 @@
 			);
 		})
 	);
+	const dateFilteredAttendanceRecords = $derived(
+		selectedAttendanceDate
+			? searchFilteredAttendanceRecords.filter((record) => record.date === selectedAttendanceDate)
+			: searchFilteredAttendanceRecords
+	);
 	const presentCount = $derived(
-		searchFilteredAttendanceRecords.filter((record) => record.status === 'present').length
+		dateFilteredAttendanceRecords.filter((record) => record.status === 'present').length
 	);
 	const absentCount = $derived(
-		searchFilteredAttendanceRecords.filter((record) => record.status === 'absent').length
+		dateFilteredAttendanceRecords.filter((record) => record.status === 'absent').length
 	);
 	const onLeaveCount = $derived(
-		searchFilteredAttendanceRecords.filter((record) => record.status === 'on-leave').length
+		dateFilteredAttendanceRecords.filter((record) => record.status === 'on-leave').length
 	);
 	const presentTotalCount = $derived(
-		searchFilteredAttendanceRecords.filter(
+		dateFilteredAttendanceRecords.filter(
 			(record) => record.status === 'present' || record.status === 'late'
 		).length
 	);
 	const onTimeRate = $derived(
-		searchFilteredAttendanceRecords.length
-			? Math.round((presentCount / searchFilteredAttendanceRecords.length) * 100)
+		dateFilteredAttendanceRecords.length
+			? Math.round((presentCount / dateFilteredAttendanceRecords.length) * 100)
 			: 0
 	);
 	const filteredAttendanceRecords = $derived(
-		searchFilteredAttendanceRecords.filter((record) => {
+		dateFilteredAttendanceRecords.filter((record) => {
 			if (selectedKpiFilter === 'all') return true;
 			if (selectedKpiFilter === 'on-time') return record.status === 'present';
 			if (selectedKpiFilter === 'present')
@@ -225,11 +233,15 @@
 
 <div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
 	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl leading-8 font-medium">Attendance Management</h1>
-			<p class="text-[13px] leading-5 text-[#687976]">
-				Monitor daily punch-ins and handle audited corrections.
-			</p>
+		<div class="flex items-center gap-2">
+			<Sidebar.Trigger class="-ms-1" />
+			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
+			<div>
+				<h1 class="text-2xl leading-8 font-medium">Attendance Management</h1>
+				<p class="text-[13px] leading-5 text-[#687976]">
+					Monitor daily punch-ins and handle audited corrections.
+				</p>
+			</div>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
@@ -286,6 +298,22 @@
 						<Select.Item value="yearly">Yearly</Select.Item>
 					</Select.Content>
 				</Select.Root>
+				<Input
+					type="date"
+					class="h-8 w-40 border-[#D4D9D9] text-[13px]"
+					bind:value={selectedAttendanceDate}
+					max={todayStr()}
+				/>
+				{#if selectedAttendanceDate}
+					<Button
+						type="button"
+						variant="outline"
+						class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
+						onclick={() => (selectedAttendanceDate = '')}
+					>
+						Clear date
+					</Button>
+				{/if}
 			</div>
 
 			<div class="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -309,8 +337,8 @@
 							>
 						</div>
 						<div class="text-3xl leading-8 font-medium">
-							{searchFilteredAttendanceRecords.length
-								? Math.round((presentTotalCount / searchFilteredAttendanceRecords.length) * 100)
+							{dateFilteredAttendanceRecords.length
+								? Math.round((presentTotalCount / dateFilteredAttendanceRecords.length) * 100)
 								: 0}%
 						</div>
 					</div>
@@ -326,8 +354,8 @@
 							{absentCount}<span class="ml-1 text-base text-[#8D8D8D]">/{data.employeeCount}</span>
 						</div>
 						<div class="text-3xl leading-8 font-medium">
-							{searchFilteredAttendanceRecords.length
-								? Math.round((absentCount / searchFilteredAttendanceRecords.length) * 100)
+							{dateFilteredAttendanceRecords.length
+								? Math.round((absentCount / dateFilteredAttendanceRecords.length) * 100)
 								: 0}%
 						</div>
 					</div>
@@ -343,8 +371,8 @@
 							{onLeaveCount}<span class="ml-1 text-base text-[#8D8D8D]">/{data.employeeCount}</span>
 						</div>
 						<div class="text-3xl leading-8 font-medium">
-							{searchFilteredAttendanceRecords.length
-								? Math.round((onLeaveCount / searchFilteredAttendanceRecords.length) * 100)
+							{dateFilteredAttendanceRecords.length
+								? Math.round((onLeaveCount / dateFilteredAttendanceRecords.length) * 100)
 								: 0}%
 						</div>
 					</div>

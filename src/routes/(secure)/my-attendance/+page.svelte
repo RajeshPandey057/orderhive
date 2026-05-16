@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SecurePageHeader from '$lib/components/secure-page-header.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import {
 		Table,
@@ -31,10 +32,11 @@
 	}
 </script>
 
+<SecurePageHeader title="Attendance" />
+
 <div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
 	<div class="rounded-md border border-[#EBEEEE] bg-white p-6">
 		<div class="mb-4 flex items-center justify-between gap-3">
-			<h1 class="text-2xl leading-8 font-medium text-[#222626]">Attendance</h1>
 			<Select.Root type="single" bind:value={period}>
 				<Select.Trigger
 					class="h-8 w-[140px] border border-[#D4D9D9] bg-white text-[13px] text-[#222626]"
