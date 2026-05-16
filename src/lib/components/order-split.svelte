@@ -202,12 +202,19 @@
 	function applyHierarchyDefaults(split: SplitEntry, user: UserResult): SplitEntry {
 		const managerEmail = (user.reportingManagerEmail ?? '').trim();
 		const seniorManagerEmail = (user.seniorManagerEmail ?? '').trim();
+		// Only fill in fields that are currently empty — preserve any manually selected values
+		const newManagerEmail = split.managerEmail?.trim() ? split.managerEmail : managerEmail;
+		const newSeniorManagerEmail = split.seniorManagerEmail?.trim()
+			? split.seniorManagerEmail
+			: seniorManagerEmail;
 		return {
 			...split,
-			managerEmail,
-			seniorManagerEmail,
-			managerName: managerEmail,
-			seniorManagerName: seniorManagerEmail
+			managerEmail: newManagerEmail,
+			seniorManagerEmail: newSeniorManagerEmail,
+			managerName: split.managerName?.trim() ? split.managerName : newManagerEmail,
+			seniorManagerName: split.seniorManagerName?.trim()
+				? split.seniorManagerName
+				: newSeniorManagerEmail
 		};
 	}
 
@@ -227,7 +234,17 @@
 					split.key === row.key ? applyHierarchyDefaults(split, user) : split
 				);
 			}
-			if (nextSplits !== splits) {
+			// Only commit if at least one value actually changed — prevents infinite loop
+			// when an agent has no hierarchy data stored in Firestore
+			const hasChanges = nextSplits.some((ns) => {
+				const orig = splits.find((s) => s.key === ns.key);
+				return (
+					orig &&
+					(ns.managerEmail !== orig.managerEmail ||
+						ns.seniorManagerEmail !== orig.seniorManagerEmail)
+				);
+			});
+			if (hasChanges) {
 				splits = nextSplits;
 				onsplitschange?.(splits);
 			}

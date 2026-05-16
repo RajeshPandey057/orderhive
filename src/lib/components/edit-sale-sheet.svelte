@@ -1512,9 +1512,9 @@
 								if (v === 'cancelled') updateSale.fields.paymentValue.set(0);
 							}
 						}
-						class="flex w-full flex-row gap-4"
+						class="grid w-full grid-cols-1 gap-4 xl:grid-cols-3"
 					>
-						<div class="flex w-full flex-col gap-2">
+						<div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/60 p-4">
 							<Field.Field orientation="horizontal">
 								<RadioGroup.Item value="eoi" id="deal-eoi" />
 								<Field.Label for="deal-eoi" class="font-normal">EOI</Field.Label>
@@ -1533,8 +1533,7 @@
 								{/each}
 							</Field.Field>
 						</div>
-						<HorizontalSeparator text="OR" class="mx-4" />
-						<div class="flex w-full flex-col gap-2">
+						<div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/60 p-4">
 							<Field.Field orientation="horizontal">
 								<RadioGroup.Item value="booking" id="deal-booking" />
 								<Field.Label for="deal-booking" class="font-normal">Booking Stage</Field.Label>
@@ -1552,8 +1551,7 @@
 								{/each}
 							</Field.Field>
 						</div>
-						<HorizontalSeparator text="OR" class="mx-4" />
-						<div class="flex w-full flex-col gap-2">
+						<div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/60 p-4">
 							<Field.Field orientation="horizontal">
 								<RadioGroup.Item value="cancelled" id="deal-cancelled" />
 								<Field.Label for="deal-cancelled" class="font-normal">Cancelled Deal</Field.Label>
