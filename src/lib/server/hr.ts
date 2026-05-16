@@ -78,7 +78,6 @@ export function serializeEmployeeDoc(id: string, data: FirebaseFirestore.Documen
 		fresherOrExperienced: data.fresherOrExperienced ?? '',
 		documents: data.documents ?? {},
 		accessType: data.accessType,
-		agentRole: data.agentRole ?? '',
 		managedTeamIds: Array.isArray(data.managedTeamIds) ? data.managedTeamIds : [],
 		accessStatus: data.accessStatus ?? 'missing',
 		createdAt: serializeDate(data.createdAt),
@@ -95,7 +94,6 @@ export function roleToEmployeeAccess(role?: FirebaseFirestore.DocumentData | nul
 		return {
 			accessStatus: 'missing' as EmployeeAccessStatus,
 			accessType: undefined,
-			agentRole: '',
 			managedTeamIds: []
 		};
 	}
@@ -103,7 +101,6 @@ export function roleToEmployeeAccess(role?: FirebaseFirestore.DocumentData | nul
 	return {
 		accessStatus: 'enabled' as EmployeeAccessStatus,
 		accessType: role.accessType as AccessType | undefined,
-		agentRole: role.agentRole ?? '',
 		managedTeamIds: Array.isArray(role.managedTeamIds) ? role.managedTeamIds : []
 	};
 }
@@ -187,7 +184,6 @@ export async function upsertEmployeeAccess(
 	email: string,
 	access: {
 		accessType: AccessType;
-		agentRole?: string;
 		managedTeamIds?: string[];
 	},
 	actorEmail: string
@@ -200,14 +196,9 @@ export async function upsertEmployeeAccess(
 		updatedAt: now
 	};
 
-	if (access.accessType === 'agent') {
-		roleRecord.agentRole = access.agentRole ?? '';
-		roleRecord.managedTeamIds = [];
-	} else if (access.accessType === 'manager' || access.accessType === 'senior-manager') {
-		roleRecord.agentRole = '';
+	if (access.accessType === 'manager' || access.accessType === 'senior-manager') {
 		roleRecord.managedTeamIds = access.managedTeamIds ?? [];
 	} else {
-		roleRecord.agentRole = '';
 		roleRecord.managedTeamIds = [];
 	}
 
@@ -225,7 +216,6 @@ export async function upsertEmployeeAccess(
 			email: normalised,
 			accessStatus: 'enabled',
 			accessType: access.accessType,
-			agentRole: roleRecord.agentRole ?? '',
 			managedTeamIds: roleRecord.managedTeamIds ?? [],
 			updatedAt: now,
 			updatedByEmail: actorEmail
@@ -242,7 +232,6 @@ export async function disableEmployeeAccess(email: string, actorEmail: string) {
 			email: normalised,
 			accessStatus: 'disabled',
 			accessType: FieldValue.delete(),
-			agentRole: '',
 			managedTeamIds: [],
 			updatedAt: FieldValue.serverTimestamp(),
 			updatedByEmail: actorEmail

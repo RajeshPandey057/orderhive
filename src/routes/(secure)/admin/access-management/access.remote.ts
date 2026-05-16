@@ -10,9 +10,6 @@ const inviteUserSchema = z.object({
 	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
 		message: 'Access type is required'
 	}),
-	// Agent-specific fields (optional, required only when accessType is 'agent')
-	agentRole: z.string().optional(),
-	agentLevel: z.string().optional(),
 	// Manager-specific fields
 	managedTeamIds: z.array(z.string()).optional()
 });
@@ -23,9 +20,6 @@ const updateUserSchema = z.object({
 	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
 		message: 'Access type is required'
 	}),
-	// Agent-specific fields (optional, required only when accessType is 'agent')
-	agentRole: z.string().optional(),
-	agentLevel: z.string().optional(),
 	// Manager-specific fields
 	managedTeamIds: z.array(z.string()).optional()
 });
@@ -53,16 +47,6 @@ export const inviteUser = form(inviteUserSchema, async (data) => {
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};
-
-	// Add agent-specific fields if accessType is 'agent'
-	if (data.accessType === 'agent') {
-		if (data.agentRole) {
-			roleRecord.agentRole = data.agentRole;
-		}
-		if (data.agentLevel) {
-			roleRecord.agentLevel = data.agentLevel;
-		}
-	}
 
 	// Add managedTeamIds for manager/senior-manager
 	if (data.accessType === 'manager' || data.accessType === 'senior-manager') {
@@ -96,20 +80,6 @@ export const updateUser = form(updateUserSchema, async (data) => {
 		accessType: data.accessType,
 		updatedAt: timestamp
 	};
-
-	// Handle agent-specific fields
-	if (data.accessType === 'agent') {
-		if (data.agentRole) {
-			updateRecord.agentRole = data.agentRole;
-		}
-		if (data.agentLevel) {
-			updateRecord.agentLevel = data.agentLevel;
-		}
-	} else {
-		// Clear agent fields if not agent
-		updateRecord.agentRole = '';
-		updateRecord.agentLevel = '';
-	}
 
 	// Handle managedTeamIds for manager/senior-manager
 	if (data.accessType === 'manager' || data.accessType === 'senior-manager') {

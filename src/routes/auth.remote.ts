@@ -29,11 +29,7 @@ export const authenticatedRedirect = command(AuthInput, async (input) => {
 			const employeeDoc = await employeeCollection.doc(employeeIdForEmail(normalisedEmail)).get();
 			if (employeeDoc.exists) {
 				console.log('No role found; defaulting employee to agent:', normalisedEmail);
-				await upsertEmployeeAccess(
-					normalisedEmail,
-					{ accessType: 'agent', agentRole: 'sales-agent' },
-					normalisedEmail
-				);
+				await upsertEmployeeAccess(normalisedEmail, { accessType: 'agent' }, normalisedEmail);
 				cookies.set(
 					SESSION_TOKEN,
 					JSON.stringify({ uid, email: normalisedEmail, role: 'agent' }),
@@ -62,11 +58,7 @@ export const authenticatedRedirect = command(AuthInput, async (input) => {
 			const employeeDoc = await employeeCollection.doc(employeeIdForEmail(normalisedEmail)).get();
 			if (employeeDoc.exists) {
 				console.log('No accessType found; defaulting employee to agent:', normalisedEmail);
-				await upsertEmployeeAccess(
-					normalisedEmail,
-					{ accessType: 'agent', agentRole: 'sales-agent' },
-					normalisedEmail
-				);
+				await upsertEmployeeAccess(normalisedEmail, { accessType: 'agent' }, normalisedEmail);
 				cookies.set(
 					SESSION_TOKEN,
 					JSON.stringify({ uid, email: normalisedEmail, role: 'agent' }),

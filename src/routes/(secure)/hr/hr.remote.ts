@@ -33,7 +33,6 @@ const emailSchema = z.email().transform((email) => normalizeEmail(email));
 
 const employeeAccessSchema = z.object({
 	accessType: accessTypeSchema,
-	agentRole: optionalString,
 	managedTeamIds: z.array(z.string()).optional().default([])
 });
 

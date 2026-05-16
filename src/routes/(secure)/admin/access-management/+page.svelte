@@ -11,27 +11,27 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
-	import Briefcase from '~icons/lucide/briefcase';
 	import Hammer from '~icons/lucide/hammer';
 	import Search from '~icons/lucide/search';
 	import Trash2 from '~icons/lucide/trash-2';
-	import Trophy from '~icons/lucide/trophy';
 	import UserPlus from '~icons/lucide/user-plus';
 	import { deleteUser, inviteUser, updateUser } from './access.remote';
+
+	type AssignableAccessType =
+		| 'admin'
+		| 'agent'
+		| 'finance'
+		| 'compliance'
+		| 'manager'
+		| 'senior-manager';
+
 	// Fetch roles collection from Firebase
 	const rolesCollection = firekitCollection<Role>('roles');
 
 	// State for filters
 	let searchQuery = $state('');
 	let selectedFilter = $state<
-		| 'all'
-		| 'admin'
-		| 'agent'
-		| 'compliance'
-		| 'finance'
-		| 'manager'
-		| 'senior-manager'
-		| 'reporting-manager'
+		'all' | 'admin' | 'agent' | 'compliance' | 'finance' | 'manager' | 'senior-manager'
 	>('all');
 
 	// Dialog state
@@ -40,10 +40,6 @@
 	// Edit Sheet state
 	let editSheetOpen = $state(false);
 	let selectedRole = $state<Role | null>(null);
-	let editAccessType = $state<string | undefined>(undefined);
-
-	// Form state for access type (needed for conditional rendering)
-	let selectedAccessType = $state<string | undefined>('admin');
 
 	// Computed filtered data
 	let filteredData = $derived.by(() => {
@@ -51,10 +47,7 @@
 
 		let filtered = rolesCollection.data;
 
-		// Apply access type filter
-		if (selectedFilter === 'reporting-manager') {
-			filtered = filtered.filter((role) => role.agentRole === selectedFilter);
-		} else if (selectedFilter !== 'all') {
+		if (selectedFilter !== 'all') {
 			filtered = filtered.filter((role) => role.accessType === selectedFilter);
 		}
 
@@ -83,35 +76,10 @@
 		{ value: 'senior-manager', label: 'Senior Manager' }
 	];
 
-	// Agent role options
-	const agentRoles = [
-		{ value: 'sales-agent', label: 'Sales Agent' },
-		{ value: 'reporting-manager', label: 'Reporting Manager' },
-		{ value: 'senior-manager', label: 'Senior Manager' }
-	];
-
-	// Agent level options
-	const agentLevels = [
-		{ value: 'bronze', label: 'Bronze' },
-		{ value: 'silver', label: 'Silver' },
-		{ value: 'gold', label: 'Gold' },
-		{ value: 'platinum', label: 'Platinum' }
-	];
-
 	// Derived labels for invite form
 	const accessTypeLabel = $derived(
 		accessTypes.find((t) => t.value === inviteUser.fields.accessType.value())?.label ??
 			'Select access type'
-	);
-
-	const agentRoleLabel = $derived(
-		agentRoles.find((r) => r.value === inviteUser.fields.agentRole.value())?.label ??
-			'Select agent role'
-	);
-
-	const agentLevelLabel = $derived(
-		agentLevels.find((l) => l.value === inviteUser.fields.agentLevel.value())?.label ??
-			'Select agent level'
 	);
 
 	// Derived labels for edit form
@@ -120,27 +88,12 @@
 			'Select access type'
 	);
 
-	const editAgentRoleLabel = $derived(
-		agentRoles.find((r) => r.value === updateUser.fields.agentRole.value())?.label ??
-			'Select agent role'
-	);
-
-	const editAgentLevelLabel = $derived(
-		agentLevels.find((l) => l.value === updateUser.fields.agentLevel.value())?.label ??
-			'Select agent level'
-	);
-
 	// Handle edit access - opens sheet with role data
 	function handleEditAccess(role: Role) {
 		selectedRole = role;
-		editAccessType = role.accessType;
 		// Pre-populate the update form fields
 		updateUser.fields.email.set(role.email);
-		updateUser.fields.accessType.set(
-			role.accessType as 'admin' | 'agent' | 'finance' | 'compliance'
-		);
-		if (role.agentRole) updateUser.fields.agentRole.set(role.agentRole);
-		if (role.agentLevel) updateUser.fields.agentLevel.set(role.agentLevel);
+		updateUser.fields.accessType.set(role.accessType as AssignableAccessType);
 		editSheetOpen = true;
 	}
 
@@ -160,13 +113,7 @@
 
 	// Handle edit access type change
 	function handleEditAccessTypeChange(value: string | undefined) {
-		editAccessType = value;
-		updateUser.fields.accessType.set(value as 'admin' | 'agent' | 'finance' | 'compliance');
-		// Clear agent fields if not agent
-		if (value !== 'agent') {
-			updateUser.fields.agentRole.set('');
-			updateUser.fields.agentLevel.set('');
-		}
+		updateUser.fields.accessType.set(value as AssignableAccessType);
 	}
 
 	// Get user initials for avatar
@@ -219,13 +166,7 @@
 
 	// Handle access type change
 	function handleAccessTypeChange(value: string | undefined) {
-		selectedAccessType = value;
-		inviteUser.fields.accessType.set(value as 'admin' | 'agent' | 'finance' | 'compliance');
-		// Clear agent fields if not agent
-		if (value !== 'agent') {
-			inviteUser.fields.agentRole.set('');
-			inviteUser.fields.agentLevel.set('');
-		}
+		inviteUser.fields.accessType.set(value as AssignableAccessType);
 	}
 </script>
 
@@ -259,7 +200,6 @@
 							if (!issues?.length) {
 								form.reset();
 								dialogOpen = false;
-								selectedAccessType = undefined;
 								toast.success('User invited successfully!');
 							}
 						} catch {
@@ -306,57 +246,6 @@
 								<Field.Error>{issue.message}</Field.Error>
 							{/each}
 						</Field.Field>
-
-						<!-- Agent-specific fields (shown only when accessType is 'agent') -->
-						{#if selectedAccessType === 'agent'}
-							<!-- Agent Role Field -->
-							<Field.Field>
-								<Field.Label for="agentRole">Agent Role</Field.Label>
-								<Select.Root
-									type="single"
-									value={inviteUser.fields.agentRole.value()}
-									onValueChange={(v) => inviteUser.fields.agentRole.set(v)}
-								>
-									<Select.Trigger id="agentRole">
-										<Briefcase />
-										{agentRoleLabel}
-									</Select.Trigger>
-									<Select.Content>
-										{#each agentRoles as role (role.value)}
-											<Select.Item value={role.value}>{role.label}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...inviteUser.fields.agentRole.as('text')} />
-								{#each inviteUser.fields.agentRole.issues() as issue, i (i)}
-									<Field.Error>{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-
-							<!-- Agent Level Field -->
-							<Field.Field>
-								<Field.Label for="agentLevel">Agent Level</Field.Label>
-								<Select.Root
-									type="single"
-									value={inviteUser.fields.agentLevel.value()}
-									onValueChange={(v) => inviteUser.fields.agentLevel.set(v)}
-								>
-									<Select.Trigger id="agentLevel">
-										<Trophy />
-										{agentLevelLabel}
-									</Select.Trigger>
-									<Select.Content>
-										{#each agentLevels as level (level.value)}
-											<Select.Item value={level.value}>{level.label}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...inviteUser.fields.agentLevel.as('text')} />
-								{#each inviteUser.fields.agentLevel.issues() as issue, i (i)}
-									<Field.Error>{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						{/if}
 
 						<!-- Submit Button -->
 						<Button type="submit" class="w-full" disabled={!!inviteUser.pending}>
@@ -420,13 +309,6 @@
 				onclick={() => (selectedFilter = 'senior-manager')}
 			>
 				Senior Manager
-			</Button>
-			<Button
-				variant={selectedFilter === 'reporting-manager' ? 'default' : 'outline'}
-				size="sm"
-				onclick={() => (selectedFilter = 'reporting-manager')}
-			>
-				Reporting Manager
 			</Button>
 		</div>
 	</div>
@@ -578,7 +460,6 @@
 								form.reset();
 								editSheetOpen = false;
 								selectedRole = null;
-								editAccessType = undefined;
 								toast.success('Access updated successfully!');
 							}
 						} catch {
@@ -626,57 +507,6 @@
 								<Field.Error>{issue.message}</Field.Error>
 							{/each}
 						</Field.Field>
-
-						<!-- Agent-specific fields (shown only when accessType is 'agent') -->
-						{#if editAccessType === 'agent'}
-							<!-- Agent Role Field -->
-							<Field.Field>
-								<Field.Label for="editAgentRole">Agent Role</Field.Label>
-								<Select.Root
-									type="single"
-									value={updateUser.fields.agentRole.value()}
-									onValueChange={(v) => updateUser.fields.agentRole.set(v)}
-								>
-									<Select.Trigger id="editAgentRole">
-										<Briefcase />
-										{editAgentRoleLabel}
-									</Select.Trigger>
-									<Select.Content>
-										{#each agentRoles as role (role.value)}
-											<Select.Item value={role.value}>{role.label}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...updateUser.fields.agentRole.as('text')} />
-								{#each updateUser.fields.agentRole.issues() as issue, i (i)}
-									<Field.Error>{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-
-							<!-- Agent Level Field -->
-							<Field.Field>
-								<Field.Label for="editAgentLevel">Agent Level</Field.Label>
-								<Select.Root
-									type="single"
-									value={updateUser.fields.agentLevel.value()}
-									onValueChange={(v) => updateUser.fields.agentLevel.set(v)}
-								>
-									<Select.Trigger id="editAgentLevel">
-										<Trophy />
-										{editAgentLevelLabel}
-									</Select.Trigger>
-									<Select.Content>
-										{#each agentLevels as level (level.value)}
-											<Select.Item value={level.value}>{level.label}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" {...updateUser.fields.agentLevel.as('text')} />
-								{#each updateUser.fields.agentLevel.issues() as issue, i (i)}
-									<Field.Error>{issue.message}</Field.Error>
-								{/each}
-							</Field.Field>
-						{/if}
 
 						<!-- Update Button -->
 						<Button type="submit" class="w-full" disabled={!!updateUser.pending}>

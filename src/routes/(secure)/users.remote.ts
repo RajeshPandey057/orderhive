@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const searchSchema = z.object({
 	q: z.string().default(''),
-	// When set, restricts results to users with the given agentRole OR super-admins
+	// When set, restricts results to users with the given accessType OR super-admins
 	roleFilter: z.enum(['manager', 'senior-manager']).optional()
 });
 
@@ -18,7 +18,6 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 		displayName: string | null;
 		email: string | null;
 		photoURL: string | null;
-		agentRole?: string | null;
 		reportingManagerEmail?: string | null;
 		seniorManagerEmail?: string | null;
 	};
@@ -34,8 +33,7 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 			id: doc.id,
 			displayName: data.displayName ?? null,
 			email: data.email ?? null,
-			photoURL: data.photoURL ?? null,
-			agentRole: data.agentRole ?? null
+			photoURL: data.photoURL ?? null
 		});
 	}
 
@@ -77,10 +75,10 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 		});
 	}
 
-	// --- Role-filtered mode: only search roles collection for matching agentRole + super-admins ---
+	// --- Role-filtered mode: only search roles collection for matching accessType + super-admins ---
 	if (roleFilter) {
 		const [byRoleSnap, superAdminSnap] = await Promise.all([
-			rolesRef.where('agentRole', '==', roleFilter).limit(200).get(),
+			rolesRef.where('accessType', '==', roleFilter).limit(200).get(),
 			rolesRef.where('accessType', '==', 'super-admin').limit(200).get()
 		]);
 		for (const snap of [byRoleSnap, superAdminSnap]) {

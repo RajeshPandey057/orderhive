@@ -35,11 +35,6 @@
 		{ value: 'manager', label: 'Manager' },
 		{ value: 'senior-manager', label: 'Senior Manager' }
 	] as const;
-	const agentRoles = [
-		{ value: 'sales-agent', label: 'Sales Agent' },
-		{ value: 'reporting-manager', label: 'Reporting Manager' },
-		{ value: 'senior-manager', label: 'Senior Manager' }
-	];
 	const departments = [
 		'Sales',
 		'Presales',
@@ -63,7 +58,6 @@
 		designation: '',
 		department: '',
 		accessType: 'agent',
-		agentRole: 'sales-agent',
 		status: 'active',
 		reportingManagerEmail: '',
 		seniorManagerEmail: '',
@@ -84,7 +78,6 @@
 			designation: employee?.designation ?? '',
 			department: employee?.department ?? '',
 			accessType: employee?.accessType ?? 'agent',
-			agentRole: employee?.agentRole || 'sales-agent',
 			status: employee?.status ?? 'active',
 			reportingManagerEmail: employee?.reportingManagerEmail ?? '',
 			seniorManagerEmail: employee?.seniorManagerEmail ?? '',
@@ -99,13 +92,7 @@
 	const accessTypeLabel = $derived(
 		accessTypes.find((type) => type.value === formData.accessType)?.label ?? 'Select access'
 	);
-	const agentRoleLabel = $derived(
-		agentRoles.find((role) => role.value === formData.agentRole)?.label ?? 'Select agent role'
-	);
-	const hideReportingSection = $derived(
-		formData.accessType === 'senior-manager' ||
-			(formData.accessType === 'agent' && formData.agentRole === 'senior-manager')
-	);
+	const hideReportingSection = $derived(formData.accessType === 'senior-manager');
 
 	type UserResult = {
 		id: string;
@@ -212,7 +199,6 @@
 				| 'compliance'
 				| 'manager'
 				| 'senior-manager',
-			agentRole: formData.accessType === 'agent' ? formData.agentRole : '',
 			managedTeamIds:
 				formData.accessType === 'manager' || formData.accessType === 'senior-manager'
 					? managedTeamText
@@ -400,19 +386,6 @@
 						</Select.Content>
 					</Select.Root>
 				</div>
-				{#if formData.accessType === 'agent'}
-					<div class="space-y-2">
-						<Label>Agent Role</Label>
-						<Select.Root type="single" bind:value={formData.agentRole}>
-							<Select.Trigger class="h-8">{agentRoleLabel}</Select.Trigger>
-							<Select.Content>
-								{#each agentRoles as role (role.value)}
-									<Select.Item value={role.value}>{role.label}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-				{/if}
 				{#if formData.accessType === 'manager' || formData.accessType === 'senior-manager'}
 					<div class="space-y-2 md:col-span-2">
 						<Label for="managedTeamIds">Managed Team UIDs</Label>

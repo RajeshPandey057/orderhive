@@ -10,8 +10,6 @@ declare global {
 		lastName?: string;
 		photoURL?: string;
 		firstName?: string;
-		agentRole?: string;
-		agentLevel?: string;
 		createdAt?: FieldValue;
 		updatedAt?: FieldValue;
 		seniorManagerEmail?: string;
@@ -91,7 +89,6 @@ declare global {
 		fresherOrExperienced?: string;
 		documents?: Partial<Record<EmployeeDocumentKind, EmployeeStoredFile>>;
 		accessType?: Role['accessType'];
-		agentRole?: string;
 		managedTeamIds?: string[];
 		accessStatus: EmployeeAccessStatus;
 		createdAt?: string;
