@@ -90,6 +90,10 @@ export async function getSalesScope(user: SessionUser): Promise<SalesScope> {
 			};
 		}
 
+		case 'general':
+			// General employees have no sales visibility
+			return { type: 'array-contains', field: 'splitAgentIds', value: uid };
+
 		default:
 			return { type: 'array-contains', field: 'splitAgentIds', value: uid };
 	}

@@ -8,6 +8,9 @@ export const holidaysCollection = firestore.collection('holidays');
 export const leaveRequestsCollection = firestore.collection('leaveRequests');
 export const attendanceLogsCollection = firestore.collection('attendanceLogs');
 
+export const SICK_LEAVE_TYPE = 'Sick Leave';
+export const PROBATION_MONTHS = 3;
+
 export function normalizeEmail(email: string) {
 	return email.trim().toLowerCase();
 }
@@ -260,12 +263,14 @@ export function serializeLeaveRequest(
 		id,
 		employeeEmail: data.employeeEmail ?? '',
 		employeeName: data.employeeName ?? '',
-		type: data.type ?? 'Casual',
+		type: data.type ?? SICK_LEAVE_TYPE,
 		startDate: data.startDate ?? '',
 		endDate: data.endDate ?? '',
 		reason: data.reason ?? '',
 		status: data.status ?? 'pending',
 		days: Number(data.days ?? 0),
+		paidSickDays: typeof data.paidSickDays === 'number' ? data.paidSickDays : undefined,
+		lopDays: typeof data.lopDays === 'number' ? data.lopDays : undefined,
 		reviewerEmail: data.reviewerEmail ?? '',
 		reviewedAt: serializeDate(data.reviewedAt),
 		createdAt: serializeDate(data.createdAt),
@@ -301,6 +306,101 @@ export function countLeaveDays(startDate: string, endDate: string) {
 	const end = new Date(`${endDate}T00:00:00`);
 	if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
 	return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
+function parseDateInput(date: string) {
+	const parsed = new Date(`${date}T00:00:00`);
+	return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDateInput(date: Date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+}
+
+export function calculateProbationEndingDate(doj: string) {
+	const start = parseDateInput(doj);
+	if (!start) return '';
+	const end = new Date(start);
+	end.setMonth(end.getMonth() + PROBATION_MONTHS);
+	end.setDate(end.getDate() - 1);
+	return formatDateInput(end);
+}
+
+export function getEmployeeProbationEndingDate(
+	employee?: Pick<Employee, 'doj' | 'probationEndingDate'> | null
+) {
+	return (
+		employee?.probationEndingDate ||
+		(employee?.doj ? calculateProbationEndingDate(employee.doj) : '')
+	);
+}
+
+export function isEmployeeOnProbation(
+	employee?: Pick<Employee, 'doj' | 'probationEndingDate'> | null,
+	today = new Date()
+) {
+	const probationEndingDate = getEmployeeProbationEndingDate(employee);
+	const end = probationEndingDate ? parseDateInput(probationEndingDate) : null;
+	return Boolean(end && end >= new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+}
+
+export function getSickLeaveAccruedDays(
+	employee?: Pick<Employee, 'doj' | 'probationEndingDate'> | null,
+	today = new Date()
+) {
+	const probationEndingDate = getEmployeeProbationEndingDate(employee);
+	const end = probationEndingDate ? parseDateInput(probationEndingDate) : null;
+	if (!end) return 0;
+
+	const year = today.getFullYear();
+	const firstAccrual = new Date(end.getFullYear(), end.getMonth() + 1, 1);
+	const currentMonth = new Date(year, today.getMonth(), 1);
+	if (firstAccrual > currentMonth) return 0;
+	if (firstAccrual.getFullYear() < year) return today.getMonth() + 1;
+	if (firstAccrual.getFullYear() > year) return 0;
+	return today.getMonth() - firstAccrual.getMonth() + 1;
+}
+
+export function isLeaveRequestInYear(request: Pick<LeaveRequest, 'startDate'>, year: number) {
+	const start = parseDateInput(request.startDate);
+	return Boolean(start && start.getFullYear() === year);
+}
+
+export function getPaidSickDaysForRequest(request: Pick<LeaveRequest, 'days' | 'paidSickDays'>) {
+	return typeof request.paidSickDays === 'number' ? request.paidSickDays : request.days;
+}
+
+export function getLopDaysForRequest(request: Pick<LeaveRequest, 'lopDays'>) {
+	return typeof request.lopDays === 'number' ? request.lopDays : 0;
+}
+
+export function calculateLeaveStats(
+	employee: Pick<Employee, 'doj' | 'probationEndingDate'> | null,
+	requests: LeaveRequest[],
+	today = new Date()
+) {
+	const year = today.getFullYear();
+	const approvedThisYear = requests.filter(
+		(request) => request.status === 'approved' && isLeaveRequestInYear(request, year)
+	);
+	const used = approvedThisYear.reduce(
+		(sum, request) => sum + getPaidSickDaysForRequest(request),
+		0
+	);
+	const lopUsed = approvedThisYear.reduce((sum, request) => sum + getLopDaysForRequest(request), 0);
+	const accrued = getSickLeaveAccruedDays(employee, today);
+
+	return {
+		accrued,
+		used,
+		lopUsed,
+		balance: Math.max(0, accrued - used),
+		onProbation: isEmployeeOnProbation(employee, today),
+		probationEndingDate: getEmployeeProbationEndingDate(employee)
+	};
 }
 
 export function minutesToDuration(minutes?: number) {

@@ -32,7 +32,7 @@
 		<Sidebar.MenuButton
 			onclick={handleLogout}
 			aria-disabled={loggingOut}
-			class="h-10 text-sm text-[#222626]"
+			class="h-10 text-sm text-sidebar-foreground hover:text-sidebar-foreground"
 		>
 			<LogOutIcon class="size-4" />
 			<span>{loggingOut ? 'Logging out...' : 'Log Out'}</span>

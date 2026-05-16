@@ -15,7 +15,8 @@ const VALID_ROLES: AccessType[] = [
 	'finance',
 	'super-admin',
 	'manager',
-	'senior-manager'
+	'senior-manager',
+	'general'
 ];
 
 export const handle: Handle = ({ event, resolve }) => {

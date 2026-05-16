@@ -20,7 +20,8 @@ declare global {
 			| 'compliance'
 			| 'super-admin'
 			| 'manager'
-			| 'senior-manager';
+			| 'senior-manager'
+			| 'general';
 		managedTeamIds?: string[];
 	};
 	type EmployeeStatus = 'active' | 'inactive' | 'archived';
@@ -118,6 +119,8 @@ declare global {
 		reason: string;
 		status: LeaveStatus;
 		days: number;
+		paidSickDays?: number;
+		lopDays?: number;
 		reviewerEmail?: string;
 		reviewedAt?: string;
 		createdAt?: string;

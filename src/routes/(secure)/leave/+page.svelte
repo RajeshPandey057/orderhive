@@ -32,14 +32,20 @@
 			myRequests: LeaveRequest[];
 			teamRequests: LeaveRequest[];
 			isAdmin: boolean;
-			stats: { used: number; balance: number; onProbation: boolean };
+			stats: {
+				accrued: number;
+				used: number;
+				lopUsed: number;
+				balance: number;
+				onProbation: boolean;
+				probationEndingDate?: string;
+			};
 		};
 	} = $props();
 
 	let submitting = $state(false);
 	let processingId = $state('');
 	let leaveForm = $state({
-		type: 'Casual',
 		startDate: '',
 		endDate: '',
 		reason: ''
@@ -50,7 +56,7 @@
 		try {
 			await createLeaveRequest(leaveForm);
 			toast.success('Leave request submitted');
-			leaveForm = { type: 'Casual', startDate: '', endDate: '', reason: '' };
+			leaveForm = { startDate: '', endDate: '', reason: '' };
 			await invalidateAll();
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Unable to submit leave request');
@@ -74,6 +80,15 @@
 
 	function formatStatus(status: LeaveStatus) {
 		return status[0].toUpperCase() + status.slice(1);
+	}
+
+	function paidDays(request: LeaveRequest) {
+		if (request.status !== 'approved') return request.paidSickDays ?? 0;
+		return request.paidSickDays ?? request.days;
+	}
+
+	function lopDays(request: LeaveRequest) {
+		return request.lopDays ?? 0;
 	}
 </script>
 
@@ -102,32 +117,36 @@
 				<Card class="border-[#EBEEEE] shadow-none">
 					<CardHeader class="pb-2">
 						<CardTitle class="text-[13px] leading-5 font-normal text-[#687976]"
-							>Accrued Balance</CardTitle
+							>Sick Leave Balance</CardTitle
 						>
 					</CardHeader>
 					<CardContent>
 						<div class="text-2xl leading-8 font-medium text-[#222626]">{data.stats.balance}</div>
-						<p class="text-[13px] leading-5 text-[#687976]">1 day/month after probation</p>
+						<p class="text-[13px] leading-5 text-[#687976]">
+							{data.stats.accrued} accrued this year
+						</p>
 					</CardContent>
 				</Card>
 				<Card class="border-[#EBEEEE] shadow-none">
 					<CardHeader class="pb-2">
 						<CardTitle class="text-[13px] leading-5 font-normal text-[#687976]"
-							>Used This Year</CardTitle
+							>Sick Leave Used</CardTitle
 						>
 					</CardHeader>
 					<CardContent>
 						<div class="text-2xl leading-8 font-medium text-[#222626]">{data.stats.used}</div>
+						<p class="text-[13px] leading-5 text-[#687976]">Paid days this year</p>
 					</CardContent>
 				</Card>
 				<Card class="border-[#EBEEEE] shadow-none">
 					<CardHeader class="pb-2">
-						<CardTitle class="text-[13px] leading-5 font-normal text-[#687976]">Status</CardTitle>
+						<CardTitle class="text-[13px] leading-5 font-normal text-[#687976]"
+							>Loss of Pay</CardTitle
+						>
 					</CardHeader>
 					<CardContent>
-						<Badge variant={data.stats.onProbation ? 'outline' : 'secondary'}>
-							{data.stats.onProbation ? 'Probation (0 Balance)' : 'Permanent'}
-						</Badge>
+						<div class="text-2xl leading-8 font-medium text-[#222626]">{data.stats.lopUsed}</div>
+						<p class="text-[13px] leading-5 text-[#687976]">Approved unpaid days this year</p>
 					</CardContent>
 				</Card>
 			</div>
@@ -141,7 +160,11 @@
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 						<div class="space-y-2">
 							<Label>Type</Label>
-							<Input bind:value={leaveForm.type} class="h-8 border-[#D4D9D9]" />
+							<div
+								class="flex h-8 items-center rounded-md border border-[#D4D9D9] px-3 text-[13px] text-[#222626]"
+							>
+								Sick Leave
+							</div>
 						</div>
 						<div class="space-y-2">
 							<Label>Start Date</Label>
@@ -167,6 +190,12 @@
 					>
 						{submitting ? 'Submitting...' : 'Submit Request'}
 					</Button>
+					{#if data.stats.onProbation}
+						<p class="text-[13px] leading-5 text-[#687976]">
+							Leave requests are available after probation
+							{data.stats.probationEndingDate ? `on ${data.stats.probationEndingDate}` : ''}.
+						</p>
+					{/if}
 				</CardContent>
 			</Card>
 
@@ -182,13 +211,15 @@
 									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Type</TableHead>
 									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Dates</TableHead>
 									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Days</TableHead>
+									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Paid</TableHead>
+									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">LOP</TableHead>
 									<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Status</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{#if data.myRequests.length === 0}
 									<TableRow
-										><TableCell colspan={4} class="h-24 text-center text-[13px] text-[#687976]"
+										><TableCell colspan={6} class="h-24 text-center text-[13px] text-[#687976]"
 											>No requests yet.</TableCell
 										></TableRow
 									>
@@ -198,6 +229,8 @@
 											<TableCell class="text-[13px]">{req.type}</TableCell>
 											<TableCell class="text-[13px]">{req.startDate} to {req.endDate}</TableCell>
 											<TableCell class="text-[13px]">{req.days}</TableCell>
+											<TableCell class="text-[13px]">{paidDays(req)}</TableCell>
+											<TableCell class="text-[13px]">{lopDays(req)}</TableCell>
 											<TableCell>
 												<Badge
 													variant={req.status === 'approved'
@@ -228,6 +261,8 @@
 								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Employee</TableHead>
 								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Type</TableHead>
 								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Dates</TableHead>
+								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Paid</TableHead>
+								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">LOP</TableHead>
 								<TableHead class="h-9 text-[13px] font-normal text-[#687976]">Status</TableHead>
 								<TableHead class="h-9 text-right text-[13px] font-normal text-[#687976]"
 									>Actions</TableHead
@@ -237,7 +272,7 @@
 						<TableBody>
 							{#if data.teamRequests.length === 0}
 								<TableRow>
-									<TableCell colspan={5} class="h-24 text-center text-[13px] text-[#687976]"
+									<TableCell colspan={7} class="h-24 text-center text-[13px] text-[#687976]"
 										>No leave requests found.</TableCell
 									>
 								</TableRow>
@@ -247,6 +282,8 @@
 										<TableCell class="text-[13px] font-medium">{req.employeeName}</TableCell>
 										<TableCell class="text-[13px]">{req.type}</TableCell>
 										<TableCell class="text-[13px]">{req.startDate} to {req.endDate}</TableCell>
+										<TableCell class="text-[13px]">{paidDays(req)}</TableCell>
+										<TableCell class="text-[13px]">{lopDays(req)}</TableCell>
 										<TableCell>
 											<Badge
 												variant={req.status === 'approved'

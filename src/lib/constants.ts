@@ -13,7 +13,8 @@ export type AccessType =
 	| 'finance'
 	| 'super-admin'
 	| 'manager'
-	| 'senior-manager';
+	| 'senior-manager'
+	| 'general';
 
 interface MenuItem {
 	title: string;
@@ -63,6 +64,7 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/holidays'
 	],
 	finance: ['/finance', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave'],
+	general: ['/general', '/profile', '/my-attendance', '/leave', '/holidays'],
 	'super-admin': [
 		'/admin',
 		'/agent',
@@ -147,6 +149,12 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' }
 	],
+	general: [
+		{ title: 'Dashboard', url: '/general/dashboard' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Calendar', url: '/holidays' }
+	],
 	'super-admin': [
 		{ title: 'Dashboard', url: '/admin/dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
@@ -185,6 +193,8 @@ export function getDefaultRoute(role: AccessType): string {
 			return '/compliance/dashboard';
 		case 'finance':
 			return '/finance/dashboard';
+		case 'general':
+			return '/general/dashboard';
 		default:
 			return '/dashboard';
 	}

@@ -12,11 +12,12 @@
 	import { toast } from 'svelte-sonner';
 	import Loader2 from '~icons/lucide/loader-2';
 	import UserRound from '~icons/lucide/user-round';
-	import {
-		createEmployee,
-		updateEmployee,
-		updateEmployeeAccess
-	} from '../../../routes/(secure)/hr/hr.remote';
+	import
+		{
+			createEmployee,
+			updateEmployee,
+			updateEmployeeAccess
+		} from '../../../routes/(secure)/hr/hr.remote';
 	import { searchUsers as searchUsersRemote } from '../../../routes/(secure)/users.remote';
 
 	let {
@@ -33,7 +34,8 @@
 		{ value: 'finance', label: 'Finance' },
 		{ value: 'compliance', label: 'Compliance' },
 		{ value: 'manager', label: 'Manager' },
-		{ value: 'senior-manager', label: 'Senior Manager' }
+		{ value: 'senior-manager', label: 'Senior Manager' },
+		{ value: 'general', label: 'General' }
 	] as const;
 	const departments = [
 		'Sales',
@@ -87,6 +89,12 @@
 			lastWorkingDay: employee?.lastWorkingDay ?? ''
 		};
 		managedTeamText = (employee?.managedTeamIds ?? []).join('\n');
+	});
+
+	$effect(() => {
+		if (!employee && formData.doj && !formData.probationEndingDate) {
+			formData.probationEndingDate = calculateProbationEndingDate(formData.doj);
+		}
 	});
 
 	const accessTypeLabel = $derived(
@@ -190,6 +198,18 @@
 		return Number.isFinite(n) && value.trim() !== '' ? n : undefined;
 	}
 
+	function calculateProbationEndingDate(doj: string) {
+		const start = new Date(`${doj}T00:00:00`);
+		if (Number.isNaN(start.getTime())) return '';
+		const end = new Date(start);
+		end.setMonth(end.getMonth() + 3);
+		end.setDate(end.getDate() - 1);
+		const year = end.getFullYear();
+		const month = String(end.getMonth() + 1).padStart(2, '0');
+		const day = String(end.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
 	function accessPayload() {
 		return {
 			accessType: formData.accessType as
@@ -198,7 +218,8 @@
 				| 'finance'
 				| 'compliance'
 				| 'manager'
-				| 'senior-manager',
+				| 'senior-manager'
+				| 'general',
 			managedTeamIds:
 				formData.accessType === 'manager' || formData.accessType === 'senior-manager'
 					? managedTeamText

@@ -5,14 +5,19 @@ import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import {
 	attendanceLogId,
 	attendanceLogsCollection,
+	calculateLeaveStats,
 	countLeaveDays,
 	disableEmployeeAccess as disableAccess,
 	employeeCollection,
 	employeeIdForEmail,
 	getEmployeeByCode,
+	getEmployeeByEmail,
 	holidaysCollection,
+	isEmployeeOnProbation,
 	leaveRequestsCollection,
 	normalizeEmail,
+	serializeLeaveRequest,
+	SICK_LEAVE_TYPE,
 	upsertEmployeeAccess
 } from '$lib/server/hr';
 import { error } from '@sveltejs/kit';
@@ -25,7 +30,8 @@ const accessTypeSchema = z.enum([
 	'finance',
 	'compliance',
 	'manager',
-	'senior-manager'
+	'senior-manager',
+	'general'
 ]);
 
 const optionalString = z.string().trim().optional().default('');
@@ -252,7 +258,6 @@ export const deleteHoliday = command(
 
 export const createLeaveRequest = command(
 	z.object({
-		type: z.string().trim().min(1).default('Casual'),
 		startDate: z.string().min(1),
 		endDate: z.string().min(1),
 		reason: z.string().trim().min(1, 'Reason is required')
@@ -261,12 +266,16 @@ export const createLeaveRequest = command(
 		const user = requireUser();
 		const days = countLeaveDays(data.startDate, data.endDate);
 		if (days <= 0) throw error(400, 'Invalid leave date range');
-		const employee = await employeeCollection.doc(employeeIdForEmail(user.email)).get();
-		const employeeName = employee.data()?.name ?? user.email.split('@')[0];
+		const employee = await getEmployeeByEmail(user.email);
+		if (!employee) throw error(400, 'Employee profile is required to request leave');
+		if (isEmployeeOnProbation(employee)) {
+			throw error(400, 'Leave requests are not available during probation');
+		}
+
 		await leaveRequestsCollection.add({
 			employeeEmail: normalizeEmail(user.email),
-			employeeName,
-			type: data.type,
+			employeeName: employee.name,
+			type: SICK_LEAVE_TYPE,
 			startDate: data.startDate,
 			endDate: data.endDate,
 			reason: data.reason,
@@ -286,12 +295,37 @@ export const reviewLeaveRequest = command(
 	}),
 	async ({ id, status }) => {
 		const user = requireHrAdmin();
-		await leaveRequestsCollection.doc(id).update({
+		const requestRef = leaveRequestsCollection.doc(id);
+		const requestSnap = await requestRef.get();
+		if (!requestSnap.exists) throw error(404, 'Leave request not found');
+		const request = serializeLeaveRequest(requestSnap.id, requestSnap.data() ?? {});
+		const update: Record<string, unknown> = {
 			status,
 			reviewerEmail: user.email,
 			reviewedAt: FieldValue.serverTimestamp(),
 			updatedAt: FieldValue.serverTimestamp()
-		});
+		};
+
+		if (status === 'approved') {
+			const employee = await getEmployeeByEmail(request.employeeEmail);
+			if (!employee) throw error(400, 'Employee profile is required to approve leave');
+			const employeeRequestsSnap = await leaveRequestsCollection
+				.where('employeeEmail', '==', normalizeEmail(request.employeeEmail))
+				.get();
+			const otherRequests = employeeRequestsSnap.docs
+				.filter((doc) => doc.id !== id)
+				.map((doc) => serializeLeaveRequest(doc.id, doc.data()));
+			const stats = calculateLeaveStats(employee, otherRequests);
+			const paidSickDays = Math.min(request.days, stats.balance);
+			update.paidSickDays = paidSickDays;
+			update.lopDays = request.days - paidSickDays;
+			update.type = SICK_LEAVE_TYPE;
+		} else {
+			update.paidSickDays = 0;
+			update.lopDays = 0;
+		}
+
+		await requestRef.update(update);
 		return { success: true };
 	}
 );
