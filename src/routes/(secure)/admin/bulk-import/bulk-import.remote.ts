@@ -280,7 +280,11 @@ const bulkImportSchema = z.object({
 
 export type ImportedSale = { id: string; client: string };
 export type ImportError = { order_id: string; row: number; message: string };
-export type BulkImportResult = { imported: ImportedSale[]; errors: ImportError[] };
+export type BulkImportResult = {
+	imported: ImportedSale[];
+	updated: ImportedSale[];
+	errors: ImportError[];
+};
 
 function makeFileRecord(url: string | undefined | '') {
 	if (!url || url.trim() === '') return null;
@@ -415,6 +419,7 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 	const rows = parsed.data;
 	const importErrors: ImportError[] = [];
 	const importedSales: ImportedSale[] = [];
+	const updatedSales: ImportedSale[] = [];
 	const primaryRowSchema = buildPrimaryRowSchema(lenient);
 
 	const groups = new Map<
@@ -622,16 +627,9 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		// Use the order_id from the CSV directly as the Firestore document ID
 		const saleId = orderId;
 
-		// Prevent overwriting an existing sale
+		// Check if the sale already exists (upsert logic)
 		const existing = await firestore.collection('sales').doc(saleId).get();
-		if (existing.exists) {
-			importErrors.push({
-				order_id: orderId,
-				row: group.primaryIdx,
-				message: `Sale ${saleId} already exists — skipped to avoid overwrite`
-			});
-			continue;
-		}
+		const isUpdate = existing.exists;
 
 		const parsedSaleDate = parseDDMmmYYYY(primary.sale_date) ?? primary.sale_date ?? null;
 
@@ -733,11 +731,32 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		};
 
 		try {
-			await firestore.collection('sales').doc(saleId).set(saleRecord);
-			importedSales.push({
-				id: saleId,
-				client: `${primary.first_name ?? ''} ${primary.last_name ?? ''}`.trim()
-			});
+			if (!isUpdate) {
+				await firestore.collection('sales').doc(saleId).set(saleRecord);
+				importedSales.push({
+					id: saleId,
+					client: `${primary.first_name ?? ''} ${primary.last_name ?? ''}`.trim()
+				});
+			} else {
+				// Preserve approval/review state and metadata from the existing record
+				const {
+					status: _status,
+					financeStatus: _financeStatus,
+					complianceStatus: _complianceStatus,
+					commissionStatus: _commissionStatus,
+					invoiceFile: _invoiceFile,
+					commnets: _commnets,
+					createdAt: _createdAt,
+					createdByUid: _createdByUid,
+					createdByEmail: _createdByEmail,
+					...updatePayload
+				} = saleRecord;
+				await firestore.collection('sales').doc(saleId).update(updatePayload);
+				updatedSales.push({
+					id: saleId,
+					client: `${primary.first_name ?? ''} ${primary.last_name ?? ''}`.trim()
+				});
+			}
 		} catch (writeErr) {
 			console.error(`Failed to write sale for order_id ${orderId}:`, writeErr);
 			importErrors.push({
@@ -748,6 +767,10 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		}
 	}
 
-	const result: BulkImportResult = { imported: importedSales, errors: importErrors };
+	const result: BulkImportResult = {
+		imported: importedSales,
+		updated: updatedSales,
+		errors: importErrors
+	};
 	return result;
 });

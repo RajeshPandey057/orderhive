@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -10,11 +11,45 @@
 	import { firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import { updateMyProfile, uploadMyDocument } from '../hr/hr.remote';
+	import { resetAllListings, resetAllSales } from './profile.remote';
 
-	let { data } = $props<{ data: { employee: Employee | null } }>();
+	let { data } = $props<{ data: { employee: Employee | null; userRole: string | null } }>();
 
 	const employee = $derived(data.employee);
+	const isSuperAdmin = $derived(data.userRole === 'super-admin');
 	let saving = $state(false);
+	let resetSalesOpen = $state(false);
+	let resetListingsOpen = $state(false);
+	let resettingSales = $state(false);
+	let resettingListings = $state(false);
+
+	async function handleResetSales() {
+		resettingSales = true;
+		try {
+			await resetAllSales({});
+			resetSalesOpen = false;
+			toast.success('All sales have been deleted and the counter has been reset');
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to reset sales');
+		} finally {
+			resettingSales = false;
+		}
+	}
+
+	async function handleResetListings() {
+		resettingListings = true;
+		try {
+			await resetAllListings({});
+			resetListingsOpen = false;
+			toast.success('All listings have been deleted and the counter has been reset');
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to reset listings');
+		} finally {
+			resettingListings = false;
+		}
+	}
 	let selectedDocumentKind = $state<EmployeeDocumentKind>('passport');
 	let selectedFileName = $state('');
 	let uploading = $state(false);
@@ -141,6 +176,11 @@
 			<Tabs.Trigger value="employment-details">Employment Details</Tabs.Trigger>
 			<Tabs.Trigger value="basic-details">Basic Details</Tabs.Trigger>
 			<Tabs.Trigger value="document-details">Document Details</Tabs.Trigger>
+			{#if isSuperAdmin}
+				<Tabs.Trigger value="danger-zone" class="text-red-600 data-[state=active]:text-red-600"
+					>Danger Zone</Tabs.Trigger
+				>
+			{/if}
 		</Tabs.List>
 
 		<Tabs.Content value="employment-details" class="mt-4">
@@ -411,5 +451,106 @@
 				</div>
 			</div>
 		</Tabs.Content>
+
+		{#if isSuperAdmin}
+			<Tabs.Content value="danger-zone" class="mt-4">
+				<div class="rounded-md border border-red-200 bg-white p-6">
+					<h3 class="mb-1 text-base font-medium text-red-600">Danger Zone</h3>
+					<p class="mb-6 text-[13px] text-[#687976]">
+						These actions are irreversible. All data will be permanently deleted and counters will
+						reset to zero.
+					</p>
+
+					<div class="space-y-4">
+						<div
+							class="flex items-center justify-between rounded-md border border-red-100 bg-red-50 p-4"
+						>
+							<div>
+								<p class="text-sm font-medium text-[#222626]">Reset All Sales</p>
+								<p class="text-[13px] text-[#687976]">
+									Permanently deletes every sale record and resets the sale ID counter to zero.
+								</p>
+							</div>
+							<Button
+								variant="destructive"
+								class="h-8 shrink-0 text-sm"
+								onclick={() => (resetSalesOpen = true)}
+							>
+								Reset Sales
+							</Button>
+						</div>
+
+						<div
+							class="flex items-center justify-between rounded-md border border-red-100 bg-red-50 p-4"
+						>
+							<div>
+								<p class="text-sm font-medium text-[#222626]">Reset All Listings</p>
+								<p class="text-[13px] text-[#687976]">
+									Permanently deletes every listing record and resets the listing ID counter to
+									zero.
+								</p>
+							</div>
+							<Button
+								variant="destructive"
+								class="h-8 shrink-0 text-sm"
+								onclick={() => (resetListingsOpen = true)}
+							>
+								Reset Listings
+							</Button>
+						</div>
+					</div>
+				</div>
+			</Tabs.Content>
+		{/if}
 	</Tabs.Root>
 </div>
+
+<AlertDialog.Root bind:open={resetSalesOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Reset All Sales?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This will permanently delete <strong>all sale records</strong> from the database and reset
+				the sale ID counter back to zero. New sales created after this will start from
+				IND-[date]-0001.
+				<br /><br />
+				<strong>This action cannot be undone.</strong>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={resettingSales}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="bg-red-600 text-white hover:bg-red-700"
+				disabled={resettingSales}
+				onclick={handleResetSales}
+			>
+				{resettingSales ? 'Resetting...' : 'Yes, reset all sales'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={resetListingsOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Reset All Listings?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This will permanently delete <strong>all listing records</strong> from the database and
+				reset the listing ID counter back to zero. New listings created after this will start from
+				LST-[date]-0001.
+				<br /><br />
+				<strong>This action cannot be undone.</strong>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={resettingListings}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="bg-red-600 text-white hover:bg-red-700"
+				disabled={resettingListings}
+				onclick={handleResetListings}
+			>
+				{resettingListings ? 'Resetting...' : 'Yes, reset all listings'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

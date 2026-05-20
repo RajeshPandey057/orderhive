@@ -14,6 +14,7 @@
 	import Download from '~icons/lucide/download';
 	import FileText from '~icons/lucide/file-text';
 	import Loader2 from '~icons/lucide/loader-2';
+	import RefreshCw from '~icons/lucide/refresh-cw';
 	import X from '~icons/lucide/x';
 	import { importBulkSales, type BulkImportResult } from './bulk-import.remote';
 
@@ -222,6 +223,7 @@
 			await submit();
 			result = (importBulkSales.result as BulkImportResult | null) ?? {
 				imported: [],
+				updated: [],
 				errors: []
 			};
 
@@ -230,12 +232,21 @@
 					`Successfully imported ${result.imported.length} sale${result.imported.length !== 1 ? 's' : ''}`
 				);
 			}
+			if (result.updated.length > 0) {
+				toast.success(
+					`Updated ${result.updated.length} existing sale${result.updated.length !== 1 ? 's' : ''}`
+				);
+			}
 			if (result.errors.length > 0) {
 				toast.warning(
 					`${result.errors.length} row${result.errors.length !== 1 ? 's' : ''} had errors`
 				);
 			}
-			if (result.imported.length === 0 && result.errors.length === 0) {
+			if (
+				result.imported.length === 0 &&
+				result.updated.length === 0 &&
+				result.errors.length === 0
+			) {
 				toast.info('No rows found in the CSV file.');
 			}
 		} catch {
@@ -409,6 +420,39 @@
 			</Card.Root>
 		{/if}
 
+		{#if result.updated.length > 0}
+			<Card.Root class="border-amber-300/50">
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<RefreshCw class="h-5 w-5 text-amber-600" />
+						<Card.Title>Updated ({result.updated.length})</Card.Title>
+					</div>
+					<Card.Description>
+						Existing sales were updated with new data. Approval statuses and comments were
+						preserved.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Sale ID</Table.Head>
+								<Table.Head>Client</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each result.updated as sale (sale.id)}
+								<Table.Row>
+									<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
+									<Table.Cell>{sale.client}</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		{#if result.errors.length > 0}
 			<Card.Root class="border-destructive/30">
 				<Card.Header>
@@ -443,7 +487,7 @@
 			</Card.Root>
 		{/if}
 
-		{#if result.imported.length === 0 && result.errors.length === 0}
+		{#if result.imported.length === 0 && result.updated.length === 0 && result.errors.length === 0}
 			<Card.Root>
 				<Card.Content class="py-8 text-center text-muted-foreground">
 					No rows found in the CSV file.
