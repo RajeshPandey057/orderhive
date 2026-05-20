@@ -39,8 +39,21 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		closer3_split: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
 		closer3_manager_email: z.string().optional().or(z.literal('')),
 		closer3_senior_manager_email: z.string().optional().or(z.literal('')),
-		deal_stage: z.string().optional().or(z.literal('')),
-		payment_value: z.coerce.number().optional().or(z.literal('')),
+		deal_stage: z.preprocess(
+			(val) => {
+				if (typeof val !== 'string') return val;
+				const lower = val.trim().toLowerCase();
+				if (lower === 'confirmed') return 'booking';
+				return lower || undefined;
+			},
+			z.string().optional().or(z.literal(''))
+		),
+		payment_value: z
+			.preprocess(
+				(val) => (typeof val === 'string' ? val.replace(/,/g, '') : val),
+				z.coerce.number().optional()
+			)
+			.or(z.literal('')),
 		booking_form_url: z.string().optional().or(z.literal('')),
 		payment_receipt_url: z.string().optional().or(z.literal('')),
 		referral_agreement_url: z.string().optional().or(z.literal('')),
@@ -67,7 +80,12 @@ function buildPrimaryRowSchema(lenient: boolean) {
 		caller_senior_manager_email: z.string().optional().or(z.literal('')),
 		closer_senior_manager_email: z.string().optional().or(z.literal('')),
 		commission_percentage: z.coerce.number().min(0).max(100).optional().or(z.literal('')),
-		passback_amount: z.coerce.number().min(0).optional().or(z.literal(''))
+		passback_amount: z
+			.preprocess(
+				(val) => (typeof val === 'string' ? val.replace(/,/g, '') : val),
+				z.coerce.number().min(0).optional()
+			)
+			.or(z.literal(''))
 	});
 
 	if (lenient) return base;
@@ -314,9 +332,12 @@ function parseDDMmmYYYY(dateStr: string | undefined | ''): string | null {
 	if (!dateStr || dateStr.trim() === '') return null;
 	const parts = dateStr.trim().split('-');
 	if (parts.length !== 3) return null;
-	const [dd, mmm, yyyy] = parts;
+	const [dd, mmm, rawYyyy] = parts;
 	const mm = MONTH_MAP[mmm.toLowerCase()];
 	if (!mm) return null;
+	const yearNum = parseInt(rawYyyy, 10);
+	if (isNaN(yearNum)) return null;
+	const yyyy = yearNum < 100 ? String(2000 + yearNum) : rawYyyy;
 	const iso = `${yyyy}-${mm}-${dd.padStart(2, '0')}`;
 	if (isNaN(new Date(iso).getTime())) return null;
 	return iso;
