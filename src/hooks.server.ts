@@ -21,15 +21,11 @@ const VALID_ROLES: AccessType[] = [
 
 export const handle: Handle = ({ event, resolve }) => {
 	const isSecureRoute = event.route.id?.startsWith('/(secure)');
-	if (!isSecureRoute) {
-		return resolve(event);
-	}
 	const { cookies, locals } = event;
 	locals.user = null;
 
-	// Read user data from cookie
+	// Always read the session cookie so API routes also get locals.user
 	const session = cookies.get(SESSION_TOKEN);
-
 	if (session) {
 		try {
 			const userData: UserData = JSON.parse(session);
@@ -45,6 +41,10 @@ export const handle: Handle = ({ event, resolve }) => {
 			// Invalid cookie, clear it
 			cookies.delete(SESSION_TOKEN, { path: '/' });
 		}
+	}
+
+	if (!isSecureRoute) {
+		return resolve(event);
 	}
 
 	const path = event.url.pathname;
