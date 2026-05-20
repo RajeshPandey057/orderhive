@@ -942,7 +942,11 @@ export async function processJobBackground(jobId: string): Promise<void> {
 		// Single email cache reused across all chunks for max deduplication
 		const resolveUser = makeEmailCache();
 
-		for (let offset = 0; offset < groups.length; offset += BG_CHUNK_SIZE) {
+		// Resume from where a previous run left off (handles server restart / stuck jobs)
+		const startOffset =
+			Math.floor(((job.processedCount as number) ?? 0) / BG_CHUNK_SIZE) * BG_CHUNK_SIZE;
+
+		for (let offset = startOffset; offset < groups.length; offset += BG_CHUNK_SIZE) {
 			const chunk = groups.slice(offset, offset + BG_CHUNK_SIZE);
 
 			const existingSnaps = await Promise.all(

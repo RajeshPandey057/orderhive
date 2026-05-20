@@ -309,7 +309,8 @@
 						step = 'processing';
 						currentActivity = `Resumed — ${processedCount}/${totalGroups} processed so far…`;
 						startTimer();
-						startPolling();
+						startPolling(); // Re-trigger server-side processing in case the background job died
+						fetch(`/api/bulk-import/${savedJobId}/start`, { method: 'POST' }).catch(() => {});
 					} else if (job.status === 'completed' || job.status === 'failed') {
 						// Already done — show results quietly without re-triggering
 						localStorage.removeItem('bulk_import_job_id');

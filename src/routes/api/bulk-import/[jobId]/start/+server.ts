@@ -28,9 +28,10 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 	if (job.createdBy !== locals.user.uid && locals.user.role !== 'super-admin') {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
-	if (job.status === 'processing' || job.status === 'completed') {
-		return json({ error: `Job already ${job.status}` }, { status: 409 });
+	if (job.status === 'completed') {
+		return json({ error: 'Job already completed' }, { status: 409 });
 	}
+	// 'processing' is allowed — restarting a stuck job resumes from processedCount
 
 	// Fire and forget — intentionally not awaited.
 	// The Node.js event loop keeps this promise running after the response.
