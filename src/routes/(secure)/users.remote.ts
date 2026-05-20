@@ -77,11 +77,16 @@ export const searchUsers = query(searchSchema, async ({ q, roleFilter }) => {
 
 	// --- Role-filtered mode: only search roles collection for matching accessType + super-admins ---
 	if (roleFilter) {
-		const [byRoleSnap, superAdminSnap] = await Promise.all([
-			rolesRef.where('accessType', '==', roleFilter).limit(200).get(),
-			rolesRef.where('accessType', '==', 'super-admin').limit(200).get()
-		]);
-		for (const snap of [byRoleSnap, superAdminSnap]) {
+		// manager dropdown: also include senior-managers and admins (they rank higher and can be reporting managers)
+		// senior-manager dropdown: also include admins alongside senior-managers
+		const typesToQuery =
+			roleFilter === 'manager'
+				? ['manager', 'senior-manager', 'admin', 'super-admin']
+				: ['senior-manager', 'admin', 'super-admin'];
+		const snaps = await Promise.all(
+			typesToQuery.map((type) => rolesRef.where('accessType', '==', type).limit(200).get())
+		);
+		for (const snap of snaps) {
 			for (const doc of snap.docs) addDoc(doc);
 		}
 
