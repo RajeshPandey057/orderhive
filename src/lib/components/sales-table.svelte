@@ -294,15 +294,34 @@
 
 	// Table state
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
-	let sorting = $state<SortingState>([]);
+	let sorting = $state<SortingState>([{ id: 'id', desc: true }]);
 	let columnFilters = $state<ColumnFiltersState>([]);
 	let columnVisibility = $state<VisibilityState>({});
 	let rowSelection = $state<RowSelectionState>({});
 	let globalFilter = $state('');
 
+	// Date filter
+	let dateFilter = $state<'all' | 'this-month'>('all');
+	const filteredData = $derived(() => {
+		if (dateFilter === 'all') return data;
+		const now = new Date();
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+		return data.filter((sale) => {
+			if (!sale.createdAt) return false;
+			// Firestore FieldValue is Timestamp at runtime — has .toDate()
+			const ts = sale.createdAt as unknown as { toDate(): Date };
+			const date =
+				typeof ts.toDate === 'function'
+					? ts.toDate()
+					: new Date(sale.createdAt as unknown as string);
+			return date >= startOfMonth && date <= endOfMonth;
+		});
+	});
+
 	const table = createSvelteTable({
 		get data() {
-			return data;
+			return filteredData();
 		},
 		columns,
 		getCoreRowModel: getCoreRowModel(),
@@ -415,7 +434,15 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 
-				<Button variant="outline" size="sm" class="h-9 gap-2">
+				<Button
+					variant={dateFilter === 'this-month' ? 'default' : 'outline'}
+					size="sm"
+					class="h-9 gap-2"
+					onclick={() => {
+						dateFilter = dateFilter === 'this-month' ? 'all' : 'this-month';
+						pagination = { ...pagination, pageIndex: 0 };
+					}}
+				>
 					<Calendar class="h-4 w-4" />
 					This Month
 				</Button>
@@ -480,7 +507,7 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 
-			{#if columnFilters.length > 0 || globalFilter}
+			{#if columnFilters.length > 0 || globalFilter || dateFilter !== 'all'}
 				<Button
 					variant="ghost"
 					size="sm"
@@ -488,6 +515,7 @@
 					onclick={() => {
 						table.resetColumnFilters();
 						globalFilter = '';
+						dateFilter = 'all';
 					}}
 				>
 					Clear filters
