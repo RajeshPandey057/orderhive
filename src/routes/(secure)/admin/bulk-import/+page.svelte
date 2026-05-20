@@ -7,7 +7,9 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Switch from '$lib/components/ui/switch/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+	import type { ImportedSale, ImportError } from '$lib/server/bulk-import-helpers';
 	import { toast } from 'svelte-sonner';
+	import { SvelteSet } from 'svelte/reactivity';
 	import AlertCircle from '~icons/lucide/alert-circle';
 	import CheckCircle from '~icons/lucide/check-circle-2';
 	import Upload from '~icons/lucide/cloud-upload';
@@ -16,7 +18,9 @@
 	import Loader2 from '~icons/lucide/loader-2';
 	import RefreshCw from '~icons/lucide/refresh-cw';
 	import X from '~icons/lucide/x';
-	import { importBulkSales, type BulkImportResult } from './bulk-import.remote';
+
+	type ActivityKind = 'chunk' | 'imported' | 'updated' | 'error';
+	type ActivityEntry = { kind: ActivityKind; label: string; ts: number };
 
 	const columnReference = [
 		{
@@ -204,75 +208,326 @@
 		}
 	];
 
+	// ---------------------------------------------------------------------------
+	// State
+	// ---------------------------------------------------------------------------
+	type Step = 'idle' | 'uploading' | 'validated' | 'processing' | 'completed' | 'error';
+
+	let step = $state<Step>('idle');
 	let lenientMode = $state(false);
-	$effect(() => {
-		importBulkSales.fields.lenient?.set(lenientMode ? 'true' : 'false');
-	});
-
 	let csvFile = $state<File | null>(null);
-	let isImporting = $state(false);
-	let result = $state<BulkImportResult | null>(null);
 
-	const canImport = $derived(csvFile !== null && !isImporting);
-	const importBulkSalesForm = importBulkSales.enhance(async ({ submit }) => {
-		if (!csvFile) return;
+	// After Phase 1 (validate + queue)
+	let jobId = $state<string | null>(null);
+	let totalGroups = $state(0);
+	let validationErrors = $state<ImportError[]>([]);
 
-		isImporting = true;
-		result = null;
-		try {
-			await submit();
-			result = (importBulkSales.result as BulkImportResult | null) ?? {
-				imported: [],
-				updated: [],
-				errors: []
-			};
+	// Accumulated via polling (Phase 2)
+	let processedCount = $state(0);
+	let importedSales = $state<ImportedSale[]>([]);
+	let updatedSales = $state<ImportedSale[]>([]);
+	let importErrors = $state<ImportError[]>([]);
 
-			if (result.imported.length > 0) {
-				toast.success(
-					`Successfully imported ${result.imported.length} sale${result.imported.length !== 1 ? 's' : ''}`
-				);
-			}
-			if (result.updated.length > 0) {
-				toast.success(
-					`Updated ${result.updated.length} existing sale${result.updated.length !== 1 ? 's' : ''}`
-				);
-			}
-			if (result.errors.length > 0) {
-				toast.warning(
-					`${result.errors.length} row${result.errors.length !== 1 ? 's' : ''} had errors`
-				);
-			}
-			if (
-				result.imported.length === 0 &&
-				result.updated.length === 0 &&
-				result.errors.length === 0
-			) {
-				toast.info('No rows found in the CSV file.');
-			}
-		} catch {
-			toast.error('An unexpected error occurred during import');
-		} finally {
-			isImporting = false;
-		}
+	const POLL_INTERVAL = 2500; // ms between status polls
+
+	const progressPercent = $derived(
+		totalGroups > 0 ? Math.round((processedCount / totalGroups) * 100) : 0
+	);
+
+	// Live activity log
+	let activityLog = $state<ActivityEntry[]>([]);
+	let currentActivity = $state('');
+	let startedAt = $state<number>(0);
+	let elapsedSeconds = $state(0);
+	let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+	// Track which sale IDs we've already logged to avoid duplicates across polls
+	let seenImportedIds = new SvelteSet<string>();
+	let seenUpdatedIds = new SvelteSet<string>();
+	let seenErrorIds = new SvelteSet<string>();
+
+	const elapsedLabel = $derived(() => {
+		const m = Math.floor(elapsedSeconds / 60);
+		const s = elapsedSeconds % 60;
+		return `${m}:${String(s).padStart(2, '0')}`;
 	});
 
+	function startTimer() {
+		startedAt = Date.now();
+		elapsedSeconds = 0;
+		elapsedTimer = setInterval(() => {
+			elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+		}, 1000);
+	}
+
+	function stopTimer() {
+		if (elapsedTimer) {
+			clearInterval(elapsedTimer);
+			elapsedTimer = null;
+		}
+	}
+
+	function stopPolling() {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+	}
+
+	function pushLog(entry: ActivityEntry) {
+		activityLog = [entry, ...activityLog].slice(0, 80);
+	}
+
+	// ---------------------------------------------------------------------------
+	// $effect: on mount check localStorage for an active job and resume polling
+	// ---------------------------------------------------------------------------
+	$effect(() => {
+		const savedJobId = localStorage.getItem('bulk_import_job_id');
+		if (savedJobId && step === 'idle') {
+			// Resume: load job state without requiring re-upload
+			fetch(`/api/bulk-import/${savedJobId}`)
+				.then((r) => r.json())
+				.then((job) => {
+					if (!job || job.error) {
+						localStorage.removeItem('bulk_import_job_id');
+						return;
+					}
+					// Only resume if still in progress
+					if (job.status === 'processing' || job.status === 'queued') {
+						jobId = savedJobId;
+						totalGroups = job.totalGroups ?? 0;
+						validationErrors = job.validationErrors ?? [];
+						processedCount = job.processedCount ?? 0;
+						importedSales = job.imported ?? [];
+						updatedSales = job.updated ?? [];
+						importErrors = job.errors ?? [];
+						// Seed seen sets so we don't re-log what's already done
+						for (const s of importedSales) seenImportedIds.add(s.id);
+						for (const s of updatedSales) seenUpdatedIds.add(s.id);
+						for (const e of importErrors) seenErrorIds.add(`${e.order_id}:${e.row}`);
+						step = 'processing';
+						currentActivity = `Resumed — ${processedCount}/${totalGroups} processed so far…`;
+						startTimer();
+						startPolling();
+					} else if (job.status === 'completed' || job.status === 'failed') {
+						// Already done — show results quietly without re-triggering
+						localStorage.removeItem('bulk_import_job_id');
+					}
+				})
+				.catch(() => {
+					localStorage.removeItem('bulk_import_job_id');
+				});
+		}
+
+		return () => {
+			stopPolling();
+			stopTimer();
+		};
+	});
+
+	// ---------------------------------------------------------------------------
+	// File handling
+	// ---------------------------------------------------------------------------
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
 		csvFile = input.files?.[0] ?? null;
-		if (csvFile) {
-			importBulkSales.fields.csv.set(csvFile);
-		} else {
-			importBulkSales.fields.csv.set(undefined);
-		}
-		result = null;
+		reset();
 	}
 
 	function removeFile() {
 		csvFile = null;
-		importBulkSales.fields.csv.set(undefined);
-		result = null;
 		const input = document.getElementById('csv-input') as HTMLInputElement;
 		if (input) input.value = '';
+		reset();
+	}
+
+	function reset() {
+		stopPolling();
+		stopTimer();
+		localStorage.removeItem('bulk_import_job_id');
+		step = 'idle';
+		jobId = null;
+		totalGroups = 0;
+		validationErrors = [];
+		processedCount = 0;
+		importedSales = [];
+		updatedSales = [];
+		importErrors = [];
+		activityLog = [];
+		currentActivity = '';
+		elapsedSeconds = 0;
+		seenImportedIds = new SvelteSet();
+		seenUpdatedIds = new SvelteSet();
+		seenErrorIds = new SvelteSet();
+	}
+
+	// ---------------------------------------------------------------------------
+	// Phase 1: upload CSV → validate + queue job
+	// ---------------------------------------------------------------------------
+	async function handleUpload() {
+		if (!csvFile) return;
+
+		step = 'uploading';
+		validationErrors = [];
+
+		const fd = new FormData();
+		fd.append('csv', csvFile);
+		fd.append('lenient', lenientMode ? 'true' : 'false');
+
+		try {
+			const res = await fetch('/api/bulk-import', { method: 'POST', body: fd });
+			const data = await res.json();
+
+			if (!res.ok) {
+				toast.error(data.error ?? 'Upload failed');
+				step = 'error';
+				return;
+			}
+
+			jobId = data.jobId;
+			totalGroups = data.totalGroups ?? 0;
+			validationErrors = data.validationErrors ?? [];
+
+			if (totalGroups === 0 && validationErrors.length === 0) {
+				toast.info('No valid rows found in the CSV file.');
+				step = 'idle';
+				return;
+			}
+
+			step = 'validated';
+
+			if (validationErrors.length > 0) {
+				toast.warning(
+					`${validationErrors.length} validation error${validationErrors.length !== 1 ? 's' : ''} found — review below before importing`
+				);
+			}
+		} catch {
+			toast.error('An unexpected error occurred during upload');
+			step = 'error';
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Phase 2: trigger server-side background processing, then poll for updates
+	// ---------------------------------------------------------------------------
+	async function startImport() {
+		if (!jobId || totalGroups === 0) return;
+
+		step = 'processing';
+		activityLog = [];
+		seenImportedIds = new SvelteSet();
+		seenUpdatedIds = new SvelteSet();
+		seenErrorIds = new SvelteSet();
+		startTimer();
+
+		try {
+			const res = await fetch(`/api/bulk-import/${jobId}/start`, { method: 'POST' });
+			const data = await res.json();
+
+			if (!res.ok) {
+				toast.error(data.error ?? 'Failed to start import');
+				step = 'error';
+				stopTimer();
+				return;
+			}
+		} catch {
+			toast.error('Network error starting import');
+			step = 'error';
+			stopTimer();
+			return;
+		}
+
+		// Persist jobId so the user can navigate away and come back
+		localStorage.setItem('bulk_import_job_id', jobId);
+
+		currentActivity = `Import started — server is processing ${totalGroups} deal${totalGroups !== 1 ? 's' : ''}…`;
+		pushLog({ kind: 'chunk', label: `Started processing ${totalGroups} groups`, ts: Date.now() });
+
+		startPolling();
+	}
+
+	function startPolling() {
+		if (pollTimer) return; // already polling
+		pollTimer = setInterval(pollJob, POLL_INTERVAL);
+	}
+
+	async function pollJob() {
+		if (!jobId) return;
+
+		try {
+			const res = await fetch(`/api/bulk-import/${jobId}`);
+			if (!res.ok) return; // transient error — keep polling
+
+			const job = await res.json();
+
+			// Diff new imported sales
+			const newImported: ImportedSale[] = (job.imported ?? []).filter(
+				(s: ImportedSale) => !seenImportedIds.has(s.id)
+			);
+			const newUpdated: ImportedSale[] = (job.updated ?? []).filter(
+				(s: ImportedSale) => !seenUpdatedIds.has(s.id)
+			);
+			const newErrors: ImportError[] = (job.errors ?? []).filter((e: ImportError) => {
+				const key = `${e.order_id}:${e.row}`;
+				return !seenErrorIds.has(key);
+			});
+
+			for (const s of newImported) {
+				seenImportedIds.add(s.id);
+				pushLog({ kind: 'imported', label: `${s.id}  ${s.client}`, ts: Date.now() });
+			}
+			for (const s of newUpdated) {
+				seenUpdatedIds.add(s.id);
+				pushLog({ kind: 'updated', label: `${s.id}  ${s.client}`, ts: Date.now() });
+			}
+			for (const e of newErrors) {
+				seenErrorIds.add(`${e.order_id}:${e.row}`);
+				pushLog({ kind: 'error', label: `${e.order_id || '?'} — ${e.message}`, ts: Date.now() });
+			}
+
+			// Update reactive state
+			processedCount = job.processedCount ?? processedCount;
+			importedSales = job.imported ?? importedSales;
+			updatedSales = job.updated ?? updatedSales;
+			importErrors = job.errors ?? importErrors;
+
+			const lastItem = newImported.at(-1) ?? newUpdated.at(-1);
+			if (lastItem) {
+				currentActivity = `Last: ${lastItem.id} (${lastItem.client}) · ${processedCount}/${totalGroups} done · ${importErrors.length} error${importErrors.length !== 1 ? 's' : ''}`;
+			} else if (processedCount > 0) {
+				currentActivity = `${processedCount}/${totalGroups} processed · ${importErrors.length} error${importErrors.length !== 1 ? 's' : ''}`;
+			}
+
+			if (job.status === 'completed' || job.status === 'failed') {
+				stopPolling();
+				stopTimer();
+				localStorage.removeItem('bulk_import_job_id');
+				step = job.status === 'completed' ? 'completed' : 'error';
+				currentActivity = `Done — ${importedSales.length} imported, ${updatedSales.length} updated, ${importErrors.length} error${importErrors.length !== 1 ? 's' : ''}`;
+
+				if (job.status === 'completed') {
+					if (importedSales.length > 0)
+						toast.success(
+							`Imported ${importedSales.length} sale${importedSales.length !== 1 ? 's' : ''}`
+						);
+					if (updatedSales.length > 0)
+						toast.success(
+							`Updated ${updatedSales.length} sale${updatedSales.length !== 1 ? 's' : ''}`
+						);
+					if (importErrors.length > 0)
+						toast.warning(
+							`${importErrors.length} row${importErrors.length !== 1 ? 's' : ''} had errors`
+						);
+					if (importedSales.length === 0 && updatedSales.length === 0 && importErrors.length === 0)
+						toast.info('No sales were created or updated.');
+				} else {
+					toast.error(job.failureReason ?? 'Import failed on the server');
+				}
+			}
+		} catch {
+			// Ignore network blips — keep polling
+		}
 	}
 </script>
 
@@ -287,55 +542,56 @@
 </header>
 
 <div class="flex flex-1 flex-col gap-6 p-6 pt-0">
-	<!-- Upload card -->
+	<!-- Upload + queue card -->
 	<Card.Root>
-		<form {...importBulkSalesForm} enctype="multipart/form-data">
-			<Card.Header>
-				<Card.Title>Import Sales from CSV</Card.Title>
-				<Card.Description>
-					Upload a CSV file to bulk-create sales. Google Drive links in the CSV are stored as-is —
-					no re-upload required.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				<!-- Sample download -->
-				<div class="flex items-center justify-between rounded-lg border border-dashed p-4">
+		<Card.Header>
+			<Card.Title>Import Sales from CSV</Card.Title>
+			<Card.Description>
+				Upload a CSV file to bulk-create or update sales. The file is validated instantly and then
+				processed in background chunks — no more timeouts on large files.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-4">
+			<!-- Sample download -->
+			<div class="flex items-center justify-between rounded-lg border border-dashed p-4">
+				<div class="flex items-center gap-3">
+					<FileText class="h-8 w-8 text-muted-foreground" />
+					<div>
+						<p class="text-sm font-medium">Need a template?</p>
+						<p class="text-xs text-muted-foreground">
+							Download the sample CSV to see the required column format.
+						</p>
+					</div>
+				</div>
+				<a
+					href={asset('/sample-bulk-upload.csv')}
+					download
+					class={buttonVariants({ variant: 'outline', size: 'sm' })}
+				>
+					<Download class="mr-2 h-4 w-4" />
+					Download Sample
+				</a>
+			</div>
+
+			<!-- File input -->
+			<input
+				id="csv-input"
+				type="file"
+				accept=".csv"
+				class="hidden"
+				onchange={handleFileChange}
+				disabled={step === 'uploading' || step === 'processing'}
+			/>
+			{#if csvFile}
+				<div class="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
 					<div class="flex items-center gap-3">
-						<FileText class="h-8 w-8 text-muted-foreground" />
+						<FileText class="h-5 w-5 text-muted-foreground" />
 						<div>
-							<p class="text-sm font-medium">Need a template?</p>
-							<p class="text-xs text-muted-foreground">
-								Download the sample CSV to see the required column format.
-							</p>
+							<p class="text-sm font-medium">{csvFile.name}</p>
+							<p class="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(1)} KB</p>
 						</div>
 					</div>
-					<a
-						href={asset('/sample-bulk-upload.csv')}
-						download
-						class={buttonVariants({ variant: 'outline', size: 'sm' })}
-					>
-						<Download class="mr-2 h-4 w-4" />
-						Download Sample
-					</a>
-				</div>
-
-				<!-- File input — always kept in DOM so FormData picks it up on submit -->
-				<input
-					id="csv-input"
-					{...importBulkSales.fields.csv.as('file')}
-					accept=".csv"
-					class="hidden"
-					onchange={handleFileChange}
-				/>
-				{#if csvFile}
-					<div class="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
-						<div class="flex items-center gap-3">
-							<FileText class="h-5 w-5 text-muted-foreground" />
-							<div>
-								<p class="text-sm font-medium">{csvFile.name}</p>
-								<p class="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(1)} KB</p>
-							</div>
-						</div>
+					{#if step === 'idle' || step === 'error'}
 						<button
 							type="button"
 							onclick={removeFile}
@@ -343,157 +599,317 @@
 						>
 							<X class="h-4 w-4" />
 						</button>
-					</div>
-				{:else}
-					<label
-						for="csv-input"
-						class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-muted/50"
-					>
-						<Upload class="h-8 w-8 text-muted-foreground" />
-						<div>
-							<p class="text-sm font-medium">Click to upload CSV file</p>
-							<p class="text-xs text-muted-foreground">Only .csv files are supported</p>
-						</div>
-					</label>
-				{/if}
-			</Card.Content>
-			<!-- Lenient mode toggle -->
-			<Card.Content class="border-t pt-4">
-				<div class="flex items-center justify-between rounded-lg border p-4">
-					<div>
-						<p class="text-sm font-medium">Non-Mandatory Mode</p>
-						<p class="text-xs text-muted-foreground">
-							When enabled, all field validations are relaxed — only order_id is required. Useful
-							for importing partial data.
-						</p>
-					</div>
-					<Switch.Root bind:checked={lenientMode} class="data-[state=checked]:bg-orange-500" />
-				</div>
-				<input
-					type="hidden"
-					{...importBulkSales.fields.lenient?.as('text')}
-					value={lenientMode ? 'true' : 'false'}
-				/>
-			</Card.Content>
-			<Card.Footer class="mt-4 justify-end">
-				<button type="submit" disabled={!canImport} class={buttonVariants({ variant: 'default' })}>
-					{#if isImporting}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-						Importing...
-					{:else}
-						<Upload class="mr-2 h-4 w-4" />
-						Import Sales
 					{/if}
+				</div>
+			{:else}
+				<label
+					for="csv-input"
+					class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-muted/50"
+				>
+					<Upload class="h-8 w-8 text-muted-foreground" />
+					<div>
+						<p class="text-sm font-medium">Click to upload CSV file</p>
+						<p class="text-xs text-muted-foreground">Only .csv files are supported</p>
+					</div>
+				</label>
+			{/if}
+		</Card.Content>
+
+		<!-- Lenient mode toggle -->
+		<Card.Content class="border-t pt-4">
+			<div class="flex items-center justify-between rounded-lg border p-4">
+				<div>
+					<p class="text-sm font-medium">Non-Mandatory Mode</p>
+					<p class="text-xs text-muted-foreground">
+						When enabled, all field validations are relaxed — only order_id is required. Useful for
+						importing partial data.
+					</p>
+				</div>
+				<Switch.Root
+					bind:checked={lenientMode}
+					disabled={step !== 'idle' && step !== 'error'}
+					class="data-[state=checked]:bg-orange-500"
+				/>
+			</div>
+		</Card.Content>
+
+		<!-- Action footer -->
+		<Card.Footer class="mt-4 flex items-center justify-end gap-3">
+			{#if step === 'validated'}
+				<p class="mr-auto text-sm text-muted-foreground">
+					{totalGroups} group{totalGroups !== 1 ? 's' : ''} ready to import
+					{#if validationErrors.length > 0}
+						· <span class="text-amber-600"
+							>{validationErrors.length} validation error{validationErrors.length !== 1
+								? 's'
+								: ''}</span
+						>
+					{/if}
+				</p>
+				<button type="button" onclick={removeFile} class={buttonVariants({ variant: 'outline' })}>
+					Cancel
 				</button>
-			</Card.Footer>
-		</form>
+				<button
+					type="button"
+					onclick={startImport}
+					disabled={totalGroups === 0}
+					class={buttonVariants({ variant: 'default' })}
+				>
+					<Upload class="mr-2 h-4 w-4" />
+					Start Import
+				</button>
+			{:else if step === 'uploading'}
+				<button disabled class={buttonVariants({ variant: 'default' })}>
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					Validating…
+				</button>
+			{:else if step === 'processing'}
+				<button disabled class={buttonVariants({ variant: 'default' })}>
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					Processing…
+				</button>
+			{:else}
+				<button
+					type="button"
+					onclick={handleUpload}
+					disabled={!csvFile || step === 'completed'}
+					class={buttonVariants({ variant: 'default' })}
+				>
+					<Upload class="mr-2 h-4 w-4" />
+					Validate & Queue
+				</button>
+			{/if}
+		</Card.Footer>
 	</Card.Root>
 
-	<!-- Results -->
-	{#if result}
-		{#if result.imported.length > 0}
-			<Card.Root>
-				<Card.Header>
+	<!-- Live progress card -->
+	{#if step === 'processing' || step === 'completed'}
+		<Card.Root class={step === 'completed' ? 'border-green-300/60' : ''}>
+			<Card.Content class="space-y-4 py-5">
+				<!-- Header row -->
+				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<CheckCircle class="h-5 w-5 text-green-600" />
-						<Card.Title>Successfully Imported ({result.imported.length})</Card.Title>
+						{#if step === 'processing'}
+							<Loader2 class="h-4 w-4 animate-spin text-primary" />
+							<span class="text-sm font-semibold">Importing…</span>
+						{:else}
+							<CheckCircle class="h-4 w-4 text-green-600" />
+							<span class="text-sm font-semibold text-green-700">Import complete</span>
+						{/if}
 					</div>
-				</Card.Header>
-				<Card.Content>
-					<Table.Root>
-						<Table.Header>
-							<Table.Row>
-								<Table.Head>Sale ID</Table.Head>
-								<Table.Head>Client</Table.Head>
-							</Table.Row>
-						</Table.Header>
-						<Table.Body>
-							{#each result.imported as sale (sale.id)}
-								<Table.Row>
-									<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
-									<Table.Cell>{sale.client}</Table.Cell>
-								</Table.Row>
-							{/each}
-						</Table.Body>
-					</Table.Root>
-				</Card.Content>
-			</Card.Root>
-		{/if}
-
-		{#if result.updated.length > 0}
-			<Card.Root class="border-amber-300/50">
-				<Card.Header>
-					<div class="flex items-center gap-2">
-						<RefreshCw class="h-5 w-5 text-amber-600" />
-						<Card.Title>Updated ({result.updated.length})</Card.Title>
+					<div class="flex items-center gap-4 text-xs text-muted-foreground">
+						<span class="tabular-nums">{processedCount} / {totalGroups} groups</span>
+						<span class="tabular-nums">{progressPercent}%</span>
+						<span class="font-mono tabular-nums">{elapsedLabel()}</span>
 					</div>
-					<Card.Description>
-						Existing sales were updated with new data. Approval statuses and comments were
-						preserved.
-					</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<Table.Root>
-						<Table.Header>
-							<Table.Row>
-								<Table.Head>Sale ID</Table.Head>
-								<Table.Head>Client</Table.Head>
-							</Table.Row>
-						</Table.Header>
-						<Table.Body>
-							{#each result.updated as sale (sale.id)}
-								<Table.Row>
-									<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
-									<Table.Cell>{sale.client}</Table.Cell>
-								</Table.Row>
-							{/each}
-						</Table.Body>
-					</Table.Root>
-				</Card.Content>
-			</Card.Root>
-		{/if}
+				</div>
 
-		{#if result.errors.length > 0}
-			<Card.Root class="border-destructive/30">
-				<Card.Header>
-					<div class="flex items-center gap-2">
-						<AlertCircle class="h-5 w-5 text-destructive" />
-						<Card.Title>Import Errors ({result.errors.length})</Card.Title>
+				<!-- Progress bar -->
+				<div class="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+					<div
+						class="h-full rounded-full transition-all duration-500 {step === 'completed'
+							? 'bg-green-500'
+							: 'bg-primary'}"
+						style="width: {progressPercent}%"
+					></div>
+				</div>
+
+				<!-- Live stat pills -->
+				<div class="flex flex-wrap gap-2">
+					<span
+						class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200"
+					>
+						<CheckCircle class="h-3 w-3" />
+						{importedSales.length} imported
+					</span>
+					<span
+						class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+					>
+						<RefreshCw class="h-3 w-3" />
+						{updatedSales.length} updated
+					</span>
+					{#if importErrors.length > 0}
+						<span
+							class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200"
+						>
+							<AlertCircle class="h-3 w-3" />
+							{importErrors.length} error{importErrors.length !== 1 ? 's' : ''}
+						</span>
+					{/if}
+				</div>
+
+				<!-- Current activity line -->
+				{#if currentActivity}
+					<p class="truncate font-mono text-xs text-muted-foreground">{currentActivity}</p>
+				{/if}
+
+				<!-- Activity log feed -->
+				{#if activityLog.length > 0}
+					<div class="max-h-52 overflow-y-auto rounded-md border bg-muted/30">
+						<ul class="divide-y divide-border text-xs">
+							{#each activityLog as entry (entry.ts + entry.label)}
+								<li class="flex items-start gap-2 px-3 py-1.5">
+									{#if entry.kind === 'imported'}
+										<CheckCircle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
+										<span class="text-green-800">{entry.label}</span>
+									{:else if entry.kind === 'updated'}
+										<RefreshCw class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+										<span class="text-amber-800">{entry.label}</span>
+									{:else if entry.kind === 'error'}
+										<AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+										<span class="text-red-700">{entry.label}</span>
+									{:else}
+										<span class="mt-0.5 h-3.5 w-3.5 shrink-0 text-center text-muted-foreground"
+											>·</span
+										>
+										<span class="text-muted-foreground">{entry.label}</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
 					</div>
-					<Card.Description>
-						The following rows could not be imported. Fix the issues and re-upload.
-					</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<Table.Root>
-						<Table.Header>
-							<Table.Row>
-								<Table.Head>Order ID</Table.Head>
-								<Table.Head>CSV Row #</Table.Head>
-								<Table.Head>Error</Table.Head>
-							</Table.Row>
-						</Table.Header>
-						<Table.Body>
-							{#each result.errors as err, i (i)}
-								<Table.Row>
-									<Table.Cell>{err.order_id || '—'}</Table.Cell>
-									<Table.Cell>{err.row || '—'}</Table.Cell>
-									<Table.Cell class="text-sm text-destructive">{err.message}</Table.Cell>
-								</Table.Row>
-							{/each}
-						</Table.Body>
-					</Table.Root>
-				</Card.Content>
-			</Card.Root>
-		{/if}
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
-		{#if result.imported.length === 0 && result.updated.length === 0 && result.errors.length === 0}
-			<Card.Root>
-				<Card.Content class="py-8 text-center text-muted-foreground">
-					No rows found in the CSV file.
-				</Card.Content>
-			</Card.Root>
-		{/if}
+	<!-- Validation errors (shown after upload, before starting import) -->
+	{#if validationErrors.length > 0}
+		<Card.Root class="border-amber-300/50">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<AlertCircle class="h-5 w-5 text-amber-600" />
+					<Card.Title>Validation Errors ({validationErrors.length})</Card.Title>
+				</div>
+				<Card.Description>
+					These rows failed validation and will be skipped. Valid rows can still be imported.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Order ID</Table.Head>
+							<Table.Head>CSV Row #</Table.Head>
+							<Table.Head>Error</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each validationErrors as err, i (i)}
+							<Table.Row>
+								<Table.Cell>{err.order_id || '—'}</Table.Cell>
+								<Table.Cell>{err.row || '—'}</Table.Cell>
+								<Table.Cell class="text-sm text-amber-700">{err.message}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	<!-- Live results (accumulated as chunks complete) -->
+	{#if importedSales.length > 0}
+		<Card.Root>
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<CheckCircle class="h-5 w-5 text-green-600" />
+					<Card.Title>Successfully Imported ({importedSales.length})</Card.Title>
+				</div>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Sale ID</Table.Head>
+							<Table.Head>Client</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each importedSales as sale (sale.id)}
+							<Table.Row>
+								<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
+								<Table.Cell>{sale.client}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if updatedSales.length > 0}
+		<Card.Root class="border-amber-300/50">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<RefreshCw class="h-5 w-5 text-amber-600" />
+					<Card.Title>Updated ({updatedSales.length})</Card.Title>
+				</div>
+				<Card.Description>
+					Existing sales were updated with new data. Approval statuses and comments were preserved.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Sale ID</Table.Head>
+							<Table.Head>Client</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each updatedSales as sale (sale.id)}
+							<Table.Row>
+								<Table.Cell class="font-mono text-sm font-medium">{sale.id}</Table.Cell>
+								<Table.Cell>{sale.client}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if importErrors.length > 0}
+		<Card.Root class="border-destructive/30">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<AlertCircle class="h-5 w-5 text-destructive" />
+					<Card.Title>Import Errors ({importErrors.length})</Card.Title>
+				</div>
+				<Card.Description>
+					The following rows could not be imported. Fix the issues and re-upload.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Order ID</Table.Head>
+							<Table.Head>CSV Row #</Table.Head>
+							<Table.Head>Error</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each importErrors as err, i (i)}
+							<Table.Row>
+								<Table.Cell>{err.order_id || '—'}</Table.Cell>
+								<Table.Cell>{err.row || '—'}</Table.Cell>
+								<Table.Cell class="text-sm text-destructive">{err.message}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if step === 'completed' && importedSales.length === 0 && updatedSales.length === 0 && importErrors.length === 0}
+		<Card.Root>
+			<Card.Content class="py-8 text-center text-muted-foreground">
+				No sales were created or updated.
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<!-- Column reference -->
