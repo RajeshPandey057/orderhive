@@ -5,9 +5,9 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import * as Select from '$lib/components/ui/select';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Select from '$lib/components/ui/select';
 	import {
 		Table,
 		TableBody,
@@ -115,13 +115,45 @@
 	let filterPeriod = $state('monthly');
 	let searchQuery = $state('');
 	let selectedAttendanceDate = $state('');
-	let selectedKpiFilter = $state<'all' | 'on-time' | 'present' | 'absent' | 'on-leave'>('all');
+	let selectedKpiFilter = $state<'all' | 'attended' | 'late' | 'on-leave'>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
 
+	// ── Period range helper ───────────────────────────────────────────────────────
+	function getPeriodRange(period: string, refDate: Date): { start: string; end: string } {
+		if (period === 'weekly') {
+			const day = refDate.getDay(); // 0 = Sun
+			const diffToMon = day === 0 ? -6 : 1 - day;
+			const mon = new Date(refDate);
+			mon.setDate(refDate.getDate() + diffToMon);
+			const sun = new Date(mon);
+			sun.setDate(mon.getDate() + 6);
+			return { start: mon.toISOString().slice(0, 10), end: sun.toISOString().slice(0, 10) };
+		} else if (period === 'monthly') {
+			const start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+			const end = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
+			return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+		} else {
+			const y = refDate.getFullYear();
+			return { start: `${y}-01-01`, end: `${y}-12-31` };
+		}
+	}
+
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
-	const searchFilteredAttendanceRecords = $derived(
-		attendanceRecords.filter((record) => {
+
+	// Period-filtered base: exact date when set, else full period around today
+	const periodFilteredRecords = $derived.by(() => {
+		const refDate = selectedAttendanceDate ? new Date(selectedAttendanceDate) : new Date();
+		if (selectedAttendanceDate) {
+			return attendanceRecords.filter((r) => r.date === selectedAttendanceDate);
+		}
+		const { start, end } = getPeriodRange(filterPeriod, refDate);
+		return attendanceRecords.filter((r) => r.date >= start && r.date <= end);
+	});
+
+	// Search applied on top — does not skew KPI numbers
+	const searchFilteredRecords = $derived(
+		periodFilteredRecords.filter((record) => {
 			const q = searchQuery.trim().toLowerCase();
 			if (!q) return true;
 			return (
@@ -132,37 +164,42 @@
 			);
 		})
 	);
-	const dateFilteredAttendanceRecords = $derived(
-		selectedAttendanceDate
-			? searchFilteredAttendanceRecords.filter((record) => record.date === selectedAttendanceDate)
-			: searchFilteredAttendanceRecords
+
+	// ── KPI derivations — unique employees, not raw row counts ───────────────────
+	const uniqueAttendedSet = $derived(
+		new Set(
+			periodFilteredRecords
+				.filter((r) => r.status === 'present' || r.status === 'late')
+				.map((r) => r.employeeEmail)
+		)
 	);
-	const presentCount = $derived(
-		dateFilteredAttendanceRecords.filter((record) => record.status === 'present').length
+	const uniqueLateSet = $derived(
+		new Set(periodFilteredRecords.filter((r) => r.status === 'late').map((r) => r.employeeEmail))
 	);
-	const absentCount = $derived(
-		dateFilteredAttendanceRecords.filter((record) => record.status === 'absent').length
-	);
+	const lateInstances = $derived(periodFilteredRecords.filter((r) => r.status === 'late').length);
+	// Employees with any record in the period (present, late, on-leave, absent)
+	const uniqueAnyRecordSet = $derived(new Set(periodFilteredRecords.map((r) => r.employeeEmail)));
+	// Employees with zero records in the period — likely absent but never logged
+	const unaccountedCount = $derived(Math.max(0, data.employeeCount - uniqueAnyRecordSet.size));
 	const onLeaveCount = $derived(
-		dateFilteredAttendanceRecords.filter((record) => record.status === 'on-leave').length
+		periodFilteredRecords.filter((r) => r.status === 'on-leave').length
 	);
-	const presentTotalCount = $derived(
-		dateFilteredAttendanceRecords.filter(
-			(record) => record.status === 'present' || record.status === 'late'
-		).length
+	const attendanceRate = $derived(
+		data.employeeCount > 0 ? Math.round((uniqueAttendedSet.size / data.employeeCount) * 100) : 0
 	);
-	const onTimeRate = $derived(
-		dateFilteredAttendanceRecords.length
-			? Math.round((presentCount / dateFilteredAttendanceRecords.length) * 100)
-			: 0
-	);
+	const avgWorkingMinutes = $derived.by(() => {
+		const valid = periodFilteredRecords.filter((r) => (r.workingMinutes ?? 0) > 0);
+		if (!valid.length) return 0;
+		return Math.round(valid.reduce((sum, r) => sum + (r.workingMinutes ?? 0), 0) / valid.length);
+	});
+
+	// Table rows: search + KPI card filter
 	const filteredAttendanceRecords = $derived(
-		dateFilteredAttendanceRecords.filter((record) => {
+		searchFilteredRecords.filter((record) => {
 			if (selectedKpiFilter === 'all') return true;
-			if (selectedKpiFilter === 'on-time') return record.status === 'present';
-			if (selectedKpiFilter === 'present')
+			if (selectedKpiFilter === 'attended')
 				return record.status === 'present' || record.status === 'late';
-			if (selectedKpiFilter === 'absent') return record.status === 'absent';
+			if (selectedKpiFilter === 'late') return record.status === 'late';
 			return record.status === 'on-leave';
 		})
 	);
@@ -213,7 +250,7 @@
 		}
 	}
 
-	function getKpiCardClass(filter: 'on-time' | 'present' | 'absent' | 'on-leave') {
+	function getKpiCardClass(filter: 'attended' | 'late' | 'on-leave') {
 		return selectedKpiFilter === filter
 			? 'rounded-md border border-[#F04C06] bg-[#FFF0DE] p-4 text-left'
 			: 'rounded-md border border-[#EBEEEE] p-4 text-left hover:bg-[#FBF9F8]';
@@ -317,67 +354,50 @@
 			</div>
 
 			<div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+				<!-- Workforce Present -->
 				<button
 					type="button"
-					class={getKpiCardClass('on-time')}
-					onclick={() => (selectedKpiFilter = 'on-time')}
+					class={getKpiCardClass('attended')}
+					onclick={() =>
+						(selectedKpiFilter = selectedKpiFilter === 'attended' ? 'all' : 'attended')}
 				>
-					<div class="text-3xl leading-8 font-medium">{onTimeRate}%</div>
-					<p class="mt-2 text-[13px] text-[#687976]">On time rate</p>
-				</button>
-				<button
-					type="button"
-					class={getKpiCardClass('present')}
-					onclick={() => (selectedKpiFilter = 'present')}
-				>
-					<div class="flex items-center justify-between">
-						<div class="text-3xl leading-8 font-medium">
-							{presentTotalCount}<span class="ml-1 text-base text-[#8D8D8D]"
-								>/{data.employeeCount}</span
-							>
-						</div>
-						<div class="text-3xl leading-8 font-medium">
-							{dateFilteredAttendanceRecords.length
-								? Math.round((presentTotalCount / dateFilteredAttendanceRecords.length) * 100)
-								: 0}%
-						</div>
+					<div class="flex items-baseline gap-1.5">
+						<div class="text-3xl leading-8 font-medium">{uniqueAttendedSet.size}</div>
+						<span class="text-base text-[#8D8D8D]">/ {data.employeeCount}</span>
 					</div>
-					<p class="mt-2 text-[13px] text-[#687976]">Present</p>
+					<p class="mt-2 text-[13px] text-[#687976]">Workforce present</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">{attendanceRate}% of workforce</p>
 				</button>
+				<!-- Late Employees -->
 				<button
 					type="button"
-					class={getKpiCardClass('absent')}
-					onclick={() => (selectedKpiFilter = 'absent')}
+					class={getKpiCardClass('late')}
+					onclick={() => (selectedKpiFilter = selectedKpiFilter === 'late' ? 'all' : 'late')}
 				>
-					<div class="flex items-center justify-between">
-						<div class="text-3xl leading-8 font-medium">
-							{absentCount}<span class="ml-1 text-base text-[#8D8D8D]">/{data.employeeCount}</span>
-						</div>
-						<div class="text-3xl leading-8 font-medium">
-							{dateFilteredAttendanceRecords.length
-								? Math.round((absentCount / dateFilteredAttendanceRecords.length) * 100)
-								: 0}%
-						</div>
-					</div>
-					<p class="mt-2 text-[13px] text-[#687976]">Absent</p>
+					<div class="text-3xl leading-8 font-medium">{uniqueLateSet.size}</div>
+					<p class="mt-2 text-[13px] text-[#687976]">Late employees</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">{lateInstances} total late instances</p>
 				</button>
+				<!-- Avg Working Hours -->
 				<button
 					type="button"
-					class={getKpiCardClass('on-leave')}
-					onclick={() => (selectedKpiFilter = 'on-leave')}
+					class="rounded-md border border-[#EBEEEE] p-4 text-left hover:bg-[#FBF9F8]"
+					onclick={() =>
+						(selectedKpiFilter = selectedKpiFilter === 'attended' ? 'all' : 'attended')}
 				>
-					<div class="flex items-center justify-between">
-						<div class="text-3xl leading-8 font-medium">
-							{onLeaveCount}<span class="ml-1 text-base text-[#8D8D8D]">/{data.employeeCount}</span>
-						</div>
-						<div class="text-3xl leading-8 font-medium">
-							{dateFilteredAttendanceRecords.length
-								? Math.round((onLeaveCount / dateFilteredAttendanceRecords.length) * 100)
-								: 0}%
-						</div>
-					</div>
-					<p class="mt-2 text-[13px] text-[#687976]">On Leave</p>
+					<div class="text-3xl leading-8 font-medium">{minutesToDuration(avgWorkingMinutes)}</div>
+					<p class="mt-2 text-[13px] text-[#687976]">Avg working hours</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">per day · vs 08:00 standard</p>
 				</button>
+				<!-- Not Recorded -->
+				<div class="rounded-md border border-[#EBEEEE] p-4 text-left">
+					<div class="flex items-baseline gap-1.5">
+						<div class="text-3xl leading-8 font-medium">{unaccountedCount}</div>
+						<span class="text-base text-[#8D8D8D]">/ {data.employeeCount}</span>
+					</div>
+					<p class="mt-2 text-[13px] text-[#687976]">Not recorded</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">no punch or leave in period</p>
+				</div>
 			</div>
 
 			<div class="flex flex-wrap items-center justify-between gap-3">
@@ -433,15 +453,22 @@
 								>
 								<TableCell>
 									<div class="flex items-center gap-1.5">
-										<Badge
-											variant={record.status === 'present'
-												? 'secondary'
-												: record.status === 'late' || record.status === 'on-leave'
-													? 'outline'
-													: 'destructive'}
-										>
-											{formatStatus(record.status)}
-										</Badge>
+										{#if record.status === 'late'}
+											<Badge variant="secondary">Present</Badge>
+											<Badge variant="outline" class="border-amber-200 bg-amber-50 text-amber-700"
+												>Late</Badge
+											>
+										{:else}
+											<Badge
+												variant={record.status === 'present'
+													? 'secondary'
+													: record.status === 'on-leave'
+														? 'outline'
+														: 'destructive'}
+											>
+												{formatStatus(record.status)}
+											</Badge>
+										{/if}
 										{#if record.source === 'biometric'}
 											<Badge
 												variant="outline"

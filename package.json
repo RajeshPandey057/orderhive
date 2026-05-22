@@ -105,14 +105,5 @@
 		"papaparse": "^5.5.3",
 		"photoswipe": "^5.4.4",
 		"puppeteer": "^24.37.5"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@firebase/util",
-			"esbuild",
-			"protobufjs",
-			"puppeteer",
-			"sharp"
-		]
 	}
 }
