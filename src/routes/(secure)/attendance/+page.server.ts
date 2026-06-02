@@ -9,9 +9,16 @@ export async function load() {
 		attendanceLogsCollection.orderBy('date', 'desc').limit(500).get(),
 		listEmployeesWithAccess()
 	]);
+	const activeEmployees = employees.filter((employee) => employee.status === 'active');
 
 	return {
 		attendanceRecords: attendanceSnap.docs.map((doc) => serializeAttendanceLog(doc.id, doc.data())),
-		employeeCount: employees.filter((employee) => employee.status === 'active').length
+		employeeCount: activeEmployees.length,
+		activeEmployees: activeEmployees.map((employee) => ({
+			email: employee.email,
+			name: employee.name,
+			code: employee.code,
+			location: employee.location
+		}))
 	};
 }

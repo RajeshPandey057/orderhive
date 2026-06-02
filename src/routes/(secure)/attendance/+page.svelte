@@ -3,7 +3,6 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
@@ -26,15 +25,22 @@
 	let {
 		data
 	}: {
-		data: { attendanceRecords: AttendanceLog[]; employeeCount: number };
+		data: {
+			attendanceRecords: AttendanceLog[];
+			employeeCount: number;
+			activeEmployees: Array<Pick<Employee, 'email' | 'name' | 'code' | 'location'>>;
+		};
 	} = $props();
+
+	type KpiFilter = 'all' | 'attended' | 'late' | 'on-leave' | 'absent' | 'not-recorded';
+	type AttendanceTableRecord = AttendanceLog & { inferredStatus?: 'not-recorded' };
 
 	// ── Tab state ───────────────────────────────────────────────────────────────
 	let activeTab = $state<'attendance' | 'punch-log'>('attendance');
 
 	// ── Punch Log: real-time state ───────────────────────────────────────────────
 	function todayStr() {
-		return new Date().toISOString().substring(0, 10);
+		return formatDateInput(new Date());
 	}
 	let punchDate = $state(todayStr());
 	let punchLogs = $state<BiometricPunch[]>([]);
@@ -114,64 +120,64 @@
 	let correctionTime = $state('10:00');
 	let correctionPunchOut = $state('');
 	let correctionReason = $state('');
-	let filterPeriod = $state('today');
+	type FilterPeriod = 'today' | 'monthly' | 'custom';
+	let filterPeriod = $state<FilterPeriod>('today');
 	let searchQuery = $state('');
-	let selectedAttendanceDate = $state('');
-	let selectedKpiFilter = $state<'all' | 'attended' | 'late' | 'on-leave' | 'absent'>('all');
+	let selectedAttendanceDate = $state(todayStr());
+	let customRangeFrom = $state(todayStr());
+	let customRangeTo = $state(todayStr());
+	let selectedKpiFilter = $state<KpiFilter>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
 
 	// ── Period range helper ───────────────────────────────────────────────────────
-	function getPeriodRange(period: string, refDate: Date): { start: string; end: string } {
+	function formatDateInput(date: Date) {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	function parseDateInput(value: string) {
+		const [year, month, day] = value.split('-').map(Number);
+		if (!year || !month || !day) return new Date();
+		return new Date(year, month - 1, day);
+	}
+
+	function getPeriodRange(period: FilterPeriod, refDate: Date): { start: string; end: string } {
 		if (period === 'today') {
-			const d = refDate.toISOString().slice(0, 10);
+			const d = formatDateInput(refDate);
 			return { start: d, end: d };
-		} else if (period === 'weekly') {
-			const day = refDate.getDay(); // 0 = Sun
-			const diffToMon = day === 0 ? -6 : 1 - day;
-			const monMs = Date.UTC(
-				refDate.getFullYear(),
-				refDate.getMonth(),
-				refDate.getDate() + diffToMon
-			);
-			const sunMs = monMs + 6 * 86400000;
-			return {
-				start: new Date(monMs).toISOString().slice(0, 10),
-				end: new Date(sunMs).toISOString().slice(0, 10)
-			};
 		} else if (period === 'monthly') {
 			const start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
 			const end = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
-			return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-		} else {
-			const y = refDate.getFullYear();
-			return { start: `${y}-01-01`, end: `${y}-12-31` };
+			return { start: formatDateInput(start), end: formatDateInput(end) };
 		}
+
+		const from = customRangeFrom || todayStr();
+		const to = customRangeTo || from;
+		return from <= to ? { start: from, end: to } : { start: to, end: from };
 	}
 
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
+	const activeEmployees = $derived(data.activeEmployees ?? []);
+	const selectedRange = $derived.by(() => {
+		const refDate =
+			filterPeriod === 'monthly'
+				? new Date()
+				: parseDateInput(selectedAttendanceDate || todayStr());
+		return getPeriodRange(filterPeriod, refDate);
+	});
 
-	// Period-filtered base: exact date when set, else full period around today
+	// Period-filtered base. This is also the source for CSV exports.
 	const periodFilteredRecords = $derived.by(() => {
-		if (selectedAttendanceDate) {
-			return attendanceRecords.filter((r) => r.date === selectedAttendanceDate);
-		}
-		const { start, end } = getPeriodRange(filterPeriod, new Date());
+		const { start, end } = selectedRange;
 		return attendanceRecords.filter((r) => r.date >= start && r.date <= end);
 	});
 
 	// Search applied on top — does not skew KPI numbers
 	const searchFilteredRecords = $derived(
-		periodFilteredRecords.filter((record) => {
-			const q = searchQuery.trim().toLowerCase();
-			if (!q) return true;
-			return (
-				record.employeeName.toLowerCase().includes(q) ||
-				record.employeeEmail.toLowerCase().includes(q) ||
-				(record.branch ?? '').toLowerCase().includes(q) ||
-				record.date.toLowerCase().includes(q)
-			);
-		})
+		periodFilteredRecords.filter((record) => matchesAttendanceSearch(record))
 	);
 
 	// ── KPI derivations — unique employees, not raw row counts ───────────────────
@@ -188,8 +194,26 @@
 	const lateInstances = $derived(periodFilteredRecords.filter((r) => r.status === 'late').length);
 	// Employees with any record in the period (present, late, on-leave, absent)
 	const uniqueAnyRecordSet = $derived(new Set(periodFilteredRecords.map((r) => r.employeeEmail)));
-	// Employees with zero records in the period — likely absent but never logged
-	const unaccountedCount = $derived(Math.max(0, data.employeeCount - uniqueAnyRecordSet.size));
+	const notRecordedRows = $derived.by((): AttendanceTableRecord[] => {
+		const { start, end } = selectedRange;
+		const displayDate = start === end ? start : `${start} to ${end}`;
+		return activeEmployees
+			.filter((employee) => !uniqueAnyRecordSet.has(employee.email))
+			.map((employee) => ({
+				id: `not-recorded-${employee.email}-${start}-${end}`,
+				employeeEmail: employee.email,
+				employeeName: employee.name || employee.email,
+				employeeCode: employee.code,
+				date: displayDate,
+				branch: employee.location,
+				punchIn: '',
+				punchOut: '',
+				workingMinutes: 0,
+				status: 'absent',
+				inferredStatus: 'not-recorded'
+			}));
+	});
+	const unaccountedCount = $derived(notRecordedRows.length);
 	const absentCount = $derived(periodFilteredRecords.filter((r) => r.status === 'absent').length);
 	const attendanceRate = $derived(
 		data.employeeCount > 0 ? Math.round((uniqueAttendedSet.size / data.employeeCount) * 100) : 0
@@ -200,17 +224,22 @@
 		return Math.round(valid.reduce((sum, r) => sum + (r.workingMinutes ?? 0), 0) / valid.length);
 	});
 
+	const searchFilteredNotRecordedRows = $derived(
+		notRecordedRows.filter((record) => matchesAttendanceSearch(record))
+	);
+
 	// Table rows: search + KPI card filter
-	const filteredAttendanceRecords = $derived(
-		searchFilteredRecords.filter((record) => {
+	const filteredAttendanceRecords = $derived.by((): AttendanceTableRecord[] => {
+		if (selectedKpiFilter === 'not-recorded') return searchFilteredNotRecordedRows;
+		return searchFilteredRecords.filter((record) => {
 			if (selectedKpiFilter === 'all') return true;
 			if (selectedKpiFilter === 'attended')
 				return record.status === 'present' || record.status === 'late';
 			if (selectedKpiFilter === 'late') return record.status === 'late';
 			if (selectedKpiFilter === 'absent') return record.status === 'absent';
 			return record.status === 'on-leave';
-		})
-	);
+		});
+	});
 
 	function openCorrection(record: AttendanceLog) {
 		selectedRecord = record;
@@ -258,15 +287,34 @@
 		}
 	}
 
-	function getKpiCardClass(filter: 'attended' | 'late' | 'on-leave' | 'absent') {
+	function getKpiCardClass(filter: Exclude<KpiFilter, 'all'>) {
 		return selectedKpiFilter === filter
 			? 'rounded-md border border-[#F04C06] bg-[#FFF0DE] p-4 text-left'
 			: 'rounded-md border border-[#EBEEEE] p-4 text-left hover:bg-[#FBF9F8]';
 	}
 
-	function downloadCSV(period: 'today' | 'weekly' | 'monthly') {
-		const { start, end } = getPeriodRange(period, new Date());
-		const rows = attendanceRecords.filter((r) => r.date >= start && r.date <= end);
+	function matchesAttendanceSearch(
+		record: Pick<AttendanceLog, 'employeeName' | 'employeeEmail' | 'branch' | 'date'>
+	) {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return true;
+		return (
+			record.employeeName.toLowerCase().includes(q) ||
+			record.employeeEmail.toLowerCase().includes(q) ||
+			(record.branch ?? '').toLowerCase().includes(q) ||
+			record.date.toLowerCase().includes(q)
+		);
+	}
+
+	function formatDateForExport(date: string) {
+		const [year, month, day] = date.split('-');
+		if (!year || !month || !day) return date;
+		return `${day}/${month}/${year.slice(-2)}`;
+	}
+
+	function downloadCSV() {
+		const { start, end } = selectedRange;
+		const rows = periodFilteredRecords;
 		const csv = Papa.unparse(
 			[
 				[
@@ -284,7 +332,7 @@
 				...rows.map((r) => [
 					r.employeeName || '',
 					r.employeeEmail,
-					r.date,
+					formatDateForExport(r.date),
 					r.branch || '',
 					r.punchIn || '',
 					r.punchOut || '',
@@ -300,7 +348,7 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `attendance-${period}-${todayStr()}.csv`;
+		a.download = `attendance-${start}-to-${end}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -330,8 +378,11 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
-			<Button variant="outline" class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
-				>Export Logs</Button
+			<Button
+				type="button"
+				variant="outline"
+				class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
+				onclick={downloadCSV}>Export Logs</Button
 			>
 			<Button
 				class="h-8 border border-black/5 bg-[#222626] text-sm text-white"
@@ -378,36 +429,46 @@
 			<div class="flex flex-wrap items-center gap-3">
 				<Select.Root type="single" bind:value={filterPeriod}>
 					<Select.Trigger class="h-8 w-35">
-						{filterPeriod === 'today'
-							? 'Today'
-							: filterPeriod === 'weekly'
-								? 'Weekly'
-								: filterPeriod === 'monthly'
-									? 'Monthly'
-									: 'Yearly'}
+						{filterPeriod === 'today' ? 'Today' : filterPeriod === 'monthly' ? 'Monthly' : 'Custom'}
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="today">Today</Select.Item>
-						<Select.Item value="weekly">Weekly</Select.Item>
 						<Select.Item value="monthly">Monthly</Select.Item>
-						<Select.Item value="yearly">Yearly</Select.Item>
+						<Select.Item value="custom">Custom</Select.Item>
 					</Select.Content>
 				</Select.Root>
-				<Input
-					type="date"
-					class="h-8 w-40 border-[#D4D9D9] text-[13px]"
-					bind:value={selectedAttendanceDate}
-					max={todayStr()}
-				/>
-				{#if selectedAttendanceDate}
-					<Button
-						type="button"
-						variant="outline"
-						class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
-						onclick={() => (selectedAttendanceDate = '')}
+				{#if filterPeriod === 'today'}
+					<Input
+						type="date"
+						class="h-8 w-40 border-[#D4D9D9] text-[13px]"
+						bind:value={selectedAttendanceDate}
+						max={todayStr()}
+					/>
+				{:else if filterPeriod === 'monthly'}
+					<div
+						class="flex h-8 items-center rounded-md border border-[#D4D9D9] px-3 text-[13px] text-[#687976]"
 					>
-						Clear date
-					</Button>
+						This month
+					</div>
+				{:else}
+					<div class="flex flex-wrap items-center gap-2">
+						<Label for="attendance-range-from" class="text-[13px] text-[#687976]">From</Label>
+						<Input
+							id="attendance-range-from"
+							type="date"
+							class="h-8 w-40 border-[#D4D9D9] text-[13px]"
+							bind:value={customRangeFrom}
+							max={todayStr()}
+						/>
+						<Label for="attendance-range-to" class="text-[13px] text-[#687976]">To</Label>
+						<Input
+							id="attendance-range-to"
+							type="date"
+							class="h-8 w-40 border-[#D4D9D9] text-[13px]"
+							bind:value={customRangeTo}
+							max={todayStr()}
+						/>
+					</div>
 				{/if}
 			</div>
 
@@ -448,14 +509,19 @@
 					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">per day · vs 08:00 standard</p>
 				</button>
 				<!-- Not Recorded -->
-				<div class="rounded-md border border-[#EBEEEE] p-4 text-left">
+				<button
+					type="button"
+					class={getKpiCardClass('not-recorded')}
+					onclick={() =>
+						(selectedKpiFilter = selectedKpiFilter === 'not-recorded' ? 'all' : 'not-recorded')}
+				>
 					<div class="flex items-baseline gap-1.5">
 						<div class="text-3xl leading-8 font-medium">{unaccountedCount}</div>
 						<span class="text-base text-[#8D8D8D]">/ {data.employeeCount}</span>
 					</div>
 					<p class="mt-2 text-[13px] text-[#687976]">Not recorded</p>
-					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">no punch or leave in period</p>
-				</div>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">no attendance log in period</p>
+				</button>
 				<!-- Absent -->
 				<button
 					type="button"
@@ -464,7 +530,7 @@
 				>
 					<div class="text-3xl leading-8 font-medium text-red-600">{absentCount}</div>
 					<p class="mt-2 text-[13px] text-[#687976]">Absent</p>
-					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">marked absent in period</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">explicit absent records</p>
 				</button>
 			</div>
 
@@ -477,26 +543,15 @@
 						bind:value={searchQuery}
 					/>
 				</div>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button
-								variant="outline"
-								class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
-								{...props}
-							>
-								<Download class="mr-2 h-4 w-4" />
-								Download CSV
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end">
-						<DropdownMenu.Item onclick={() => downloadCSV('today')}>Daily (Today)</DropdownMenu.Item
-						>
-						<DropdownMenu.Item onclick={() => downloadCSV('weekly')}>Weekly</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={() => downloadCSV('monthly')}>Monthly</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
+					onclick={downloadCSV}
+				>
+					<Download class="mr-2 h-4 w-4" />
+					Download CSV
+				</Button>
 			</div>
 		</div>
 
@@ -537,7 +592,11 @@
 								>
 								<TableCell>
 									<div class="flex items-center gap-1.5">
-										{#if record.status === 'late'}
+										{#if record.inferredStatus === 'not-recorded'}
+											<Badge variant="outline" class="border-[#D4D9D9] text-[#687976]"
+												>Not recorded</Badge
+											>
+										{:else if record.status === 'late'}
 											<Badge variant="secondary">Present</Badge>
 											<Badge variant="outline" class="border-amber-200 bg-amber-50 text-amber-700"
 												>Late</Badge
@@ -564,14 +623,18 @@
 									</div>
 								</TableCell>
 								<TableCell class="text-right">
-									<Button
-										variant="ghost"
-										size="sm"
-										class="h-6 border border-[#EBEEEE] text-xs"
-										onclick={() => openCorrection(record)}
-									>
-										Correct
-									</Button>
+									{#if record.inferredStatus !== 'not-recorded'}
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-6 border border-[#EBEEEE] text-xs"
+											onclick={() => openCorrection(record)}
+										>
+											Correct
+										</Button>
+									{:else}
+										<span class="text-xs text-[#8D8D8D]">-</span>
+									{/if}
 								</TableCell>
 							</TableRow>
 						{/each}
