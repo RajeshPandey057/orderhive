@@ -66,6 +66,19 @@ const fileArray = z
 	.optional()
 	.default([]);
 
+const listingClientSchema = z.object({
+	firstName: z.string().optional().default(''),
+	lastName: z.string().optional().default(''),
+	phone: z.string().min(1, 'Phone number is required'),
+	email: z
+		.union([z.literal(''), z.string().email('Valid email is required')])
+		.optional()
+		.default(''),
+	titleDeedFile: z.custom<File>((f) => !f || f instanceof File).optional(),
+	passportFile: z.custom<File>((f) => !f || f instanceof File).optional(),
+	emiratesIdFile: z.custom<File>((f) => !f || f instanceof File).optional()
+});
+
 const stringArrayFromForm = z.preprocess(
 	(v) => {
 		if (Array.isArray(v)) return v;
@@ -94,6 +107,19 @@ function normalizeListingFormData(rawData: unknown) {
 			data[key] = data[bracketKey];
 		}
 	}
+	if (data.clients === undefined) {
+		const clients: Record<string, unknown>[] = [];
+		for (const [key, value] of Object.entries(data)) {
+			const match = key.match(/^clients\[(\d+)\]\.(.+)$/);
+			if (!match) continue;
+			const index = Number(match[1]);
+			const field = match[2];
+			clients[index] ??= {};
+			clients[index][field] = value;
+		}
+		const normalizedClients = clients.filter(Boolean);
+		if (normalizedClients.length) data.clients = normalizedClients;
+	}
 	return data;
 }
 
@@ -121,6 +147,7 @@ const listingShape = {
 		.union([z.literal(''), z.string().email('Valid email is required')])
 		.optional()
 		.default(''),
+	clients: z.array(listingClientSchema).optional().default([]),
 
 	// Property details
 	developerName: z.string().min(1, 'Developer is required'),
@@ -280,6 +307,27 @@ const listingSchema = z
 				});
 			}
 		}
+
+		data.clients.forEach((client, index) => {
+			if (!client.titleDeedFile || (client.titleDeedFile as File).size <= 0) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['clients', index, 'titleDeedFile'],
+					message: `Client ${index + 2} title deed / Qood is required`
+				});
+			}
+
+			if (
+				data.listingType === 'portal' &&
+				(!client.passportFile || (client.passportFile as File).size <= 0)
+			) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['clients', index, 'passportFile'],
+					message: `Client ${index + 2} passport is required for portal listings`
+				});
+			}
+		});
 	});
 
 export const createListing = form('unchecked', async (rawData, issue) => {
@@ -308,6 +356,33 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		toUploadedFile(data.emiratesIdFile as File | null, `${basePath}/emirates-id`)
 	]);
 
+	const additionalClients = await Promise.all(
+		data.clients.map(async (client, index) => {
+			const clientPath = `${basePath}/clients/${index + 2}`;
+			const [clientTitleDeedFile, clientPassportFile, clientEmiratesIdFile] = await Promise.all([
+				toUploadedFile(client.titleDeedFile as File | null, `${clientPath}/title-deed`),
+				toUploadedFile(client.passportFile as File | null, `${clientPath}/passport`),
+				toUploadedFile(client.emiratesIdFile as File | null, `${clientPath}/emirates-id`)
+			]);
+
+			return {
+				firstName: client.firstName,
+				lastName: client.lastName,
+				name: `${client.firstName} ${client.lastName}`.trim(),
+				phone: client.phone,
+				email: client.email,
+				titleDeedFileName: clientTitleDeedFile?.name ?? null,
+				passportFileName: clientPassportFile?.name ?? null,
+				emiratesIdFileName: clientEmiratesIdFile?.name ?? null,
+				attachments: {
+					titleDeed: clientTitleDeedFile ?? null,
+					passport: clientPassportFile ?? null,
+					emiratesId: clientEmiratesIdFile ?? null
+				}
+			};
+		})
+	);
+
 	// Upload media files in parallel
 	const pictureFileInputs = Array.isArray(data.pictureFiles) ? data.pictureFiles : [];
 	const videoFileInputs = Array.isArray(data.videoFiles) ? data.videoFiles : [];
@@ -331,6 +406,21 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 			.filter(Boolean)
 			.map((f) => ({ type: 'video' as const, fileName: f!.name, url: f!.downloadURL }))
 	];
+	const primaryClient = {
+		firstName: data.firstName,
+		lastName: data.lastName,
+		name: `${data.firstName} ${data.lastName}`.trim(),
+		phone: data.clientPhone,
+		email: data.clientEmail,
+		titleDeedFileName: titleDeedFile?.name ?? null,
+		passportFileName: passportFile?.name ?? null,
+		emiratesIdFileName: emiratesIdFile?.name ?? null,
+		attachments: {
+			titleDeed: titleDeedFile ?? null,
+			passport: passportFile ?? null,
+			emiratesId: emiratesIdFile ?? null
+		}
+	};
 
 	const listingRecord = {
 		id: listingId,
@@ -346,6 +436,7 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		clientName: `${data.firstName} ${data.lastName}`.trim(),
 		clientPhone: data.clientPhone,
 		clientEmail: data.clientEmail,
+		clients: [primaryClient, ...additionalClients],
 		developerName: data.developerName,
 		projectName: data.projectName,
 		unitNo: data.unitNo,

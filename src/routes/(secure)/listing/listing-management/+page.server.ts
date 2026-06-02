@@ -33,6 +33,7 @@ export async function load({ locals }) {
 				clientName: d.clientName ?? '',
 				clientPhone: d.clientPhone ?? '',
 				clientEmail: d.clientEmail ?? '',
+				clients: d.clients ?? [],
 				developerName: d.developerName ?? '',
 				projectName: d.projectName ?? '',
 				unitNo: d.unitNo ?? '',

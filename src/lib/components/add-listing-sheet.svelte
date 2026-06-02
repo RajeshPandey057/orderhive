@@ -34,6 +34,17 @@
 	import { searchUsers as searchUsersRemote } from '../../routes/(secure)/users.remote';
 
 	type ListingType = Listing['listingType'];
+	type ClientDocumentKey = 'titleDeed' | 'passport' | 'emiratesId';
+	type AdditionalClient = {
+		key: number;
+		firstName: string;
+		lastName: string;
+		phone: string;
+		email: string;
+		titleDeedFileName: string;
+		passportFileName: string;
+		emiratesIdFileName: string;
+	};
 
 	let {
 		currentUserEmail = '',
@@ -80,6 +91,8 @@
 	let titleDeedFileName = $state('');
 	let passportFileName = $state('');
 	let emiratesIdFileName = $state('');
+	let additionalClients = $state<AdditionalClient[]>([]);
+	let nextClientKey = $state(2);
 	let unitStatus = $state('');
 	let paymentType = $state('');
 	let rentAmount = $state<number | ''>('');
@@ -158,6 +171,35 @@
 	let agentHierarchyRequest = 0;
 
 	const developers = LISTING_DEVELOPERS.map((label) => ({ value: label, label }));
+	const clientDocumentConfigs: {
+		key: ClientDocumentKey;
+		label: string;
+		uploadLabel: string;
+		inputName: 'titleDeedFile' | 'passportFile' | 'emiratesIdFile';
+		errorKey: 'titleDeedFileName' | 'passportFileName' | 'emiratesIdFileName';
+	}[] = [
+		{
+			key: 'titleDeed',
+			label: 'Title Deed / Qood',
+			uploadLabel: 'Upload Title Deed / Qood',
+			inputName: 'titleDeedFile',
+			errorKey: 'titleDeedFileName'
+		},
+		{
+			key: 'passport',
+			label: 'Passport',
+			uploadLabel: 'Upload Passport',
+			inputName: 'passportFile',
+			errorKey: 'passportFileName'
+		},
+		{
+			key: 'emiratesId',
+			label: 'Emirates ID',
+			uploadLabel: 'Upload Emirates ID',
+			inputName: 'emiratesIdFile',
+			errorKey: 'emiratesIdFileName'
+		}
+	];
 
 	const developerLabel = $derived(
 		developers.find((item) => item.value === developerName)?.label ?? (developerName || 'Developer')
@@ -268,19 +310,73 @@
 		}, 300);
 	});
 
-	function onFileSelect(event: Event, key: 'titleDeed' | 'passport' | 'emiratesId') {
-		const file = (event.currentTarget as HTMLInputElement).files?.[0];
-		const fileName = file?.name ?? '';
-
-		if (key === 'titleDeed') titleDeedFileName = fileName;
-		if (key === 'passport') passportFileName = fileName;
-		if (key === 'emiratesId') emiratesIdFileName = fileName;
+	function createAdditionalClient(): AdditionalClient {
+		return {
+			key: nextClientKey++,
+			firstName: '',
+			lastName: '',
+			phone: '',
+			email: '',
+			titleDeedFileName: '',
+			passportFileName: '',
+			emiratesIdFileName: ''
+		};
 	}
 
-	function removeFile(key: 'titleDeed' | 'passport' | 'emiratesId') {
-		if (key === 'titleDeed') titleDeedFileName = '';
-		if (key === 'passport') passportFileName = '';
-		if (key === 'emiratesId') emiratesIdFileName = '';
+	function addClient() {
+		additionalClients = [...additionalClients, createAdditionalClient()];
+	}
+
+	function removeClient(key: number) {
+		additionalClients = additionalClients.filter((client) => client.key !== key);
+	}
+
+	function setClientDocumentName(
+		client: AdditionalClient | null,
+		key: ClientDocumentKey,
+		fileName: string
+	) {
+		if (!client) {
+			if (key === 'titleDeed') titleDeedFileName = fileName;
+			if (key === 'passport') passportFileName = fileName;
+			if (key === 'emiratesId') emiratesIdFileName = fileName;
+			return;
+		}
+
+		additionalClients = additionalClients.map((item) => {
+			if (item.key !== client.key) return item;
+			return {
+				...item,
+				...(key === 'titleDeed' && { titleDeedFileName: fileName }),
+				...(key === 'passport' && { passportFileName: fileName }),
+				...(key === 'emiratesId' && { emiratesIdFileName: fileName })
+			};
+		});
+	}
+
+	function getClientDocumentName(client: AdditionalClient | null, key: ClientDocumentKey) {
+		if (!client) {
+			if (key === 'titleDeed') return titleDeedFileName;
+			if (key === 'passport') return passportFileName;
+			return emiratesIdFileName;
+		}
+		if (key === 'titleDeed') return client.titleDeedFileName;
+		if (key === 'passport') return client.passportFileName;
+		return client.emiratesIdFileName;
+	}
+
+	function onFileSelect(
+		event: Event,
+		key: ClientDocumentKey,
+		client: AdditionalClient | null = null
+	) {
+		const file = (event.currentTarget as HTMLInputElement).files?.[0];
+		const fileName = file?.name ?? '';
+		setClientDocumentName(client, key, fileName);
+	}
+
+	function removeFile(key: ClientDocumentKey, client: AdditionalClient | null = null) {
+		setClientDocumentName(client, key, '');
 	}
 
 	function revokePreviewUrl(url?: string) {
@@ -399,6 +495,8 @@
 		titleDeedFileName = '';
 		passportFileName = '';
 		emiratesIdFileName = '';
+		additionalClients = [];
+		nextClientKey = 2;
 		unitStatus = '';
 		paymentType = '';
 		rentAmount = '';
@@ -435,6 +533,20 @@
 		if (!clientPhone.trim()) nextErrors.clientPhone = 'Mobile number is required';
 		if (clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim()))
 			nextErrors.clientEmail = 'Valid email is required';
+		for (const [index, client] of additionalClients.entries()) {
+			const label = `Client ${index + 2}`;
+			if (!client.phone.trim())
+				nextErrors[`clients.${index}.phone`] = `${label} mobile number is required`;
+			if (client.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client.email.trim())) {
+				nextErrors[`clients.${index}.email`] = `${label} valid email is required`;
+			}
+			if (!client.titleDeedFileName)
+				nextErrors[`clients.${index}.titleDeedFileName`] = `${label} title deed/Qood is required`;
+			if (listingType === 'portal' && !client.passportFileName) {
+				nextErrors[`clients.${index}.passportFileName`] =
+					`${label} passport is required for portal listing`;
+			}
+		}
 		if (!reportingManager) nextErrors.reportingManager = 'Reporting manager is required';
 		if (!seniorManager) nextErrors.seniorManager = 'Senior manager is required';
 		if (!developerName.trim()) nextErrors.developerName = 'Developer name is required';
@@ -723,47 +835,251 @@
 					</Field.Set>
 
 					<Field.Set>
-						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
-						<Field.Group>
-							<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
-								<Field.Field>
-									<Field.Label>First Name</Field.Label>
-									<Input name="firstName" bind:value={firstName} placeholder="First Name" />
-									{#if errors.firstName}<Field.Error class="text-sm text-destructive"
-											>{errors.firstName}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label>Last Name</Field.Label>
-									<Input name="lastName" bind:value={lastName} placeholder="Last Name" />
-									{#if errors.lastName}<Field.Error class="text-sm text-destructive"
-											>{errors.lastName}</Field.Error
-										>{/if}
-								</Field.Field>
-								<Field.Field>
-									<Field.Label>Client Email</Field.Label>
-									<Input
-										type="email"
-										name="clientEmail"
-										bind:value={clientEmail}
-										placeholder="Email"
-									/>
-									{#if errors.clientEmail}<Field.Error class="text-sm text-destructive"
-											>{errors.clientEmail}</Field.Error
-										>{/if}
-								</Field.Field>
+						<div class="flex items-center justify-between gap-3">
+							<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
+							<Button type="button" variant="outline" size="sm" class="gap-2" onclick={addClient}>
+								<PlusRound class="h-4 w-4" />
+								Add Client
+							</Button>
+						</div>
+						<Field.Group class="space-y-5">
+							<div class="rounded-xl border border-border/60 bg-background/80 p-4">
+								<div class="mb-4 flex items-center justify-between">
+									<p class="text-base font-semibold">Client 1</p>
+								</div>
+								<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
+									<Field.Field>
+										<Field.Label>First Name</Field.Label>
+										<Input name="firstName" bind:value={firstName} placeholder="First Name" />
+										{#if errors.firstName}<Field.Error class="text-sm text-destructive"
+												>{errors.firstName}</Field.Error
+											>{/if}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Last Name</Field.Label>
+										<Input name="lastName" bind:value={lastName} placeholder="Last Name" />
+										{#if errors.lastName}<Field.Error class="text-sm text-destructive"
+												>{errors.lastName}</Field.Error
+											>{/if}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Client Email</Field.Label>
+										<Input
+											type="email"
+											name="clientEmail"
+											bind:value={clientEmail}
+											placeholder="Email"
+										/>
+										{#if errors.clientEmail}<Field.Error class="text-sm text-destructive"
+												>{errors.clientEmail}</Field.Error
+											>{/if}
+									</Field.Field>
+									<Field.Field>
+										<Field.Label>Client Mobile No</Field.Label>
+										<Input
+											name="clientPhone"
+											bind:value={clientPhone}
+											placeholder="Enter a phone number"
+										/>
+										{#if errors.clientPhone}<Field.Error class="text-sm text-destructive"
+												>{errors.clientPhone}</Field.Error
+											>{/if}
+									</Field.Field>
+								</div>
+								<div class="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
+									{#each clientDocumentConfigs as doc, documentIndex (doc.key)}
+										<div class="flex min-w-0 items-start gap-4">
+											<span
+												class="mt-3.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>{documentIndex + 1}</span
+											>
+											<Field.Field class="min-w-0 flex-1">
+												{#if getClientDocumentName(null, doc.key)}
+													<div
+														class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
+													>
+														<FileText class="h-9 w-9 shrink-0 text-orange-500" />
+														<div class="min-w-0 flex-1">
+															<span
+																class="block max-w-full truncate text-sm font-medium"
+																title={getClientDocumentName(null, doc.key)}
+																>{getClientDocumentName(null, doc.key)}</span
+															>
+															<span class="block truncate text-xs text-muted-foreground"
+																>{doc.label}</span
+															>
+														</div>
+														<button
+															type="button"
+															onclick={() => removeFile(doc.key)}
+															class="shrink-0 text-destructive hover:text-destructive/80"
+															aria-label={`Remove ${doc.label}`}
+														>
+															<Trash2 class="h-5 w-5" />
+														</button>
+													</div>
+												{:else}
+													<label
+														for={`client-1-${doc.key}`}
+														class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+													>
+														<Upload class="h-5 w-5 shrink-0 text-gray-600" />
+														<span class="truncate text-sm font-medium">{doc.uploadLabel}</span>
+													</label>
+												{/if}
+												<Input
+													id={`client-1-${doc.key}`}
+													name={doc.inputName}
+													class="sr-only"
+													type="file"
+													onchange={(event) => onFileSelect(event, doc.key)}
+												/>
+												{#if doc.key === 'titleDeed'}
+													<p class="min-h-5 text-xs text-muted-foreground">Optional</p>
+												{:else if listingType === 'portal'}
+													<p class="min-h-5 text-xs text-muted-foreground">
+														Required for portal listing
+													</p>
+												{:else}
+													<p class="min-h-5 text-xs text-muted-foreground" aria-hidden="true">
+														&nbsp;
+													</p>
+												{/if}
+												{#if errors[doc.errorKey]}<Field.Error class="text-sm text-destructive"
+														>{errors[doc.errorKey]}</Field.Error
+													>{/if}
+											</Field.Field>
+										</div>
+									{/each}
+								</div>
 							</div>
-							<Field.Field>
-								<Field.Label>Client Mobile No</Field.Label>
-								<Input
-									name="clientPhone"
-									bind:value={clientPhone}
-									placeholder="Enter a phone number"
-								/>
-								{#if errors.clientPhone}<Field.Error class="text-sm text-destructive"
-										>{errors.clientPhone}</Field.Error
-									>{/if}
-							</Field.Field>
+
+							{#each additionalClients as client, index (client.key)}
+								<div class="rounded-xl border border-border/60 bg-background/80 p-4">
+									<div class="mb-4 flex items-center justify-between">
+										<p class="text-base font-semibold">Client {index + 2}</p>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onclick={() => removeClient(client.key)}
+											aria-label={`Remove client ${index + 2}`}
+										>
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</div>
+									<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
+										<Field.Field>
+											<Field.Label>First Name</Field.Label>
+											<Input
+												name={`clients[${index}].firstName`}
+												bind:value={client.firstName}
+												placeholder="First Name"
+											/>
+										</Field.Field>
+										<Field.Field>
+											<Field.Label>Last Name</Field.Label>
+											<Input
+												name={`clients[${index}].lastName`}
+												bind:value={client.lastName}
+												placeholder="Last Name"
+											/>
+										</Field.Field>
+										<Field.Field>
+											<Field.Label>Client Email</Field.Label>
+											<Input
+												type="email"
+												name={`clients[${index}].email`}
+												bind:value={client.email}
+												placeholder="Email"
+											/>
+											{#if errors[`clients.${index}.email`]}<Field.Error
+													class="text-sm text-destructive"
+													>{errors[`clients.${index}.email`]}</Field.Error
+												>{/if}
+										</Field.Field>
+										<Field.Field>
+											<Field.Label>Client Mobile No</Field.Label>
+											<Input
+												name={`clients[${index}].phone`}
+												bind:value={client.phone}
+												placeholder="Enter a phone number"
+											/>
+											{#if errors[`clients.${index}.phone`]}<Field.Error
+													class="text-sm text-destructive"
+													>{errors[`clients.${index}.phone`]}</Field.Error
+												>{/if}
+										</Field.Field>
+									</div>
+									<div class="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
+										{#each clientDocumentConfigs as doc, documentIndex (doc.key)}
+											<div class="flex min-w-0 items-start gap-4">
+												<span
+													class="mt-3.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+													>{documentIndex + 1}</span
+												>
+												<Field.Field class="min-w-0 flex-1">
+													{#if getClientDocumentName(client, doc.key)}
+														<div
+															class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
+														>
+															<FileText class="h-9 w-9 shrink-0 text-orange-500" />
+															<div class="min-w-0 flex-1">
+																<span
+																	class="block max-w-full truncate text-sm font-medium"
+																	title={getClientDocumentName(client, doc.key)}
+																	>{getClientDocumentName(client, doc.key)}</span
+																>
+																<span class="block truncate text-xs text-muted-foreground"
+																	>{doc.label}</span
+																>
+															</div>
+															<button
+																type="button"
+																onclick={() => removeFile(doc.key, client)}
+																class="shrink-0 text-destructive hover:text-destructive/80"
+																aria-label={`Remove ${doc.label}`}
+															>
+																<Trash2 class="h-5 w-5" />
+															</button>
+														</div>
+													{:else}
+														<label
+															for={`client-${client.key}-${doc.key}`}
+															class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+														>
+															<Upload class="h-5 w-5 shrink-0 text-gray-600" />
+															<span class="truncate text-sm font-medium">{doc.uploadLabel}</span>
+														</label>
+													{/if}
+													<Input
+														id={`client-${client.key}-${doc.key}`}
+														name={`clients[${index}].${doc.inputName}`}
+														class="sr-only"
+														type="file"
+														onchange={(event) => onFileSelect(event, doc.key, client)}
+													/>
+													{#if doc.key === 'titleDeed'}
+														<p class="min-h-5 text-xs text-muted-foreground">Optional</p>
+													{:else if listingType === 'portal'}
+														<p class="min-h-5 text-xs text-muted-foreground">
+															Required for portal listing
+														</p>
+													{:else}
+														<p class="min-h-5 text-xs text-muted-foreground" aria-hidden="true">
+															&nbsp;
+														</p>
+													{/if}
+													{#if errors[`clients.${index}.${doc.errorKey}`]}<Field.Error
+															class="text-sm text-destructive"
+															>{errors[`clients.${index}.${doc.errorKey}`]}</Field.Error
+														>{/if}
+												</Field.Field>
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/each}
 						</Field.Group>
 					</Field.Set>
 
@@ -1270,168 +1586,6 @@
 							</div>
 						</Field.Group>
 					</Field.Set>
-
-					<Field.Set>
-						<Field.Legend class="flex items-center gap-4 text-lg font-medium">
-							<div
-								class="grid h-8 w-8 place-items-center rounded-lg border border-white/5 bg-orange-100 p-0"
-							>
-								<Upload class="h-4 w-4 text-orange-500" stroke-width="4" />
-							</div>
-							Attachments
-						</Field.Legend>
-						<Field.Group class="space-y-4">
-							<div class="grid gap-4 xl:grid-cols-2">
-								<div class="flex items-center gap-4">
-									<span
-										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-										>1</span
-									>
-									<Field.Field class="w-full">
-										{#if titleDeedFileName}
-											<div
-												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-											>
-												<div class="flex items-center gap-3">
-													<FileText class="h-9 w-9 text-orange-500" />
-													<div class="flex flex-col">
-														<span class="text-sm font-medium">{titleDeedFileName}</span>
-														<span class="text-xs text-muted-foreground">Title Deed / Qood</span>
-													</div>
-												</div>
-												<button
-													type="button"
-													onclick={() => removeFile('titleDeed')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
-											</div>
-										{:else}
-											<label
-												for="titleDeed"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload Title Deed / Qood</span>
-											</label>
-										{/if}
-										<Input
-											id="titleDeed"
-											name="titleDeedFile"
-											class="sr-only"
-											type="file"
-											onchange={(event) => onFileSelect(event, 'titleDeed')}
-										/>
-										<p class="text-xs text-muted-foreground">Optional</p>
-										{#if errors.titleDeedFileName}<Field.Error class="text-sm text-destructive"
-												>{errors.titleDeedFileName}</Field.Error
-											>{/if}
-									</Field.Field>
-								</div>
-
-								<div class="flex items-center gap-4">
-									<span
-										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-										>2</span
-									>
-									<Field.Field class="w-full">
-										{#if passportFileName}
-											<div
-												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-											>
-												<div class="flex items-center gap-3">
-													<FileText class="h-9 w-9 text-orange-500" />
-													<div class="flex flex-col">
-														<span class="text-sm font-medium">{passportFileName}</span>
-														<span class="text-xs text-muted-foreground">Passport</span>
-													</div>
-												</div>
-												<button
-													type="button"
-													onclick={() => removeFile('passport')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
-											</div>
-										{:else}
-											<label
-												for="passport"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload Passport</span>
-											</label>
-										{/if}
-										<Input
-											id="passport"
-											name="passportFile"
-											class="sr-only"
-											type="file"
-											onchange={(event) => onFileSelect(event, 'passport')}
-										/>
-										{#if listingType === 'portal'}
-											<p class="text-xs text-muted-foreground">Required for portal listing</p>
-										{/if}
-										{#if errors.passportFileName}<Field.Error class="text-sm text-destructive"
-												>{errors.passportFileName}</Field.Error
-											>{/if}
-									</Field.Field>
-								</div>
-
-								<div class="flex items-center gap-4">
-									<span
-										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-										>3</span
-									>
-									<Field.Field class="w-full">
-										{#if emiratesIdFileName}
-											<div
-												class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
-											>
-												<div class="flex items-center gap-3">
-													<FileText class="h-9 w-9 text-orange-500" />
-													<div class="flex flex-col">
-														<span class="text-sm font-medium">{emiratesIdFileName}</span>
-														<span class="text-xs text-muted-foreground">Emirates ID</span>
-													</div>
-												</div>
-												<button
-													type="button"
-													onclick={() => removeFile('emiratesId')}
-													class="text-destructive hover:text-destructive/80"
-												>
-													<Trash2 class="h-5 w-5" />
-												</button>
-											</div>
-										{:else}
-											<label
-												for="emiratesId"
-												class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-											>
-												<Upload class="h-5 w-5 text-gray-600" />
-												<span class="text-sm font-medium">Upload Emirates ID</span>
-											</label>
-										{/if}
-										<Input
-											id="emiratesId"
-											name="emiratesIdFile"
-											class="sr-only"
-											type="file"
-											onchange={(event) => onFileSelect(event, 'emiratesId')}
-										/>
-										{#if listingType === 'portal'}
-											<p class="text-xs text-muted-foreground">Required for portal listing</p>
-										{/if}
-										{#if errors.emiratesIdFileName}<Field.Error class="text-sm text-destructive"
-												>{errors.emiratesIdFileName}</Field.Error
-											>{/if}
-									</Field.Field>
-								</div>
-							</div>
-						</Field.Group>
-					</Field.Set>
 				</div>
 				<div class:hidden={activeTab !== 'property-photo-videos'}>
 					<Field.Set>
@@ -1456,32 +1610,38 @@
 									>{errors.floorPlanFiles}</Field.Error
 								>{/if}
 							{#if floorPlanAssets.length > 0}
-								<div class="grid grid-cols-2 gap-3">
+								<div class="grid gap-3 xl:grid-cols-2">
 									{#each floorPlanAssets as asset (asset.id)}
-										<div class="rounded-lg border border-border/60 bg-background/60 p-2">
+										<div
+											class="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 p-2"
+										>
 											{#if asset.previewUrl}
 												<img
 													src={asset.previewUrl}
 													alt={asset.fileName}
-													class="h-28 w-full rounded-md object-cover"
+													class="h-16 w-20 shrink-0 rounded-md object-cover"
 												/>
 											{:else}
 												<div
-													class="flex h-28 items-center justify-center rounded-md bg-muted text-xs"
+													class="flex h-16 w-20 shrink-0 items-center justify-center rounded-md bg-muted text-xs"
 												>
-													{asset.fileName}
+													<FileText class="h-6 w-6 text-muted-foreground" />
 												</div>
 											{/if}
-											<div class="mt-2 flex items-center justify-between gap-2">
-												<p class="truncate text-xs text-muted-foreground">{asset.fileName}</p>
-												<button
-													type="button"
-													class="text-destructive hover:text-destructive/80"
-													onclick={() => removeFloorPlanAsset(asset.id)}
-												>
-													<Trash2 class="h-4 w-4" />
-												</button>
+											<div class="min-w-0 flex-1">
+												<p class="truncate text-sm font-medium" title={asset.fileName}>
+													{asset.fileName}
+												</p>
+												<p class="truncate text-xs text-muted-foreground">Floor plan</p>
 											</div>
+											<button
+												type="button"
+												class="shrink-0 text-destructive hover:text-destructive/80"
+												onclick={() => removeFloorPlanAsset(asset.id)}
+												aria-label={`Remove ${asset.fileName}`}
+											>
+												<Trash2 class="h-4 w-4" />
+											</button>
 										</div>
 									{/each}
 								</div>
@@ -1523,34 +1683,42 @@
 								>{/if}
 
 							{#if mediaAssets.length > 0}
-								<div class="grid grid-cols-2 gap-3">
+								<div class="grid gap-3 xl:grid-cols-2">
 									{#each mediaAssets as asset (asset.id)}
-										<div class="rounded-lg border border-border/60 bg-background/60 p-2">
+										<div
+											class="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 p-2"
+										>
 											{#if asset.type === 'photo' && asset.previewUrl}
 												<img
 													src={asset.previewUrl}
 													alt={asset.fileName}
-													class="h-32 w-full rounded-md object-cover"
+													class="h-16 w-20 shrink-0 rounded-md object-cover"
 												/>
 											{:else if asset.type === 'video' && asset.previewUrl}
 												<video
 													src={asset.previewUrl}
-													class="h-32 w-full rounded-md object-cover"
+													class="h-16 w-20 shrink-0 rounded-md object-cover"
 													controls
 												>
 													<track kind="captions" />
 												</video>
 											{/if}
-											<div class="mt-2 flex items-center justify-between gap-2">
-												<p class="truncate text-xs text-muted-foreground">{asset.fileName}</p>
-												<button
-													type="button"
-													class="text-destructive hover:text-destructive/80"
-													onclick={() => removeMediaAsset(asset.id)}
-												>
-													<Trash2 class="h-4 w-4" />
-												</button>
+											<div class="min-w-0 flex-1">
+												<p class="truncate text-sm font-medium" title={asset.fileName}>
+													{asset.fileName}
+												</p>
+												<p class="truncate text-xs text-muted-foreground">
+													{asset.type === 'photo' ? 'Property photo' : 'Property video'}
+												</p>
 											</div>
+											<button
+												type="button"
+												class="shrink-0 text-destructive hover:text-destructive/80"
+												onclick={() => removeMediaAsset(asset.id)}
+												aria-label={`Remove ${asset.fileName}`}
+											>
+												<Trash2 class="h-4 w-4" />
+											</button>
 										</div>
 									{/each}
 								</div>

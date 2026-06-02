@@ -69,6 +69,10 @@
 		if (listing.plotSize) return `Plot: ${listing.plotSize.toLocaleString()} sqft`;
 		return `${listing.unitArea.toLocaleString()} sqft`;
 	}
+
+	function handleRowOpen(listing: Listing) {
+		onEdit?.(listing);
+	}
 </script>
 
 <div class="flex flex-wrap items-center gap-3">
@@ -150,7 +154,10 @@
 				</Table.Row>
 			{:else}
 				{#each filteredListings as listing (listing.id)}
-					<Table.Row class="border-b last:border-b-0">
+					<Table.Row
+						class={onEdit ? 'cursor-pointer border-b last:border-b-0' : 'border-b last:border-b-0'}
+						onclick={() => handleRowOpen(listing)}
+					>
 						<Table.Cell class="font-medium">{listing.clientName}</Table.Cell>
 						<Table.Cell class="font-mono text-xs font-medium">{listing.id}</Table.Cell>
 						<Table.Cell>
@@ -186,7 +193,10 @@
 										<button
 											type="button"
 											class="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-											onclick={() => onEdit!(listing)}
+											onclick={(event) => {
+												event.stopPropagation();
+												onEdit!(listing);
+											}}
 											aria-label="Edit listing"
 										>
 											<Pencil class="h-4 w-4" />
@@ -196,7 +206,10 @@
 										<button
 											type="button"
 											class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-											onclick={() => onDelete!(listing)}
+											onclick={(event) => {
+												event.stopPropagation();
+												onDelete!(listing);
+											}}
 											aria-label="Delete listing"
 										>
 											<Trash2 class="h-4 w-4" />
