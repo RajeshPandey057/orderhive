@@ -3,6 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
@@ -18,6 +19,7 @@
 	} from '$lib/components/ui/table';
 	import { Download, Radio, Search } from '@lucide/svelte';
 	import { collection, getFirestore, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+	import Papa from 'papaparse';
 	import { toast } from 'svelte-sonner';
 	import { correctAttendance, reconcileAttendance, syncUnprocessed } from '../hr/hr.remote';
 
@@ -112,23 +114,31 @@
 	let correctionTime = $state('10:00');
 	let correctionPunchOut = $state('');
 	let correctionReason = $state('');
-	let filterPeriod = $state('monthly');
+	let filterPeriod = $state('today');
 	let searchQuery = $state('');
 	let selectedAttendanceDate = $state('');
-	let selectedKpiFilter = $state<'all' | 'attended' | 'late' | 'on-leave'>('all');
+	let selectedKpiFilter = $state<'all' | 'attended' | 'late' | 'on-leave' | 'absent'>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
 
 	// ── Period range helper ───────────────────────────────────────────────────────
 	function getPeriodRange(period: string, refDate: Date): { start: string; end: string } {
-		if (period === 'weekly') {
+		if (period === 'today') {
+			const d = refDate.toISOString().slice(0, 10);
+			return { start: d, end: d };
+		} else if (period === 'weekly') {
 			const day = refDate.getDay(); // 0 = Sun
 			const diffToMon = day === 0 ? -6 : 1 - day;
-			const mon = new Date(refDate);
-			mon.setDate(refDate.getDate() + diffToMon);
-			const sun = new Date(mon);
-			sun.setDate(mon.getDate() + 6);
-			return { start: mon.toISOString().slice(0, 10), end: sun.toISOString().slice(0, 10) };
+			const monMs = Date.UTC(
+				refDate.getFullYear(),
+				refDate.getMonth(),
+				refDate.getDate() + diffToMon
+			);
+			const sunMs = monMs + 6 * 86400000;
+			return {
+				start: new Date(monMs).toISOString().slice(0, 10),
+				end: new Date(sunMs).toISOString().slice(0, 10)
+			};
 		} else if (period === 'monthly') {
 			const start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
 			const end = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
@@ -143,11 +153,10 @@
 
 	// Period-filtered base: exact date when set, else full period around today
 	const periodFilteredRecords = $derived.by(() => {
-		const refDate = selectedAttendanceDate ? new Date(selectedAttendanceDate) : new Date();
 		if (selectedAttendanceDate) {
 			return attendanceRecords.filter((r) => r.date === selectedAttendanceDate);
 		}
-		const { start, end } = getPeriodRange(filterPeriod, refDate);
+		const { start, end } = getPeriodRange(filterPeriod, new Date());
 		return attendanceRecords.filter((r) => r.date >= start && r.date <= end);
 	});
 
@@ -181,9 +190,7 @@
 	const uniqueAnyRecordSet = $derived(new Set(periodFilteredRecords.map((r) => r.employeeEmail)));
 	// Employees with zero records in the period — likely absent but never logged
 	const unaccountedCount = $derived(Math.max(0, data.employeeCount - uniqueAnyRecordSet.size));
-	const onLeaveCount = $derived(
-		periodFilteredRecords.filter((r) => r.status === 'on-leave').length
-	);
+	const absentCount = $derived(periodFilteredRecords.filter((r) => r.status === 'absent').length);
 	const attendanceRate = $derived(
 		data.employeeCount > 0 ? Math.round((uniqueAttendedSet.size / data.employeeCount) * 100) : 0
 	);
@@ -200,6 +207,7 @@
 			if (selectedKpiFilter === 'attended')
 				return record.status === 'present' || record.status === 'late';
 			if (selectedKpiFilter === 'late') return record.status === 'late';
+			if (selectedKpiFilter === 'absent') return record.status === 'absent';
 			return record.status === 'on-leave';
 		})
 	);
@@ -250,10 +258,51 @@
 		}
 	}
 
-	function getKpiCardClass(filter: 'attended' | 'late' | 'on-leave') {
+	function getKpiCardClass(filter: 'attended' | 'late' | 'on-leave' | 'absent') {
 		return selectedKpiFilter === filter
 			? 'rounded-md border border-[#F04C06] bg-[#FFF0DE] p-4 text-left'
 			: 'rounded-md border border-[#EBEEEE] p-4 text-left hover:bg-[#FBF9F8]';
+	}
+
+	function downloadCSV(period: 'today' | 'weekly' | 'monthly') {
+		const { start, end } = getPeriodRange(period, new Date());
+		const rows = attendanceRecords.filter((r) => r.date >= start && r.date <= end);
+		const csv = Papa.unparse(
+			[
+				[
+					'Employee',
+					'Email',
+					'Date',
+					'Branch',
+					'Punch In',
+					'Punch Out',
+					'Working Hours',
+					'Status',
+					'Source',
+					'Corrected'
+				],
+				...rows.map((r) => [
+					r.employeeName || '',
+					r.employeeEmail,
+					r.date,
+					r.branch || '',
+					r.punchIn || '',
+					r.punchOut || '',
+					minutesToDuration(r.workingMinutes),
+					r.status,
+					r.source || '',
+					r.corrected ? 'Yes' : 'No'
+				])
+			],
+			{ header: false }
+		);
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `attendance-${period}-${todayStr()}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
 	}
 
 	function formatStatus(status: AttendanceStatus) {
@@ -328,8 +377,17 @@
 		<div class="space-y-4">
 			<div class="flex flex-wrap items-center gap-3">
 				<Select.Root type="single" bind:value={filterPeriod}>
-					<Select.Trigger class="h-8 w-[140px]">{filterPeriod}</Select.Trigger>
+					<Select.Trigger class="h-8 w-35">
+						{filterPeriod === 'today'
+							? 'Today'
+							: filterPeriod === 'weekly'
+								? 'Weekly'
+								: filterPeriod === 'monthly'
+									? 'Monthly'
+									: 'Yearly'}
+					</Select.Trigger>
 					<Select.Content>
+						<Select.Item value="today">Today</Select.Item>
 						<Select.Item value="weekly">Weekly</Select.Item>
 						<Select.Item value="monthly">Monthly</Select.Item>
 						<Select.Item value="yearly">Yearly</Select.Item>
@@ -353,7 +411,7 @@
 				{/if}
 			</div>
 
-			<div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+			<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
 				<!-- Workforce Present -->
 				<button
 					type="button"
@@ -398,6 +456,16 @@
 					<p class="mt-2 text-[13px] text-[#687976]">Not recorded</p>
 					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">no punch or leave in period</p>
 				</div>
+				<!-- Absent -->
+				<button
+					type="button"
+					class={getKpiCardClass('absent')}
+					onclick={() => (selectedKpiFilter = selectedKpiFilter === 'absent' ? 'all' : 'absent')}
+				>
+					<div class="text-3xl leading-8 font-medium text-red-600">{absentCount}</div>
+					<p class="mt-2 text-[13px] text-[#687976]">Absent</p>
+					<p class="mt-0.5 text-[11px] text-[#8D8D8D]">marked absent in period</p>
+				</button>
 			</div>
 
 			<div class="flex flex-wrap items-center justify-between gap-3">
@@ -409,10 +477,26 @@
 						bind:value={searchQuery}
 					/>
 				</div>
-				<Button variant="outline" class="h-8 border-[#EBEEEE] text-sm text-[#222626]">
-					<Download class="mr-2 h-4 w-4" />
-					Download in excel
-				</Button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button
+								variant="outline"
+								class="h-8 border-[#EBEEEE] text-sm text-[#222626]"
+								{...props}
+							>
+								<Download class="mr-2 h-4 w-4" />
+								Download CSV
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						<DropdownMenu.Item onclick={() => downloadCSV('today')}>Daily (Today)</DropdownMenu.Item
+						>
+						<DropdownMenu.Item onclick={() => downloadCSV('weekly')}>Weekly</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={() => downloadCSV('monthly')}>Monthly</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</div>
 		</div>
 
@@ -502,7 +586,7 @@
 				<div class="flex items-center gap-3">
 					<Input
 						type="date"
-						class="h-8 w-[160px] border-[#D4D9D9] text-[13px]"
+						class="h-8 w-40 border-[#D4D9D9] text-[13px]"
 						bind:value={punchDate}
 						max={todayStr()}
 					/>
@@ -518,7 +602,7 @@
 						Live
 					</div>
 				</div>
-				<div class="relative w-full max-w-[280px]">
+				<div class="relative w-full max-w-70">
 					<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#859693]" />
 					<Input
 						class="h-8 border-[#D4D9D9] pl-9 text-[13px]"
@@ -576,7 +660,7 @@
 							<TableRow class={punch.employeeEmail === null ? 'bg-amber-50/40' : ''}>
 								<TableCell class="font-mono text-[13px]">{punch.timeStr}</TableCell>
 								<TableCell class="text-[13px] font-medium">{punch.deviceUserId}</TableCell>
-								<TableCell class="max-w-[180px] truncate text-[13px]"
+								<TableCell class="max-w-45 truncate text-[13px]"
 									>{punch.employeeEmail ?? '—'}</TableCell
 								>
 								<TableCell class="text-[13px]">{punch.employeeName ?? '—'}</TableCell>
