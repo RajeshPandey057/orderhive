@@ -432,10 +432,9 @@
 		if (!selectedLocation) nextErrors.location = 'Community is required';
 		if (!agentEmail.trim()) nextErrors.agentEmail = 'Agent email is required';
 		if (!agentMobile.trim()) nextErrors.agentMobile = 'Agent mobile number is required';
-		if (!firstName.trim()) nextErrors.firstName = 'First name is required';
-		if (!lastName.trim()) nextErrors.lastName = 'Last name is required';
 		if (!clientPhone.trim()) nextErrors.clientPhone = 'Mobile number is required';
-		if (!clientEmail.trim()) nextErrors.clientEmail = 'Email is required';
+		if (clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim()))
+			nextErrors.clientEmail = 'Valid email is required';
 		if (!reportingManager) nextErrors.reportingManager = 'Reporting manager is required';
 		if (!seniorManager) nextErrors.seniorManager = 'Senior manager is required';
 		if (!developerName.trim()) nextErrors.developerName = 'Developer name is required';

@@ -114,10 +114,13 @@ const listingShape = {
 	seniorManager: z.string().min(1, 'Senior manager is required'),
 
 	// Client details
-	firstName: z.string().min(1, 'First name is required'),
-	lastName: z.string().min(1, 'Last name is required'),
+	firstName: z.string().optional().default(''),
+	lastName: z.string().optional().default(''),
 	clientPhone: z.string().min(1, 'Phone number is required'),
-	clientEmail: z.string().email('Valid email is required'),
+	clientEmail: z
+		.union([z.literal(''), z.string().email('Valid email is required')])
+		.optional()
+		.default(''),
 
 	// Property details
 	developerName: z.string().min(1, 'Developer is required'),
