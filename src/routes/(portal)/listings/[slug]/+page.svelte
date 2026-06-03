@@ -66,8 +66,8 @@
 							<h1 class="text-2xl font-bold text-foreground sm:text-3xl">{listing.projectName}</h1>
 							<p class="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
 								<MapPinIcon class="h-4 w-4" />
-								{listing.propertyAddress.buildingName ?? listing.projectName}, {listing.propertyAddress
-									.area ??
+								{listing.propertyAddress.buildingName ?? listing.projectName}, {listing
+									.propertyAddress.area ??
 									listing.location ??
 									'Area N/A'}, {listing.propertyAddress.city ?? 'City N/A'}
 							</p>
@@ -100,7 +100,7 @@
 
 				<section class="rounded-xl border border-border bg-card p-3 sm:p-4">
 					<ListingMediaGallery
-						mediaItems={mediaItems}
+						{mediaItems}
 						listingId={listing.id}
 						listingTitle={listing.projectName}
 					/>
@@ -175,7 +175,9 @@
 							<div class="flex justify-between gap-4">
 								<span class="text-muted-foreground">DxB Price</span><span
 									class="text-right font-medium"
-									>{listing.originalPrice == null ? 'N/A' : `AED ${formatPrice(listing.originalPrice)}`}</span
+									>{listing.originalPrice == null
+										? 'N/A'
+										: `AED ${formatPrice(listing.originalPrice)}`}</span
 								>
 							</div>
 							<div class="flex justify-between gap-4">
@@ -254,7 +256,7 @@
 							</h2>
 							<div class="space-y-3 text-sm">
 								<div class="flex justify-between gap-4">
-									<span class="text-muted-foreground">Title Deed / Qood</span><span
+									<span class="text-muted-foreground">Title Deed / Oqood</span><span
 										class="text-right font-medium">{listing.titleDeedFileName ?? 'N/A'}</span
 									>
 								</div>

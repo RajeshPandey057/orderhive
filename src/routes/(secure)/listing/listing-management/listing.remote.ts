@@ -66,19 +66,6 @@ const fileArray = z
 	.optional()
 	.default([]);
 
-const listingClientSchema = z.object({
-	firstName: z.string().optional().default(''),
-	lastName: z.string().optional().default(''),
-	phone: z.string().min(1, 'Phone number is required'),
-	email: z
-		.union([z.literal(''), z.string().email('Valid email is required')])
-		.optional()
-		.default(''),
-	titleDeedFile: z.custom<File>((f) => !f || f instanceof File).optional(),
-	passportFile: z.custom<File>((f) => !f || f instanceof File).optional(),
-	emiratesIdFile: z.custom<File>((f) => !f || f instanceof File).optional()
-});
-
 const stringArrayFromForm = z.preprocess(
 	(v) => {
 		if (Array.isArray(v)) return v;
@@ -101,24 +88,17 @@ const stringArrayFromForm = z.preprocess(
 function normalizeListingFormData(rawData: unknown) {
 	if (!rawData || typeof rawData !== 'object') return rawData;
 	const data = { ...(rawData as Record<string, unknown>) };
-	for (const key of ['pictureFiles', 'videoFiles', 'floorPlanFiles'] as const) {
+	for (const key of [
+		'pictureFiles',
+		'videoFiles',
+		'floorPlanFiles',
+		'passportFiles',
+		'emiratesIdFiles'
+	] as const) {
 		const bracketKey = `${key}[]`;
 		if (data[key] === undefined && data[bracketKey] !== undefined) {
 			data[key] = data[bracketKey];
 		}
-	}
-	if (data.clients === undefined) {
-		const clients: Record<string, unknown>[] = [];
-		for (const [key, value] of Object.entries(data)) {
-			const match = key.match(/^clients\[(\d+)\]\.(.+)$/);
-			if (!match) continue;
-			const index = Number(match[1]);
-			const field = match[2];
-			clients[index] ??= {};
-			clients[index][field] = value;
-		}
-		const normalizedClients = clients.filter(Boolean);
-		if (normalizedClients.length) data.clients = normalizedClients;
 	}
 	return data;
 }
@@ -147,7 +127,6 @@ const listingShape = {
 		.union([z.literal(''), z.string().email('Valid email is required')])
 		.optional()
 		.default(''),
-	clients: z.array(listingClientSchema).optional().default([]),
 
 	// Property details
 	developerName: z.string().min(1, 'Developer is required'),
@@ -185,8 +164,8 @@ const listingShape = {
 
 	// File attachments
 	titleDeedFile: z.custom<File>((f) => !f || f instanceof File).optional(),
-	passportFile: z.custom<File>((f) => !f || f instanceof File).optional(),
-	emiratesIdFile: z.custom<File>((f) => !f || f instanceof File).optional(),
+	passportFiles: fileArray,
+	emiratesIdFiles: fileArray,
 
 	// Media (multiple files — set programmatically before submit)
 	pictureFiles: fileArray,
@@ -294,40 +273,20 @@ const listingSchema = z
 			ctx.addIssue({
 				code: 'custom',
 				path: ['titleDeedFile'],
-				message: 'Title deed / Qood is required'
+				message: 'Title deed / Oqood is required'
 			});
 		}
 
 		if (data.listingType === 'portal') {
-			if (!data.passportFile || (data.passportFile as File).size <= 0) {
+			const passportFiles = Array.isArray(data.passportFiles) ? data.passportFiles : [];
+			if (!passportFiles.some((f) => f instanceof File && f.size > 0)) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['passportFile'],
+					path: ['passportFiles'],
 					message: 'Passport is required for portal listings'
 				});
 			}
 		}
-
-		data.clients.forEach((client, index) => {
-			if (!client.titleDeedFile || (client.titleDeedFile as File).size <= 0) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['clients', index, 'titleDeedFile'],
-					message: `Client ${index + 2} title deed / Qood is required`
-				});
-			}
-
-			if (
-				data.listingType === 'portal' &&
-				(!client.passportFile || (client.passportFile as File).size <= 0)
-			) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['clients', index, 'passportFile'],
-					message: `Client ${index + 2} passport is required for portal listings`
-				});
-			}
-		});
 	});
 
 export const createListing = form('unchecked', async (rawData, issue) => {
@@ -349,38 +308,30 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 	const listingId = await generateListingId();
 	const basePath = `listings/${createdByUid}/${listingId}`;
 
-	// Upload single file attachments in parallel
-	const [titleDeedFile, passportFile, emiratesIdFile] = await Promise.all([
-		toUploadedFile(data.titleDeedFile as File | null, `${basePath}/title-deed`),
-		toUploadedFile(data.passportFile as File | null, `${basePath}/passport`),
-		toUploadedFile(data.emiratesIdFile as File | null, `${basePath}/emirates-id`)
+	// Upload title deed
+	const titleDeedFile = await toUploadedFile(
+		data.titleDeedFile as File | null,
+		`${basePath}/title-deed`
+	);
+
+	// Upload passport and EID files (up to 5 each)
+	const rawPassportFiles = (data.passportFiles as File[]).filter(
+		(f) => f instanceof File && f.size > 0
+	);
+	const rawEmiratesIdFiles = (data.emiratesIdFiles as File[]).filter(
+		(f) => f instanceof File && f.size > 0
+	);
+	const [uploadedPassports, uploadedEmiratesIds] = await Promise.all([
+		Promise.all(rawPassportFiles.map((f, i) => toUploadedFile(f, `${basePath}/passport-${i + 1}`))),
+		Promise.all(
+			rawEmiratesIdFiles.map((f, i) => toUploadedFile(f, `${basePath}/emirates-id-${i + 1}`))
+		)
 	]);
-
-	const additionalClients = await Promise.all(
-		data.clients.map(async (client, index) => {
-			const clientPath = `${basePath}/clients/${index + 2}`;
-			const [clientTitleDeedFile, clientPassportFile, clientEmiratesIdFile] = await Promise.all([
-				toUploadedFile(client.titleDeedFile as File | null, `${clientPath}/title-deed`),
-				toUploadedFile(client.passportFile as File | null, `${clientPath}/passport`),
-				toUploadedFile(client.emiratesIdFile as File | null, `${clientPath}/emirates-id`)
-			]);
-
-			return {
-				firstName: client.firstName,
-				lastName: client.lastName,
-				name: `${client.firstName} ${client.lastName}`.trim(),
-				phone: client.phone,
-				email: client.email,
-				titleDeedFileName: clientTitleDeedFile?.name ?? null,
-				passportFileName: clientPassportFile?.name ?? null,
-				emiratesIdFileName: clientEmiratesIdFile?.name ?? null,
-				attachments: {
-					titleDeed: clientTitleDeedFile ?? null,
-					passport: clientPassportFile ?? null,
-					emiratesId: clientEmiratesIdFile ?? null
-				}
-			};
-		})
+	const passports = uploadedPassports.filter(
+		(f): f is NonNullable<(typeof uploadedPassports)[number]> => f != null
+	);
+	const emiratesIds = uploadedEmiratesIds.filter(
+		(f): f is NonNullable<(typeof uploadedEmiratesIds)[number]> => f != null
 	);
 
 	// Upload media files in parallel
@@ -406,21 +357,6 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 			.filter(Boolean)
 			.map((f) => ({ type: 'video' as const, fileName: f!.name, url: f!.downloadURL }))
 	];
-	const primaryClient = {
-		firstName: data.firstName,
-		lastName: data.lastName,
-		name: `${data.firstName} ${data.lastName}`.trim(),
-		phone: data.clientPhone,
-		email: data.clientEmail,
-		titleDeedFileName: titleDeedFile?.name ?? null,
-		passportFileName: passportFile?.name ?? null,
-		emiratesIdFileName: emiratesIdFile?.name ?? null,
-		attachments: {
-			titleDeed: titleDeedFile ?? null,
-			passport: passportFile ?? null,
-			emiratesId: emiratesIdFile ?? null
-		}
-	};
 
 	const listingRecord = {
 		id: listingId,
@@ -436,7 +372,6 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		clientName: `${data.firstName} ${data.lastName}`.trim(),
 		clientPhone: data.clientPhone,
 		clientEmail: data.clientEmail,
-		clients: [primaryClient, ...additionalClients],
 		developerName: data.developerName,
 		projectName: data.projectName,
 		unitNo: data.unitNo,
@@ -478,8 +413,10 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		},
 		// Listing-type compatible file name fields
 		titleDeedFileName: titleDeedFile?.name ?? null,
-		passportFileName: passportFile?.name ?? null,
-		emiratesIdFileName: emiratesIdFile?.name ?? null,
+		passportFileName: passports[0]?.name ?? null,
+		passportFileNames: passports.map((f) => f.name),
+		emiratesIdFileName: emiratesIds[0]?.name ?? null,
+		emiratesIdFileNames: emiratesIds.map((f) => f.name),
 		floorPlansFileName: uploadedFloorPlans
 			.filter(Boolean)
 			.map((file) => file!.name)
@@ -492,8 +429,8 @@ export const createListing = form('unchecked', async (rawData, issue) => {
 		// Full file metadata for downloads / compliance
 		attachments: {
 			titleDeed: titleDeedFile ?? null,
-			passport: passportFile ?? null,
-			emiratesId: emiratesIdFile ?? null,
+			passports,
+			emiratesIds,
 			pictures: uploadedPictures.filter(Boolean),
 			videos: uploadedVideos.filter(Boolean),
 			floorPlans: uploadedFloorPlans.filter(Boolean)
@@ -567,12 +504,32 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 	}
 	if (Object.keys(issue).length > 0) return;
 
-	// Upload only if a real new file was provided
-	const [newTitleDeed, newPassport, newEmiratesId] = await Promise.all([
-		toUploadedFile(data.titleDeedFile as File | null, `${basePath}/title-deed`),
-		toUploadedFile(data.passportFile as File | null, `${basePath}/passport`),
-		toUploadedFile(data.emiratesIdFile as File | null, `${basePath}/emirates-id`)
+	// Upload title deed, passport(s), and EID(s) only when new files are provided
+	const newTitleDeed = await toUploadedFile(
+		data.titleDeedFile as File | null,
+		`${basePath}/title-deed`
+	);
+
+	const rawNewPassportFiles = (data.passportFiles as File[]).filter(
+		(f) => f instanceof File && f.size > 0
+	);
+	const rawNewEmiratesIdFiles = (data.emiratesIdFiles as File[]).filter(
+		(f) => f instanceof File && f.size > 0
+	);
+	const [uploadedNewPassports, uploadedNewEmiratesIds] = await Promise.all([
+		Promise.all(
+			rawNewPassportFiles.map((f, i) => toUploadedFile(f, `${basePath}/passport-${i + 1}`))
+		),
+		Promise.all(
+			rawNewEmiratesIdFiles.map((f, i) => toUploadedFile(f, `${basePath}/emirates-id-${i + 1}`))
+		)
 	]);
+	const newPassports = uploadedNewPassports.filter(
+		(f): f is NonNullable<(typeof uploadedNewPassports)[number]> => f != null
+	);
+	const newEmiratesIds = uploadedNewEmiratesIds.filter(
+		(f): f is NonNullable<(typeof uploadedNewEmiratesIds)[number]> => f != null
+	);
 
 	const pictureFileInputs = Array.isArray(data.pictureFiles) ? data.pictureFiles : [];
 	const videoFileInputs = Array.isArray(data.videoFiles) ? data.videoFiles : [];
@@ -588,15 +545,26 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 		)
 	]);
 
-	// Resolve final attachment metadata: prefer new upload, fall back to existing Firestore record
+	// Resolve final attachment metadata: prefer new uploads, fall back to existing Firestore record
 	const finalTitleDeed = newTitleDeed ?? existing.attachments?.titleDeed ?? null;
-	const finalPassport = newPassport ?? existing.attachments?.passport ?? null;
-	const finalEmiratesId = newEmiratesId ?? existing.attachments?.emiratesId ?? null;
+	const finalPassports = (
+		newPassports.length > 0
+			? newPassports
+			: (existing.attachments?.passports ??
+				(existing.attachments?.passport ? [existing.attachments.passport] : []))
+	) as { name: string }[];
+	const finalEmiratesIds = (
+		newEmiratesIds.length > 0
+			? newEmiratesIds
+			: (existing.attachments?.emiratesIds ??
+				(existing.attachments?.emiratesId ? [existing.attachments.emiratesId] : []))
+	) as { name: string }[];
 
 	// Required documents/files can be new or pre-existing on update.
-	if (!finalTitleDeed) issue.titleDeedFile = 'Title deed / Qood is required';
+	if (!finalTitleDeed) issue.titleDeedFile = 'Title deed / Oqood is required';
 	if (data.listingType === 'portal') {
-		if (!finalPassport) issue.passportFile = 'Passport is required for portal listings';
+		if (finalPassports.length === 0)
+			issue.passportFiles = 'Passport is required for portal listings';
 	}
 
 	const newMediaAssets = [
@@ -699,16 +667,18 @@ export const updateListing = form('unchecked', async (rawData, issue) => {
 			...(data.landmark && { landmark: data.landmark })
 		},
 		titleDeedFileName: finalTitleDeed?.name ?? existing.titleDeedFileName ?? null,
-		passportFileName: finalPassport?.name ?? existing.passportFileName ?? null,
-		emiratesIdFileName: finalEmiratesId?.name ?? existing.emiratesIdFileName ?? null,
+		passportFileName: finalPassports[0]?.name ?? existing.passportFileName ?? null,
+		passportFileNames: finalPassports.map((f) => f.name),
+		emiratesIdFileName: finalEmiratesIds[0]?.name ?? existing.emiratesIdFileName ?? null,
+		emiratesIdFileNames: finalEmiratesIds.map((f) => f.name),
 		mediaAssets: mergedMediaAssets,
 		floorPlanAssets: mergedFloorPlanAssets,
 		floorPlansFileName: mergedFloorPlanAssets.map((asset) => asset.fileName).join(', '),
 		price: data.price,
 		attachments: {
 			titleDeed: finalTitleDeed,
-			passport: finalPassport,
-			emiratesId: finalEmiratesId,
+			passports: finalPassports,
+			emiratesIds: finalEmiratesIds,
 			pictures: [...retainedPictureAttachments, ...uploadedPictures.filter(Boolean)],
 			videos: [...retainedVideoAttachments, ...uploadedVideos.filter(Boolean)],
 			floorPlans: [...retainedFloorPlanAttachments, ...uploadedFloorPlans.filter(Boolean)]

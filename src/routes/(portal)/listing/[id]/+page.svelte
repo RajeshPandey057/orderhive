@@ -295,7 +295,7 @@
 					</h2>
 					<div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
 						<div class="rounded-lg bg-muted/50 p-3">
-							<div class="text-muted-foreground">Title Deed / Qood</div>
+							<div class="text-muted-foreground">Title Deed / Oqood</div>
 							<div class="mt-1 truncate font-medium">
 								{listing.titleDeedFileName ?? 'Not uploaded'}
 							</div>

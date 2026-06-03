@@ -364,21 +364,6 @@ declare global {
 		clientName: string;
 		clientPhone: string;
 		clientEmail: string;
-		clients?: {
-			firstName?: string;
-			lastName?: string;
-			name?: string;
-			phone?: string;
-			email?: string;
-			titleDeedFileName?: string | null;
-			passportFileName?: string | null;
-			emiratesIdFileName?: string | null;
-			attachments?: {
-				titleDeed?: ListingDocumentFile | null;
-				passport?: ListingDocumentFile | null;
-				emiratesId?: ListingDocumentFile | null;
-			};
-		}[];
 		availableFor: 'Sell' | 'Rent' | 'Both' | string;
 		furnishing: 'Furnished' | 'Unfurnished' | 'Semi-Furnished' | string;
 		city: string;
@@ -411,7 +396,9 @@ declare global {
 		amountPaid?: number | null;
 		titleDeedFileName?: string;
 		passportFileName?: string;
+		passportFileNames?: string[];
 		emiratesIdFileName?: string;
+		emiratesIdFileNames?: string[];
 		videoFileName?: string;
 		picturesFileName?: string;
 		floorPlansFileName?: string;

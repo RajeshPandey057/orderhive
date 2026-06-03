@@ -18,7 +18,6 @@
 	} from '$lib/components/ui/table';
 	import { Download, Radio, Search } from '@lucide/svelte';
 	import { collection, getFirestore, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-	import Papa from 'papaparse';
 	import { toast } from 'svelte-sonner';
 	import { correctAttendance, reconcileAttendance, syncUnprocessed } from '../hr/hr.remote';
 
@@ -306,51 +305,26 @@
 		);
 	}
 
-	function formatDateForExport(date: string) {
-		const [year, month, day] = date.split('-');
-		if (!year || !month || !day) return date;
-		return `${day}/${month}/${year.slice(-2)}`;
-	}
-
-	function downloadCSV() {
+	async function downloadCSV() {
 		const { start, end } = selectedRange;
-		const rows = periodFilteredRecords;
-		const csv = Papa.unparse(
-			[
-				[
-					'Employee',
-					'Email',
-					'Date',
-					'Branch',
-					'Punch In',
-					'Punch Out',
-					'Working Hours',
-					'Status',
-					'Source',
-					'Corrected'
-				],
-				...rows.map((r) => [
-					r.employeeName || '',
-					r.employeeEmail,
-					formatDateForExport(r.date),
-					r.branch || '',
-					r.punchIn || '',
-					r.punchOut || '',
-					minutesToDuration(r.workingMinutes),
-					r.status,
-					r.source || '',
-					r.corrected ? 'Yes' : 'No'
-				])
-			],
-			{ header: false }
-		);
-		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `attendance-${start}-to-${end}.csv`;
-		a.click();
-		URL.revokeObjectURL(url);
+		try {
+			const res = await fetch(
+				`/api/attendance-csv?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
+			);
+			if (!res.ok) {
+				toast.error('Failed to export attendance');
+				return;
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `attendance-${start}-to-${end}.csv`;
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch {
+			toast.error('Failed to export attendance');
+		}
 	}
 
 	function formatStatus(status: AttendanceStatus) {

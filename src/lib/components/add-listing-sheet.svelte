@@ -34,17 +34,6 @@
 	import { searchUsers as searchUsersRemote } from '../../routes/(secure)/users.remote';
 
 	type ListingType = Listing['listingType'];
-	type ClientDocumentKey = 'titleDeed' | 'passport' | 'emiratesId';
-	type AdditionalClient = {
-		key: number;
-		firstName: string;
-		lastName: string;
-		phone: string;
-		email: string;
-		titleDeedFileName: string;
-		passportFileName: string;
-		emiratesIdFileName: string;
-	};
 
 	let {
 		currentUserEmail = '',
@@ -89,10 +78,9 @@
 	let postalCode = $state('');
 	let landmark = $state('');
 	let titleDeedFileName = $state('');
-	let passportFileName = $state('');
-	let emiratesIdFileName = $state('');
-	let additionalClients = $state<AdditionalClient[]>([]);
-	let nextClientKey = $state(2);
+	let passportAssets = $state<{ id: number; file: File; fileName: string }[]>([]);
+	let emiratesIdAssets = $state<{ id: number; file: File; fileName: string }[]>([]);
+	let nextDocId = $state(1);
 	let unitStatus = $state('');
 	let paymentType = $state('');
 	let rentAmount = $state<number | ''>('');
@@ -131,6 +119,18 @@
 		for (const a of floorPlanAssets) dt.items.add(a.file);
 		floorPlanInputRef.files = dt.files;
 	});
+	$effect(() => {
+		if (!passportInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of passportAssets) dt.items.add(a.file);
+		passportInputRef.files = dt.files;
+	});
+	$effect(() => {
+		if (!emiratesIdInputRef) return;
+		const dt = new DataTransfer();
+		for (const a of emiratesIdAssets) dt.items.add(a.file);
+		emiratesIdInputRef.files = dt.files;
+	});
 	let mediaAssets = $state<
 		{ id: number; type: 'photo' | 'video'; file: File; fileName: string; previewUrl?: string }[]
 	>([]);
@@ -147,6 +147,8 @@
 	let pictureInputRef: HTMLInputElement | undefined = $state(undefined);
 	let videoInputRef: HTMLInputElement | undefined = $state(undefined);
 	let floorPlanInputRef: HTMLInputElement | undefined = $state(undefined);
+	let passportInputRef: HTMLInputElement | undefined = $state(undefined);
+	let emiratesIdInputRef: HTMLInputElement | undefined = $state(undefined);
 	let developerSearchValue = $state('');
 	let managerSearchValue = $state('');
 	let seniorManagerSearchValue = $state('');
@@ -171,35 +173,6 @@
 	let agentHierarchyRequest = 0;
 
 	const developers = LISTING_DEVELOPERS.map((label) => ({ value: label, label }));
-	const clientDocumentConfigs: {
-		key: ClientDocumentKey;
-		label: string;
-		uploadLabel: string;
-		inputName: 'titleDeedFile' | 'passportFile' | 'emiratesIdFile';
-		errorKey: 'titleDeedFileName' | 'passportFileName' | 'emiratesIdFileName';
-	}[] = [
-		{
-			key: 'titleDeed',
-			label: 'Title Deed / Qood',
-			uploadLabel: 'Upload Title Deed / Qood',
-			inputName: 'titleDeedFile',
-			errorKey: 'titleDeedFileName'
-		},
-		{
-			key: 'passport',
-			label: 'Passport',
-			uploadLabel: 'Upload Passport',
-			inputName: 'passportFile',
-			errorKey: 'passportFileName'
-		},
-		{
-			key: 'emiratesId',
-			label: 'Emirates ID',
-			uploadLabel: 'Upload Emirates ID',
-			inputName: 'emiratesIdFile',
-			errorKey: 'emiratesIdFileName'
-		}
-	];
 
 	const developerLabel = $derived(
 		developers.find((item) => item.value === developerName)?.label ?? (developerName || 'Developer')
@@ -310,73 +283,38 @@
 		}, 300);
 	});
 
-	function createAdditionalClient(): AdditionalClient {
-		return {
-			key: nextClientKey++,
-			firstName: '',
-			lastName: '',
-			phone: '',
-			email: '',
-			titleDeedFileName: '',
-			passportFileName: '',
-			emiratesIdFileName: ''
-		};
-	}
-
-	function addClient() {
-		additionalClients = [...additionalClients, createAdditionalClient()];
-	}
-
-	function removeClient(key: number) {
-		additionalClients = additionalClients.filter((client) => client.key !== key);
-	}
-
-	function setClientDocumentName(
-		client: AdditionalClient | null,
-		key: ClientDocumentKey,
-		fileName: string
-	) {
-		if (!client) {
-			if (key === 'titleDeed') titleDeedFileName = fileName;
-			if (key === 'passport') passportFileName = fileName;
-			if (key === 'emiratesId') emiratesIdFileName = fileName;
-			return;
-		}
-
-		additionalClients = additionalClients.map((item) => {
-			if (item.key !== client.key) return item;
-			return {
-				...item,
-				...(key === 'titleDeed' && { titleDeedFileName: fileName }),
-				...(key === 'passport' && { passportFileName: fileName }),
-				...(key === 'emiratesId' && { emiratesIdFileName: fileName })
-			};
-		});
-	}
-
-	function getClientDocumentName(client: AdditionalClient | null, key: ClientDocumentKey) {
-		if (!client) {
-			if (key === 'titleDeed') return titleDeedFileName;
-			if (key === 'passport') return passportFileName;
-			return emiratesIdFileName;
-		}
-		if (key === 'titleDeed') return client.titleDeedFileName;
-		if (key === 'passport') return client.passportFileName;
-		return client.emiratesIdFileName;
-	}
-
-	function onFileSelect(
-		event: Event,
-		key: ClientDocumentKey,
-		client: AdditionalClient | null = null
-	) {
+	function onTitleDeedSelect(event: Event) {
 		const file = (event.currentTarget as HTMLInputElement).files?.[0];
-		const fileName = file?.name ?? '';
-		setClientDocumentName(client, key, fileName);
+		titleDeedFileName = file?.name ?? '';
+	}
+	function removeTitleDeed() {
+		titleDeedFileName = '';
 	}
 
-	function removeFile(key: ClientDocumentKey, client: AdditionalClient | null = null) {
-		setClientDocumentName(client, key, '');
+	function onPassportAdd(event: Event) {
+		const files = (event.currentTarget as HTMLInputElement).files;
+		if (!files?.length) return;
+		const toAdd = Array.from(files)
+			.slice(0, 5 - passportAssets.length)
+			.map((f) => ({ id: nextDocId++, file: f, fileName: f.name }));
+		passportAssets = [...passportAssets, ...toAdd];
+		(event.currentTarget as HTMLInputElement).value = '';
+	}
+	function removePassportAsset(id: number) {
+		passportAssets = passportAssets.filter((a) => a.id !== id);
+	}
+
+	function onEmiratesIdAdd(event: Event) {
+		const files = (event.currentTarget as HTMLInputElement).files;
+		if (!files?.length) return;
+		const toAdd = Array.from(files)
+			.slice(0, 5 - emiratesIdAssets.length)
+			.map((f) => ({ id: nextDocId++, file: f, fileName: f.name }));
+		emiratesIdAssets = [...emiratesIdAssets, ...toAdd];
+		(event.currentTarget as HTMLInputElement).value = '';
+	}
+	function removeEmiratesIdAsset(id: number) {
+		emiratesIdAssets = emiratesIdAssets.filter((a) => a.id !== id);
 	}
 
 	function revokePreviewUrl(url?: string) {
@@ -493,10 +431,8 @@
 		postalCode = '';
 		landmark = '';
 		titleDeedFileName = '';
-		passportFileName = '';
-		emiratesIdFileName = '';
-		additionalClients = [];
-		nextClientKey = 2;
+		passportAssets = [];
+		emiratesIdAssets = [];
 		unitStatus = '';
 		paymentType = '';
 		rentAmount = '';
@@ -533,20 +469,6 @@
 		if (!clientPhone.trim()) nextErrors.clientPhone = 'Mobile number is required';
 		if (clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim()))
 			nextErrors.clientEmail = 'Valid email is required';
-		for (const [index, client] of additionalClients.entries()) {
-			const label = `Client ${index + 2}`;
-			if (!client.phone.trim())
-				nextErrors[`clients.${index}.phone`] = `${label} mobile number is required`;
-			if (client.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client.email.trim())) {
-				nextErrors[`clients.${index}.email`] = `${label} valid email is required`;
-			}
-			if (!client.titleDeedFileName)
-				nextErrors[`clients.${index}.titleDeedFileName`] = `${label} title deed/Qood is required`;
-			if (listingType === 'portal' && !client.passportFileName) {
-				nextErrors[`clients.${index}.passportFileName`] =
-					`${label} passport is required for portal listing`;
-			}
-		}
 		if (!reportingManager) nextErrors.reportingManager = 'Reporting manager is required';
 		if (!seniorManager) nextErrors.seniorManager = 'Senior manager is required';
 		if (!developerName.trim()) nextErrors.developerName = 'Developer name is required';
@@ -571,12 +493,12 @@
 		}
 		if (!price && price !== 0) nextErrors.price = 'Expected selling price is required';
 
-		if (!titleDeedFileName) nextErrors.titleDeedFileName = 'Title deed/Qood is required';
+		if (!titleDeedFileName) nextErrors.titleDeedFileName = 'Title deed/Oqood is required';
 		if (!floorPlanAssets.length) nextErrors.floorPlanFiles = 'Floor plan is required';
 		if (photoCount === 0) nextErrors.pictureFiles = 'At least one property photo is required';
 		if (listingType === 'portal') {
-			if (!passportFileName)
-				nextErrors.passportFileName = 'Passport is required for portal listing';
+			if (passportAssets.length === 0)
+				nextErrors.passportFiles = 'Passport is required for portal listing';
 		}
 
 		errors = nextErrors;
@@ -678,6 +600,24 @@
 				name="videoFiles[]"
 				multiple
 				bind:this={videoInputRef}
+				class="sr-only"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
+			<input
+				type="file"
+				name="passportFiles[]"
+				multiple
+				bind:this={passportInputRef}
+				class="sr-only"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
+			<input
+				type="file"
+				name="emiratesIdFiles[]"
+				multiple
+				bind:this={emiratesIdInputRef}
 				class="sr-only"
 				tabindex="-1"
 				aria-hidden="true"
@@ -835,13 +775,7 @@
 					</Field.Set>
 
 					<Field.Set>
-						<div class="flex items-center justify-between gap-3">
-							<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
-							<Button type="button" variant="outline" size="sm" class="gap-2" onclick={addClient}>
-								<PlusRound class="h-4 w-4" />
-								Add Client
-							</Button>
-						</div>
+						<Field.Legend class="text-lg font-medium">Client Details</Field.Legend>
 						<Field.Group class="space-y-5">
 							<div class="rounded-xl border border-border/60 bg-background/80 p-4">
 								<div class="mb-4 flex items-center justify-between">
@@ -886,201 +820,181 @@
 											>{/if}
 									</Field.Field>
 								</div>
-								<div class="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
-									{#each clientDocumentConfigs as doc, documentIndex (doc.key)}
-										<div class="flex min-w-0 items-start gap-4">
-											<span
-												class="mt-3.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-												>{documentIndex + 1}</span
-											>
-											<Field.Field class="min-w-0 flex-1">
-												{#if getClientDocumentName(null, doc.key)}
-													<div
-														class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
-													>
-														<FileText class="h-9 w-9 shrink-0 text-orange-500" />
-														<div class="min-w-0 flex-1">
-															<span
-																class="block max-w-full truncate text-sm font-medium"
-																title={getClientDocumentName(null, doc.key)}
-																>{getClientDocumentName(null, doc.key)}</span
-															>
-															<span class="block truncate text-xs text-muted-foreground"
-																>{doc.label}</span
-															>
-														</div>
-														<button
-															type="button"
-															onclick={() => removeFile(doc.key)}
-															class="shrink-0 text-destructive hover:text-destructive/80"
-															aria-label={`Remove ${doc.label}`}
-														>
-															<Trash2 class="h-5 w-5" />
-														</button>
-													</div>
-												{:else}
-													<label
-														for={`client-1-${doc.key}`}
-														class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
-													>
-														<Upload class="h-5 w-5 shrink-0 text-gray-600" />
-														<span class="truncate text-sm font-medium">{doc.uploadLabel}</span>
-													</label>
-												{/if}
-												<Input
-													id={`client-1-${doc.key}`}
-													name={doc.inputName}
-													class="sr-only"
-													type="file"
-													onchange={(event) => onFileSelect(event, doc.key)}
-												/>
-												{#if doc.key === 'titleDeed'}
-													<p class="min-h-5 text-xs text-muted-foreground">Optional</p>
-												{:else if listingType === 'portal'}
-													<p class="min-h-5 text-xs text-muted-foreground">
-														Required for portal listing
-													</p>
-												{:else}
-													<p class="min-h-5 text-xs text-muted-foreground" aria-hidden="true">
-														&nbsp;
-													</p>
-												{/if}
-												{#if errors[doc.errorKey]}<Field.Error class="text-sm text-destructive"
-														>{errors[doc.errorKey]}</Field.Error
-													>{/if}
-											</Field.Field>
-										</div>
-									{/each}
-								</div>
-							</div>
-
-							{#each additionalClients as client, index (client.key)}
-								<div class="rounded-xl border border-border/60 bg-background/80 p-4">
-									<div class="mb-4 flex items-center justify-between">
-										<p class="text-base font-semibold">Client {index + 2}</p>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={() => removeClient(client.key)}
-											aria-label={`Remove client ${index + 2}`}
+								<div class="mt-5 space-y-4">
+									<!-- Title Deed (single file) -->
+									<div class="flex min-w-0 items-start gap-4">
+										<span
+											class="mt-3.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+											>1</span
 										>
-											<Trash2 class="h-4 w-4" />
-										</Button>
-									</div>
-									<div class="grid grid-cols-1 gap-x-4 gap-y-5 xl:grid-cols-3">
-										<Field.Field>
-											<Field.Label>First Name</Field.Label>
-											<Input
-												name={`clients[${index}].firstName`}
-												bind:value={client.firstName}
-												placeholder="First Name"
-											/>
-										</Field.Field>
-										<Field.Field>
-											<Field.Label>Last Name</Field.Label>
-											<Input
-												name={`clients[${index}].lastName`}
-												bind:value={client.lastName}
-												placeholder="Last Name"
-											/>
-										</Field.Field>
-										<Field.Field>
-											<Field.Label>Client Email</Field.Label>
-											<Input
-												type="email"
-												name={`clients[${index}].email`}
-												bind:value={client.email}
-												placeholder="Email"
-											/>
-											{#if errors[`clients.${index}.email`]}<Field.Error
-													class="text-sm text-destructive"
-													>{errors[`clients.${index}.email`]}</Field.Error
-												>{/if}
-										</Field.Field>
-										<Field.Field>
-											<Field.Label>Client Mobile No</Field.Label>
-											<Input
-												name={`clients[${index}].phone`}
-												bind:value={client.phone}
-												placeholder="Enter a phone number"
-											/>
-											{#if errors[`clients.${index}.phone`]}<Field.Error
-													class="text-sm text-destructive"
-													>{errors[`clients.${index}.phone`]}</Field.Error
-												>{/if}
-										</Field.Field>
-									</div>
-									<div class="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
-										{#each clientDocumentConfigs as doc, documentIndex (doc.key)}
-											<div class="flex min-w-0 items-start gap-4">
-												<span
-													class="mt-3.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
-													>{documentIndex + 1}</span
+										<Field.Field class="min-w-0 flex-1">
+											{#if titleDeedFileName}
+												<div
+													class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
 												>
-												<Field.Field class="min-w-0 flex-1">
-													{#if getClientDocumentName(client, doc.key)}
-														<div
-															class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
+													<FileText class="h-9 w-9 shrink-0 text-orange-500" />
+													<div class="min-w-0 flex-1">
+														<span
+															class="block max-w-full truncate text-sm font-medium"
+															title={titleDeedFileName}>{titleDeedFileName}</span
 														>
-															<FileText class="h-9 w-9 shrink-0 text-orange-500" />
-															<div class="min-w-0 flex-1">
-																<span
-																	class="block max-w-full truncate text-sm font-medium"
-																	title={getClientDocumentName(client, doc.key)}
-																	>{getClientDocumentName(client, doc.key)}</span
-																>
-																<span class="block truncate text-xs text-muted-foreground"
-																	>{doc.label}</span
-																>
-															</div>
-															<button
-																type="button"
-																onclick={() => removeFile(doc.key, client)}
-																class="shrink-0 text-destructive hover:text-destructive/80"
-																aria-label={`Remove ${doc.label}`}
-															>
-																<Trash2 class="h-5 w-5" />
-															</button>
-														</div>
-													{:else}
-														<label
-															for={`client-${client.key}-${doc.key}`}
-															class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+														<span class="block truncate text-xs text-muted-foreground"
+															>Title Deed / Oqood</span
 														>
-															<Upload class="h-5 w-5 shrink-0 text-gray-600" />
-															<span class="truncate text-sm font-medium">{doc.uploadLabel}</span>
-														</label>
-													{/if}
-													<Input
-														id={`client-${client.key}-${doc.key}`}
-														name={`clients[${index}].${doc.inputName}`}
-														class="sr-only"
+													</div>
+													<button
+														type="button"
+														onclick={removeTitleDeed}
+														class="shrink-0 text-destructive hover:text-destructive/80"
+														aria-label="Remove Title Deed"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{:else}
+												<label
+													for="client-1-titleDeed"
+													class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 shrink-0 text-gray-600" />
+													<span class="truncate text-sm font-medium">Upload Title Deed / Oqood</span
+													>
+												</label>
+											{/if}
+											<Input
+												id="client-1-titleDeed"
+												name="titleDeedFile"
+												class="sr-only"
+												type="file"
+												onchange={onTitleDeedSelect}
+											/>
+											<p class="min-h-5 text-xs text-muted-foreground">Optional</p>
+											{#if errors.titleDeedFileName}<Field.Error class="text-sm text-destructive"
+													>{errors.titleDeedFileName}</Field.Error
+												>{/if}
+										</Field.Field>
+									</div>
+
+									<!-- Passport (multi-file, up to 5) -->
+									<div class="min-w-0">
+										<div class="mb-2 flex items-center gap-2">
+											<span
+												class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>2</span
+											>
+											<span class="text-sm font-medium">Passport</span>
+											{#if listingType === 'portal'}<span class="text-xs text-muted-foreground"
+													>(Required for portal listing)</span
+												>{/if}
+										</div>
+										<div class="space-y-2">
+											{#each passportAssets as asset (asset.id)}
+												<div
+													class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<FileText class="h-9 w-9 shrink-0 text-orange-500" />
+													<div class="min-w-0 flex-1">
+														<span
+															class="block max-w-full truncate text-sm font-medium"
+															title={asset.fileName}>{asset.fileName}</span
+														>
+														<span class="block truncate text-xs text-muted-foreground"
+															>Passport</span
+														>
+													</div>
+													<button
+														type="button"
+														onclick={() => removePassportAsset(asset.id)}
+														class="shrink-0 text-destructive hover:text-destructive/80"
+														aria-label="Remove passport"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{/each}
+											{#if passportAssets.length < 5}
+												<label
+													class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 shrink-0 text-gray-600" />
+													<span class="truncate text-sm font-medium"
+														>{passportAssets.length > 0
+															? 'Add another Passport'
+															: 'Upload Passport'}</span
+													>
+													<input
 														type="file"
-														onchange={(event) => onFileSelect(event, doc.key, client)}
+														class="sr-only"
+														multiple
+														accept="image/*,application/pdf"
+														onchange={onPassportAdd}
 													/>
-													{#if doc.key === 'titleDeed'}
-														<p class="min-h-5 text-xs text-muted-foreground">Optional</p>
-													{:else if listingType === 'portal'}
-														<p class="min-h-5 text-xs text-muted-foreground">
-															Required for portal listing
-														</p>
-													{:else}
-														<p class="min-h-5 text-xs text-muted-foreground" aria-hidden="true">
-															&nbsp;
-														</p>
-													{/if}
-													{#if errors[`clients.${index}.${doc.errorKey}`]}<Field.Error
-															class="text-sm text-destructive"
-															>{errors[`clients.${index}.${doc.errorKey}`]}</Field.Error
-														>{/if}
-												</Field.Field>
-											</div>
-										{/each}
+												</label>
+											{/if}
+										</div>
+										{#if errors.passportFiles}<Field.Error class="text-sm text-destructive"
+												>{errors.passportFiles}</Field.Error
+											>{/if}
+									</div>
+
+									<!-- Emirates ID (multi-file, up to 5) -->
+									<div class="min-w-0">
+										<div class="mb-2 flex items-center gap-2">
+											<span
+												class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+												>3</span
+											>
+											<span class="text-sm font-medium">Emirates ID</span>
+										</div>
+										<div class="space-y-2">
+											{#each emiratesIdAssets as asset (asset.id)}
+												<div
+													class="flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-muted-foreground/40 bg-background p-3"
+												>
+													<FileText class="h-9 w-9 shrink-0 text-orange-500" />
+													<div class="min-w-0 flex-1">
+														<span
+															class="block max-w-full truncate text-sm font-medium"
+															title={asset.fileName}>{asset.fileName}</span
+														>
+														<span class="block truncate text-xs text-muted-foreground"
+															>Emirates ID</span
+														>
+													</div>
+													<button
+														type="button"
+														onclick={() => removeEmiratesIdAsset(asset.id)}
+														class="shrink-0 text-destructive hover:text-destructive/80"
+														aria-label="Remove Emirates ID"
+													>
+														<Trash2 class="h-5 w-5" />
+													</button>
+												</div>
+											{/each}
+											{#if emiratesIdAssets.length < 5}
+												<label
+													class="flex min-h-14 w-full min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+												>
+													<Upload class="h-5 w-5 shrink-0 text-gray-600" />
+													<span class="truncate text-sm font-medium"
+														>{emiratesIdAssets.length > 0
+															? 'Add another Emirates ID'
+															: 'Upload Emirates ID'}</span
+													>
+													<input
+														type="file"
+														class="sr-only"
+														multiple
+														accept="image/*,application/pdf"
+														onchange={onEmiratesIdAdd}
+													/>
+												</label>
+											{/if}
+										</div>
 									</div>
 								</div>
-							{/each}
-						</Field.Group>
+							</div></Field.Group
+						>
 					</Field.Set>
 
 					<Field.Set>

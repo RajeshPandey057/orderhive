@@ -544,7 +544,7 @@
 			nextErrors.plotArea = 'Plot area is required for plot';
 		if (listingType === 'portal') {
 			if (!titleDeedFileName)
-				nextErrors.titleDeedFileName = 'Title deed/Qood is required for portal listing';
+				nextErrors.titleDeedFileName = 'Title deed/Oqood is required for portal listing';
 			if (!passportFileName)
 				nextErrors.passportFileName = 'Passport is required for portal listing';
 		}
@@ -1218,7 +1218,7 @@
 						<Field.Legend class="text-lg font-medium">Documents</Field.Legend>
 						<Field.Group>
 							<div class="flex flex-col gap-4">
-								{#each [{ key: 'titleDeed' as const, label: 'Title Deed / Qood', fileName: titleDeedFileName, replaced: titleDeedReplaced, inputId: 'edit-titleDeed', inputName: 'titleDeedFile', errorKey: 'titleDeedFileName' }, { key: 'passport' as const, label: 'Passport', fileName: passportFileName, replaced: passportReplaced, inputId: 'edit-passport', inputName: 'passportFile', errorKey: 'passportFileName' }, { key: 'emiratesId' as const, label: 'Emirates ID', fileName: emiratesIdFileName, replaced: emiratesIdReplaced, inputId: 'edit-emiratesId', inputName: 'emiratesIdFile', errorKey: 'emiratesIdFileName' }] as doc, i (doc.key)}
+								{#each [{ key: 'titleDeed' as const, label: 'Title Deed / Oqood', fileName: titleDeedFileName, replaced: titleDeedReplaced, inputId: 'edit-titleDeed', inputName: 'titleDeedFile', errorKey: 'titleDeedFileName' }, { key: 'passport' as const, label: 'Passport', fileName: passportFileName, replaced: passportReplaced, inputId: 'edit-passport', inputName: 'passportFiles', errorKey: 'passportFileName' }, { key: 'emiratesId' as const, label: 'Emirates ID', fileName: emiratesIdFileName, replaced: emiratesIdReplaced, inputId: 'edit-emiratesId', inputName: 'emiratesIdFiles', errorKey: 'emiratesIdFileName' }] as doc, i (doc.key)}
 									<div class="flex items-center gap-4">
 										<span
 											class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
