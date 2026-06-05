@@ -8,7 +8,6 @@
 	import ExternalLinkIcon from '~icons/lucide/external-link';
 	import FileTextIcon from '~icons/lucide/file-text';
 	import MapPinIcon from '~icons/lucide/map-pin';
-	import UserIcon from '~icons/lucide/user';
 
 	let { data } = $props();
 
@@ -153,32 +152,6 @@
 			</section>
 
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-				<!-- Client Details -->
-				<section class="rounded-xl border border-border bg-card p-5">
-					<h3 class="mb-4 flex items-center gap-2 text-base font-semibold">
-						<UserIcon class="h-4 w-4" />
-						Client Details
-					</h3>
-					<div class="space-y-3 text-sm">
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">Name</span>
-							<span class="font-medium">{listing.clientName}</span>
-						</div>
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">Phone</span>
-							<span class="font-medium">{listing.clientPhone}</span>
-						</div>
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">Email</span>
-							<span class="font-medium">{listing.clientEmail}</span>
-						</div>
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">Agent</span>
-							<span class="text-right font-medium">{listing.agentEmail || 'N/A'}</span>
-						</div>
-					</div>
-				</section>
-
 				<!-- Property Information -->
 				<section class="rounded-xl border border-border bg-card p-5">
 					<h3 class="mb-4 flex items-center gap-2 text-base font-semibold">

@@ -42,7 +42,6 @@
 		return listings.filter((listing) => {
 			const matchesSearch =
 				!query ||
-				listing.clientName.toLowerCase().includes(query) ||
 				listing.projectName.toLowerCase().includes(query) ||
 				listing.developerName.toLowerCase().includes(query) ||
 				listing.unitNo.toLowerCase().includes(query) ||
@@ -116,7 +115,6 @@
 	<Table.Root>
 		<Table.Header>
 			<Table.Row class="border-b bg-gray-200/40">
-				<Table.Head>Client Name</Table.Head>
 				<Table.Head>Listing ID</Table.Head>
 				<Table.Head>Property</Table.Head>
 				<Table.Head>Project Type</Table.Head>
@@ -134,7 +132,7 @@
 		<Table.Body>
 			{#if filteredListings.length === 0}
 				<Table.Row>
-					<Table.Cell colspan={hasActions ? 11 : 10} class="py-12">
+					<Table.Cell colspan={hasActions ? 10 : 9} class="py-12">
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -158,7 +156,6 @@
 						class={onEdit ? 'cursor-pointer border-b last:border-b-0' : 'border-b last:border-b-0'}
 						onclick={() => handleRowOpen(listing)}
 					>
-						<Table.Cell class="font-medium">{listing.clientName}</Table.Cell>
 						<Table.Cell class="font-mono text-xs font-medium">{listing.id}</Table.Cell>
 						<Table.Cell>
 							<div class="font-medium">{listing.projectName}</div>

@@ -121,33 +121,6 @@
 				</section>
 
 				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-					<!--
-					<section class="rounded-xl border border-border bg-card p-5 sm:p-6">
-						<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
-							<UserIcon class="h-5 w-5" />
-							Client Details
-						</h2>
-						<div class="space-y-3 text-sm">
-							<div class="flex justify-between gap-4">
-								<span class="text-muted-foreground">Name</span>
-								<span class="font-medium">{listing.clientName}</span>
-							</div>
-							<div class="flex justify-between gap-4">
-								<span class="text-muted-foreground">Phone</span>
-								<span class="font-medium">{listing.clientPhone}</span>
-							</div>
-							<div class="flex justify-between gap-4">
-								<span class="text-muted-foreground">Email</span>
-								<span class="font-medium">{listing.clientEmail}</span>
-							</div>
-							<div class="flex justify-between gap-4">
-								<span class="text-muted-foreground">Agent</span>
-								<span class="text-right font-medium">{listing.agentEmail || 'N/A'}</span>
-							</div>
-						</div>
-					</section>
-					-->
-
 					<section class="rounded-xl border border-border bg-card p-5 sm:p-6">
 						<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
 							<Building2Icon class="h-5 w-5" />

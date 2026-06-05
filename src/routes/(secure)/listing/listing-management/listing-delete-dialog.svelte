@@ -35,9 +35,9 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Delete Listing</AlertDialog.Title>
 			<AlertDialog.Description>
-				Are you sure you want to delete the listing for
-				<span class="font-semibold">{listing?.clientName ?? ''}</span>
-				— {listing?.projectName ?? ''}, Unit {listing?.unitNo ?? ''}? This action cannot be undone.
+				Are you sure you want to delete
+				<span class="font-semibold">{listing?.projectName ?? ''}</span>, Unit {listing?.unitNo ??
+					''}? This action cannot be undone.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

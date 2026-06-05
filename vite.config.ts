@@ -5,6 +5,21 @@ import Icons from 'unplugin-icons/vite';
 import { defineConfig } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
 
+
+// [Polygram DOM] — OID stamper (added automatically, do not edit)
+import { createHash as __pgHash } from 'crypto';
+const __polygramOid = (() => {
+  const OID_ATTR = 'data-polygram-id';
+  const computeOid = (f, l, c, n) => __pgHash('sha1').update(`${f}:${l}:${c}:${n}`).digest('hex').slice(0, 8);
+  const getName = n => n.type === 'JSXIdentifier' ? n.name : n.type === 'JSXMemberExpression' ? `${getName(n.object)}.${n.property.name}` : 'unknown';
+  return ({ types: t }) => ({ visitor: { JSXOpeningElement(p, s) {
+    if (p.node.attributes.some(a => t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: OID_ATTR }))) return;
+    const loc = p.node.loc; if (!loc) return;
+    const oid = computeOid(s.filename ?? 'unknown', loc.start.line, loc.start.column, getName(p.node.name));
+    p.node.attributes.push(t.jsxAttribute(t.jsxIdentifier(OID_ATTR), t.stringLiteral(oid)));
+  }}});
+})();
+
 export default defineConfig(({ isSsrBuild }) => ({
 	build: {
 		rollupOptions: {

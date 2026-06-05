@@ -12,12 +12,9 @@
 	} from '$lib/listing-options';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { SvelteSet } from 'svelte/reactivity';
 	import BedDoubleIcon from '~icons/lucide/bed-double';
-	import BookmarkIcon from '~icons/lucide/bookmark';
 	import Building2Icon from '~icons/lucide/building-2';
 	import ChevronDownIcon from '~icons/lucide/chevron-down';
-	import HeartIcon from '~icons/lucide/heart';
 	import MapPinIcon from '~icons/lucide/map-pin';
 	import Maximize2Icon from '~icons/lucide/maximize-2';
 	import SearchIcon from '~icons/lucide/search';
@@ -36,7 +33,6 @@
 	let priceMax = $state('');
 	let distressFilter = $state('');
 	let sortFilter = $state('new');
-	let savedListings = $state<Set<string>>(new Set());
 	let initializedFromUrl = $state(false);
 
 	function formatPrice(price: number): string {
@@ -46,16 +42,6 @@
 	function getImageUrl(listing: Listing): string {
 		const firstPhoto = listing.mediaAssets?.find((a) => a.type === 'photo' && a.url);
 		return firstPhoto?.url ?? `https://picsum.photos/seed/${listing.id}/560/380`;
-	}
-
-	function toggleSave(id: string) {
-		const next = new SvelteSet(savedListings);
-		if (next.has(id)) {
-			next.delete(id);
-		} else {
-			next.add(id);
-		}
-		savedListings = next;
 	}
 
 	function slugify(value: string): string {
@@ -75,20 +61,22 @@
 	}
 
 	const allListings = $derived((data.listings ?? []) as Listing[]);
-	const projectOptions = $derived([
-		...new Set(allListings.map((listing) => listing.projectName).filter(Boolean))
-	].sort());
-	const handoverOptions = $derived([
-		...new Set(
-			allListings
-				.map((listing) =>
-					listing.handoverYear && listing.handoverQuarter
-						? `${listing.handoverYear}-${listing.handoverQuarter}`
-						: ''
-				)
-				.filter(Boolean)
-		)
-	].sort());
+	const projectOptions = $derived(
+		[...new Set(allListings.map((listing) => listing.projectName).filter(Boolean))].sort()
+	);
+	const handoverOptions = $derived(
+		[
+			...new Set(
+				allListings
+					.map((listing) =>
+						listing.handoverYear && listing.handoverQuarter
+							? `${listing.handoverYear}-${listing.handoverQuarter}`
+							: ''
+					)
+					.filter(Boolean)
+			)
+		].sort()
+	);
 
 	function getDistressType(listing: Listing): 'market' | 'original' | 'normal' {
 		const salePrice = listing.price;
@@ -120,32 +108,31 @@
 				const matchProjectType = !projectTypeFilter || l.projectType === projectTypeFilter;
 				const matchUnitType = !unitTypeFilter || l.unitType === unitTypeFilter;
 
-			const matchBeds =
-				!bedsFilter ||
-				l.bedrooms === bedsFilter ||
-				l.bedrooms === bedsFilter.replace(' Bed', '');
+				const matchBeds =
+					!bedsFilter || l.bedrooms === bedsFilter || l.bedrooms === bedsFilter.replace(' Bed', '');
 
-			const matchPrice =
-				(!priceMin || salePrice >= Number(priceMin)) &&
-				(!priceMax || salePrice <= Number(priceMax));
+				const matchPrice =
+					(!priceMin || salePrice >= Number(priceMin)) &&
+					(!priceMax || salePrice <= Number(priceMax));
 
 				const matchDistress = !distressFilter || getDistressType(l) === distressFilter;
 
-			return (
-				matchDeveloper &&
-				matchProject &&
-				matchCity &&
-				matchCommunity &&
-				matchHandover &&
-				matchProjectType &&
-				matchUnitType &&
-				matchBeds &&
-				matchPrice &&
-				matchDistress
-			);
+				return (
+					matchDeveloper &&
+					matchProject &&
+					matchCity &&
+					matchCommunity &&
+					matchHandover &&
+					matchProjectType &&
+					matchUnitType &&
+					matchBeds &&
+					matchPrice &&
+					matchDistress
+				);
 			})
 			.sort((a, b) => {
-				if (sortFilter === 'old') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+				if (sortFilter === 'old')
+					return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 				if (sortFilter === 'price-asc') return a.price - b.price;
 				if (sortFilter === 'price-desc') return b.price - a.price;
 				return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -222,89 +209,119 @@
 
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
 	<!-- Filters bar -->
-		<div class="rounded-xl border border-border bg-card p-4">
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-				<select bind:value={developerFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Developers</option>
-					{#each LISTING_DEVELOPERS as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={projectFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Projects</option>
-					{#each projectOptions as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={cityFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Cities</option>
-					{#each LISTING_CITIES as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={communityFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Communities</option>
-					{#each DUBAI_COMMUNITIES.filter((option) => option !== 'Others') as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={handoverFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">Any Handover</option>
-					{#each handoverOptions.length ? handoverOptions : HANDOVER_YEARS.flatMap((year) => HANDOVER_QUARTERS.map((quarter) => `${year}-${quarter}`)) as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<input
-					type="number"
-					placeholder="Min Price (AED)"
-					bind:value={priceMin}
-					class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-				/>
-				<input
-					type="number"
-					placeholder="Max Price (AED)"
-					bind:value={priceMax}
-					class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-				/>
-				<select bind:value={projectTypeFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Types</option>
-					<option>Off-Plan Property</option>
-					<option>Ready Property</option>
-				</select>
-				<select bind:value={unitTypeFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Unit Types</option>
-					{#each UNIT_TYPES.filter((option) => option !== 'Others') as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={bedsFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">Any Bedrooms</option>
-					{#each BEDROOM_OPTIONS as option (option)}
-						<option>{option}</option>
-					{/each}
-				</select>
-				<select bind:value={distressFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="">All Listings</option>
-					<option value="market">Below Market</option>
-					<option value="original">Below Original Price</option>
-					<option value="normal">Normal Listing</option>
-				</select>
-				<select bind:value={sortFilter} class="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-					<option value="new">Recently Added</option>
-					<option value="old">Oldest First</option>
-					<option value="price-asc">Price: Low to High</option>
-					<option value="price-desc">Price: High to Low</option>
-				</select>
-			</div>
-			<div class="mt-3 flex justify-end">
-				<button
-					onclick={clearFilters}
-					class="h-9 rounded-lg border border-input px-4 text-sm text-muted-foreground hover:bg-accent"
-				>
-					Clear
-				</button>
-			</div>
+	<div class="rounded-xl border border-border bg-card p-4">
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+			<select
+				bind:value={developerFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Developers</option>
+				{#each LISTING_DEVELOPERS as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={projectFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Projects</option>
+				{#each projectOptions as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={cityFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Cities</option>
+				{#each LISTING_CITIES as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={communityFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Communities</option>
+				{#each DUBAI_COMMUNITIES.filter((option) => option !== 'Others') as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={handoverFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">Any Handover</option>
+				{#each handoverOptions.length ? handoverOptions : HANDOVER_YEARS.flatMap( (year) => HANDOVER_QUARTERS.map((quarter) => `${year}-${quarter}`) ) as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<input
+				type="number"
+				placeholder="Min Price (AED)"
+				bind:value={priceMin}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			/>
+			<input
+				type="number"
+				placeholder="Max Price (AED)"
+				bind:value={priceMax}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			/>
+			<select
+				bind:value={projectTypeFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Types</option>
+				<option>Off-Plan Property</option>
+				<option>Ready Property</option>
+			</select>
+			<select
+				bind:value={unitTypeFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Unit Types</option>
+				{#each UNIT_TYPES.filter((option) => option !== 'Others') as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={bedsFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">Any Bedrooms</option>
+				{#each BEDROOM_OPTIONS as option (option)}
+					<option>{option}</option>
+				{/each}
+			</select>
+			<select
+				bind:value={distressFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="">All Listings</option>
+				<option value="market">Below Market</option>
+				<option value="original">Below Original Price</option>
+				<option value="normal">Normal Listing</option>
+			</select>
+			<select
+				bind:value={sortFilter}
+				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+			>
+				<option value="new">Recently Added</option>
+				<option value="old">Oldest First</option>
+				<option value="price-asc">Price: Low to High</option>
+				<option value="price-desc">Price: High to Low</option>
+			</select>
 		</div>
+		<div class="mt-3 flex justify-end">
+			<button
+				onclick={clearFilters}
+				class="h-9 rounded-lg border border-input px-4 text-sm text-muted-foreground hover:bg-accent"
+			>
+				Clear
+			</button>
+		</div>
+	</div>
 
 	<!-- Listings grid -->
 	{#if filteredListings.length === 0}
@@ -355,21 +372,6 @@
 						>
 							{isPortal ? 'Portal' : 'Internal'}
 						</span>
-						<!-- Save button -->
-						<button
-							onclick={(e) => {
-								e.stopPropagation();
-								toggleSave(listing.id);
-							}}
-							aria-label="Save listing"
-							class="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
-						>
-							{#if savedListings.has(listing.id)}
-								<HeartIcon class="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
-							{:else}
-								<HeartIcon class="h-3.5 w-3.5 text-muted-foreground" />
-							{/if}
-						</button>
 					</div>
 
 					<!-- Details -->
@@ -416,12 +418,6 @@
 							<p class="line-clamp-2 text-xs font-medium text-teal-600">
 								{listing.developerName}{listing.location ? ` | ${listing.location}` : ''}
 							</p>
-							<p class="text-xs text-muted-foreground">
-								Client: {listing.clientName}
-							</p>
-							<p class="truncate text-xs text-muted-foreground">
-								Created by: {listing.createdByEmail || 'N/A'}
-							</p>
 						</div>
 						<div class="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
 							<div class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
@@ -438,19 +434,6 @@
 								>
 									View on portal →
 								</a>
-							{:else}
-								<button
-									onclick={(e) => {
-										e.stopPropagation();
-										toggleSave(listing.id);
-									}}
-								>
-									<BookmarkIcon
-										class="h-3.5 w-3.5 {savedListings.has(listing.id)
-											? 'fill-primary text-primary'
-											: 'text-muted-foreground'}"
-									/>
-								</button>
 							{/if}
 						</div>
 					</div>

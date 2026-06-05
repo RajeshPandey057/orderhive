@@ -1,11 +1,8 @@
 <script lang="ts">
 	import FullLogo from '$lib/svg/full-logo.svelte';
-	import { SvelteSet } from 'svelte/reactivity';
 	import BathIcon from '~icons/lucide/bath';
 	import BedDoubleIcon from '~icons/lucide/bed-double';
-	import BookmarkIcon from '~icons/lucide/bookmark';
 	import ChevronDownIcon from '~icons/lucide/chevron-down';
-	import HeartIcon from '~icons/lucide/heart';
 	import MapPinIcon from '~icons/lucide/map-pin';
 	import Maximize2Icon from '~icons/lucide/maximize-2';
 	import SaveIcon from '~icons/lucide/save';
@@ -20,7 +17,6 @@
 	let priceMin = $state('');
 	let priceMax = $state('');
 	let areaMin = $state('');
-	let savedListings = $state<Set<string>>(new Set());
 
 	let { data } = $props();
 
@@ -79,16 +75,6 @@
 		return map[type] ?? '1';
 	}
 
-	function toggleSave(id: string) {
-		const next = new SvelteSet(savedListings);
-		if (next.has(id)) {
-			next.delete(id);
-		} else {
-			next.add(id);
-		}
-		savedListings = next;
-	}
-
 	function slugify(value: string): string {
 		return value
 			.toLowerCase()
@@ -135,8 +121,7 @@
 						: true);
 
 			const matchPrice =
-				(!priceMin || l.price >= Number(priceMin)) &&
-				(!priceMax || l.price <= Number(priceMax));
+				(!priceMin || l.price >= Number(priceMin)) && (!priceMax || l.price <= Number(priceMax));
 
 			const matchArea =
 				!areaMin || (l.builtUpArea ?? l.unitArea ?? l.plotSize ?? 0) >= Number(areaMin);
@@ -371,22 +356,6 @@
 							<div
 								class="pointer-events-none absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent"
 							></div>
-
-							<!-- Save / Heart button -->
-							<button
-								onclick={(e) => {
-									e.stopPropagation();
-									toggleSave(listing.id);
-								}}
-								aria-label="Save listing"
-								class="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-foreground shadow-sm transition-colors hover:bg-white"
-							>
-								{#if savedListings.has(listing.id)}
-									<HeartIcon class="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
-								{:else}
-									<HeartIcon class="h-3.5 w-3.5 text-muted-foreground" />
-								{/if}
-							</button>
 						</div>
 
 						<!-- Property Details -->
@@ -452,17 +421,6 @@
 											.city}
 									</span>
 								</div>
-								<button
-									class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-									onclick={(e) => {
-										e.stopPropagation();
-										toggleSave(listing.id);
-									}}
-								>
-									<BookmarkIcon
-										class={`h-3.5 w-3.5 ${savedListings.has(listing.id) ? 'fill-primary text-primary' : ''}`}
-									/>
-								</button>
 							</div>
 						</div>
 					</div>
