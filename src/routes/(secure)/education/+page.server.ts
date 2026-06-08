@@ -12,13 +12,13 @@ export async function load({ locals }) {
 	}
 
 	const snap = await educationVideosCollection.get();
-	const videos = snap.docs
+	const items = snap.docs
 		.map((doc) => serializeEducationVideo(doc.id, doc.data()))
-		.filter((video) => video.status === 'ready')
+		.filter((item) => item.status === 'ready')
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 	return {
-		videos,
+		items,
 		canManage: canManageEducationVideos(locals.user.role)
 	};
 }

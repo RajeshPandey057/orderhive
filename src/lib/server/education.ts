@@ -6,6 +6,7 @@ import {
 import { firestore } from '$lib/server/firebase';
 
 type EducationVideoRecord = {
+	itemType?: 'video' | 'pdf';
 	title?: string;
 	subject?: string;
 	tags?: string[];
@@ -13,6 +14,11 @@ type EducationVideoRecord = {
 	sourceUrl?: string;
 	embedUrl?: string;
 	driveFileId?: string;
+	filePath?: string;
+	fileName?: string;
+	fileSize?: number;
+	contentType?: string;
+	lastModified?: number;
 	searchText?: string;
 	searchTokens?: string[];
 	status?: EducationVideoStatus;
@@ -42,13 +48,19 @@ export function serializeEducationVideo(
 
 	return {
 		id,
+		itemType: record.itemType === 'pdf' ? 'pdf' : 'video',
 		title: record.title ?? 'Untitled video',
 		subject: record.subject ?? '',
 		tags,
-		sourceType: record.sourceType === 'google-drive' ? 'google-drive' : 'google-drive',
+		sourceType: record.sourceType === 'upload' ? 'upload' : 'google-drive',
 		sourceUrl: record.sourceUrl ?? '',
 		embedUrl: record.embedUrl ?? '',
 		driveFileId: record.driveFileId ?? '',
+		filePath: record.filePath ?? '',
+		fileName: record.fileName ?? '',
+		fileSize: record.fileSize ?? 0,
+		contentType: record.contentType ?? '',
+		lastModified: record.lastModified ?? 0,
 		searchText: searchIndex.searchText,
 		searchTokens: searchIndex.searchTokens,
 		status: record.status === 'archived' || record.status === 'invalid' ? record.status : 'ready',

@@ -2,13 +2,23 @@ const DRIVE_HOSTS = new Set(['drive.google.com', 'docs.google.com']);
 const DRIVE_FILE_ID_PATTERN = /^[a-zA-Z0-9_-]{10,}$/;
 
 export type EducationVideoStatus = 'ready' | 'invalid' | 'archived';
-export type EducationVideoSourceType = 'google-drive';
+export type EducationVideoSourceType = 'google-drive' | 'upload';
+
+export const MAX_EDUCATION_PDF_SIZE = 50 * 1024 * 1024;
 
 export type NormalizedGoogleDriveSource = {
 	driveFileId: string;
 	sourceUrl: string;
 	embedUrl: string;
 };
+
+export function isSupportedEducationPdf(file: File | null | undefined): file is File {
+	if (!(file instanceof File) || file.size <= 0) return false;
+	const lowerName = file.name.toLowerCase();
+	const isPdfMime =
+		file.type === 'application/pdf' || file.type === 'application/x-pdf' || file.type === '';
+	return isPdfMime && lowerName.endsWith('.pdf');
+}
 
 export function getGoogleDriveThumbnailUrl(driveFileId: string, size = 1200): string {
 	return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w${size}`;

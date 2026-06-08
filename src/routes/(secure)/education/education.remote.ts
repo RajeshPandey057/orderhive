@@ -56,6 +56,7 @@ export const createEducationVideo = command(createEducationVideoSchema, async (d
 	const docRef = educationVideosCollection.doc();
 
 	await docRef.set({
+		itemType: 'video',
 		title,
 		subject,
 		tags,
@@ -101,6 +102,7 @@ export const updateEducationVideo = command(updateEducationVideoSchema, async (d
 
 	await docRef.set(
 		{
+			itemType: 'video',
 			title,
 			subject,
 			tags,

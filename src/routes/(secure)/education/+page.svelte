@@ -12,7 +12,9 @@
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import {
+		MAX_EDUCATION_PDF_SIZE,
 		getGoogleDriveThumbnailUrl,
+		isSupportedEducationPdf,
 		normalizeEducationTags,
 		normalizeGoogleDriveVideoSource,
 		type NormalizedGoogleDriveSource
@@ -21,40 +23,59 @@
 	import ChevronLeftIcon from '~icons/lucide/chevron-left';
 	import ChevronRightIcon from '~icons/lucide/chevron-right';
 	import CirclePlayIcon from '~icons/lucide/circle-play';
+	import FileTextIcon from '~icons/lucide/file-text';
 	import GraduationCapIcon from '~icons/lucide/graduation-cap';
+	import LoaderCircleIcon from '~icons/lucide/loader-circle';
 	import PencilIcon from '~icons/lucide/pencil';
 	import PlusIcon from '~icons/lucide/plus';
 	import SearchIcon from '~icons/lucide/search';
 	import XIcon from '~icons/lucide/x';
 	import { createEducationVideo, updateEducationVideo } from './education.remote';
 
+	type EducationFilter = 'all' | 'video' | 'pdf';
+	type SortOrder = 'newest' | 'oldest' | 'title';
+
 	let { data } = $props<{
 		data: {
-			videos: EducationVideo[];
+			items: EducationVideo[];
 			canManage: boolean;
-			user?: { role?: string | null } | null;
 		};
 	}>();
 
-	const allVideos = $derived((data.videos ?? []) as EducationVideo[]);
+	const allItems = $derived((data.items ?? []) as EducationVideo[]);
+	const canManage = $derived(Boolean(data.canManage));
 
 	let searchQuery = $state('');
-	let sortOrder = $state<'newest' | 'oldest' | 'title'>('newest');
-	let addVideoOpen = $state(false);
-	let title = $state('');
-	let driveLink = $state('');
-	let subject = $state('');
-	let tagInputs = $state(['', '', '']);
-	let titleError = $state('');
-	let driveLinkError = $state('');
-	let submitError = $state('');
-	let creatingVideo = $state(false);
-	let editingVideoId = $state<string | null>(null);
-	let activeVideo = $state<EducationVideo | null>(null);
+	let mediaFilter = $state<EducationFilter>('all');
+	let sortOrder = $state<SortOrder>('newest');
 	let fullscreenContainer = $state<HTMLDivElement | null>(null);
+	let activeItem = $state<EducationVideo | null>(null);
 	let thumbnailFailures = $state<Record<string, boolean>>({});
+	let pdfFrameLoading = $state<Record<string, boolean>>({});
 
-	const canManage = $derived(Boolean(data.canManage));
+	let addVideoOpen = $state(false);
+	let videoTitle = $state('');
+	let driveLink = $state('');
+	let videoSubject = $state('');
+	let videoTagInputs = $state(['', '', '']);
+	let videoTitleError = $state('');
+	let driveLinkError = $state('');
+	let videoSubmitError = $state('');
+	let savingVideo = $state(false);
+	let editingVideoId = $state<string | null>(null);
+
+	let addPdfOpen = $state(false);
+	let pdfTitle = $state('');
+	let pdfSubject = $state('');
+	let pdfTagInputs = $state(['', '', '']);
+	let pdfFile = $state<File | null>(null);
+	let pdfFileInputKey = $state(0);
+	let currentPdfFileName = $state('');
+	let pdfTitleError = $state('');
+	let pdfFileError = $state('');
+	let pdfSubmitError = $state('');
+	let savingPdf = $state(false);
+	let editingPdfId = $state<string | null>(null);
 
 	const drivePreview = $derived.by(() => {
 		const trimmedLink = driveLink.trim();
@@ -79,13 +100,17 @@
 		};
 	});
 
-	const filteredVideos = $derived.by(() => {
+	const filteredItems = $derived.by(() => {
 		const query = searchQuery.trim().toLowerCase();
 
-		return [...allVideos]
-			.filter((video) => {
+		return [...allItems]
+			.filter((item) => {
+				if (mediaFilter !== 'all' && item.itemType !== mediaFilter) {
+					return false;
+				}
+
 				if (!query) return true;
-				return video.searchText.includes(query);
+				return item.searchText.includes(query);
 			})
 			.sort((left, right) => {
 				if (sortOrder === 'oldest') {
@@ -100,57 +125,179 @@
 			});
 	});
 
-	function formatDate(value: string): string {
-		return new Intl.DateTimeFormat('en-AE', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric'
-		}).format(new Date(value));
+	const activeItemIndex = $derived.by(() => {
+		const currentItem = activeItem;
+		if (!currentItem) return -1;
+
+		return filteredItems.findIndex((item) => item.id === currentItem.id);
+	});
+
+	const canGoToPreviousItem = $derived(activeItemIndex > 0);
+	const canGoToNextItem = $derived(activeItemIndex >= 0 && activeItemIndex < filteredItems.length - 1);
+
+	function formatCountLabel(): string {
+		if (mediaFilter === 'video') return 'videos';
+		if (mediaFilter === 'pdf') return 'PDFs';
+		return 'items';
 	}
 
-	function addTagField() {
-		tagInputs = [...tagInputs, ''];
+	function getEmptyTitle(): string {
+		if (searchQuery.trim()) {
+			return mediaFilter === 'all'
+				? 'No matching content found'
+				: mediaFilter === 'video'
+					? 'No matching videos found'
+					: 'No matching PDFs found';
+		}
+
+		return mediaFilter === 'all'
+			? 'No education content in the library yet'
+			: mediaFilter === 'video'
+				? 'No videos in the library yet'
+				: 'No PDFs in the library yet';
 	}
 
-	function removeTagField(index: number) {
-		tagInputs = tagInputs.filter((_, tagIndex) => tagIndex !== index);
+	function getEmptyDescription(): string {
+		if (searchQuery.trim()) {
+			return 'Try adjusting your search terms or switching the content filter.';
+		}
+
+		if (mediaFilter === 'pdf') {
+			return 'Admins can upload PDFs to start building the Education Module library.';
+		}
+
+		if (mediaFilter === 'video') {
+			return 'Admins can add Google Drive video links to start building the Education Module.';
+		}
+
+		return 'Admins can add videos and PDFs to start building the Education Module.';
 	}
 
-	function resetCreateForm() {
+	function getVideoThumbnailUrl(item: EducationVideo): string | null {
+		if (item.itemType !== 'video' || !item.driveFileId || thumbnailFailures[item.id]) return null;
+		return getGoogleDriveThumbnailUrl(item.driveFileId);
+	}
+
+	function markThumbnailFailed(itemId: string) {
+		thumbnailFailures = { ...thumbnailFailures, [itemId]: true };
+	}
+
+	function getPdfPreviewUrl(item: EducationVideo, mode: 'card' | 'hover' | 'overlay' = 'card'): string {
+		const hash =
+			mode === 'card'
+				? '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'
+				: '#toolbar=0&navpanes=0&view=FitH';
+		return `/api/education/assets/${item.id}${hash}`;
+	}
+
+	function getPdfFrameKey(itemId: string, mode: 'card' | 'hover' | 'overlay'): string {
+		return `${itemId}:${mode}`;
+	}
+
+	function isPdfFrameLoading(itemId: string, mode: 'card' | 'hover' | 'overlay'): boolean {
+		return pdfFrameLoading[getPdfFrameKey(itemId, mode)] ?? true;
+	}
+
+	function setPdfFrameLoading(
+		itemId: string,
+		mode: 'card' | 'hover' | 'overlay',
+		isLoading: boolean
+	) {
+		pdfFrameLoading = {
+			...pdfFrameLoading,
+			[getPdfFrameKey(itemId, mode)]: isLoading
+		};
+	}
+
+	function addVideoTagField() {
+		videoTagInputs = [...videoTagInputs, ''];
+	}
+
+	function removeVideoTagField(index: number) {
+		videoTagInputs = videoTagInputs.filter((_, tagIndex) => tagIndex !== index);
+	}
+
+	function addPdfTagField() {
+		pdfTagInputs = [...pdfTagInputs, ''];
+	}
+
+	function removePdfTagField(index: number) {
+		pdfTagInputs = pdfTagInputs.filter((_, tagIndex) => tagIndex !== index);
+	}
+
+	function resetVideoForm() {
 		editingVideoId = null;
-		title = '';
+		videoTitle = '';
 		driveLink = '';
-		subject = '';
-		tagInputs = ['', '', ''];
-		titleError = '';
+		videoSubject = '';
+		videoTagInputs = ['', '', ''];
+		videoTitleError = '';
 		driveLinkError = '';
-		submitError = '';
+		videoSubmitError = '';
 	}
 
-	function openCreateSheet() {
-		resetCreateForm();
+	function resetPdfForm() {
+		editingPdfId = null;
+		pdfTitle = '';
+		pdfSubject = '';
+		pdfTagInputs = ['', '', ''];
+		pdfFile = null;
+		currentPdfFileName = '';
+		pdfTitleError = '';
+		pdfFileError = '';
+		pdfSubmitError = '';
+		pdfFileInputKey += 1;
+	}
+
+	function openCreateVideoSheet() {
+		resetVideoForm();
+		addPdfOpen = false;
 		addVideoOpen = true;
 	}
 
-	function openEditSheet(video: EducationVideo) {
-		editingVideoId = video.id;
-		title = video.title;
-		driveLink = video.sourceUrl;
-		subject = video.subject;
-		tagInputs = video.tags.length > 0 ? [...video.tags, '', '', ''].slice(0, Math.max(video.tags.length, 3)) : ['', '', ''];
-		titleError = '';
+	function openEditVideoSheet(item: EducationVideo) {
+		editingVideoId = item.id;
+		videoTitle = item.title;
+		driveLink = item.sourceUrl;
+		videoSubject = item.subject;
+		videoTagInputs =
+			item.tags.length > 0 ? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3)) : ['', '', ''];
+		videoTitleError = '';
 		driveLinkError = '';
-		submitError = '';
+		videoSubmitError = '';
+		addPdfOpen = false;
 		addVideoOpen = true;
 	}
 
-	function validateCreateForm(): NormalizedGoogleDriveSource | null {
-		titleError = '';
-		driveLinkError = '';
-		submitError = '';
+	function openCreatePdfSheet() {
+		resetPdfForm();
+		addVideoOpen = false;
+		addPdfOpen = true;
+	}
 
-		if (!title.trim()) {
-			titleError = 'Title is required.';
+	function openEditPdfSheet(item: EducationVideo) {
+		editingPdfId = item.id;
+		pdfTitle = item.title;
+		pdfSubject = item.subject;
+		pdfTagInputs =
+			item.tags.length > 0 ? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3)) : ['', '', ''];
+		pdfFile = null;
+		currentPdfFileName = item.fileName ?? '';
+		pdfTitleError = '';
+		pdfFileError = '';
+		pdfSubmitError = '';
+		pdfFileInputKey += 1;
+		addVideoOpen = false;
+		addPdfOpen = true;
+	}
+
+	function validateVideoForm(): NormalizedGoogleDriveSource | null {
+		videoTitleError = '';
+		driveLinkError = '';
+		videoSubmitError = '';
+
+		if (!videoTitle.trim()) {
+			videoTitleError = 'Title is required.';
 		}
 
 		const normalizedSource = normalizeGoogleDriveVideoSource(driveLink);
@@ -160,27 +307,51 @@
 			driveLinkError = 'Please provide a valid embeddable Google Drive file link.';
 		}
 
-		if (titleError || driveLinkError || !normalizedSource) {
+		if (videoTitleError || driveLinkError || !normalizedSource) {
 			return null;
 		}
 
 		return normalizedSource;
 	}
 
-	async function handleCreateVideoSubmit(event: SubmitEvent) {
+	function validatePdfForm(requireFile: boolean): boolean {
+		pdfTitleError = '';
+		pdfFileError = '';
+		pdfSubmitError = '';
+
+		if (!pdfTitle.trim()) {
+			pdfTitleError = 'Title is required.';
+		}
+
+		if (requireFile && !pdfFile) {
+			pdfFileError = 'PDF file is required.';
+		}
+
+		if (pdfFile && !isSupportedEducationPdf(pdfFile)) {
+			pdfFileError = 'Please upload a valid PDF file.';
+		}
+
+		if (pdfFile && pdfFile.size > MAX_EDUCATION_PDF_SIZE) {
+			pdfFileError = 'PDF file must be 50 MB or smaller.';
+		}
+
+		return !(pdfTitleError || pdfFileError);
+	}
+
+	async function handleVideoSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		const normalizedSource = validateCreateForm();
+		const normalizedSource = validateVideoForm();
 		if (!normalizedSource) return;
 
-		creatingVideo = true;
+		savingVideo = true;
 
 		try {
 			const payload = {
-				title,
+				title: videoTitle,
 				driveLink: normalizedSource.sourceUrl,
-				subject,
-				tags: normalizeEducationTags(tagInputs)
+				subject: videoSubject,
+				tags: normalizeEducationTags(videoTagInputs)
 			};
 
 			if (editingVideoId) {
@@ -193,19 +364,77 @@
 				await createEducationVideo(payload);
 				toast.success('Education video added');
 			}
+
 			addVideoOpen = false;
-			resetCreateForm();
+			resetVideoForm();
 			await invalidateAll();
 		} catch (err) {
-			submitError = err instanceof Error ? err.message : 'Unable to save the video right now.';
-			toast.error(submitError);
+			videoSubmitError = err instanceof Error ? err.message : 'Unable to save the video right now.';
+			toast.error(videoSubmitError);
 		} finally {
-			creatingVideo = false;
+			savingVideo = false;
 		}
 	}
 
-	async function openVideo(video: EducationVideo) {
-		activeVideo = video;
+	function handlePdfFileChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		pdfFile = input.files?.[0] ?? null;
+		currentPdfFileName = pdfFile?.name ?? (editingPdfId ? currentPdfFileName : '');
+		pdfFileError = '';
+	}
+
+	async function handlePdfSubmit(event: SubmitEvent) {
+		event.preventDefault();
+
+		const requireFile = !editingPdfId;
+		if (!validatePdfForm(requireFile)) return;
+
+		savingPdf = true;
+
+		try {
+			const formData = new FormData();
+			formData.append('title', pdfTitle);
+			formData.append('subject', pdfSubject);
+
+			for (const tag of normalizeEducationTags(pdfTagInputs)) {
+				formData.append('tags', tag);
+			}
+
+			if (editingPdfId) {
+				formData.append('id', editingPdfId);
+			}
+
+			if (pdfFile) {
+				formData.append('pdfFile', pdfFile);
+			}
+
+			const response = await fetch('/api/education/pdfs', {
+				method: editingPdfId ? 'PUT' : 'POST',
+				body: formData
+			});
+
+			if (!response.ok) {
+				const errorText = (await response.text()).trim();
+				throw new Error(errorText || 'Unable to save the PDF right now.');
+			}
+
+			toast.success(editingPdfId ? 'Education PDF updated' : 'Education PDF added');
+			addPdfOpen = false;
+			resetPdfForm();
+			await invalidateAll();
+		} catch (err) {
+			pdfSubmitError = err instanceof Error ? err.message : 'Unable to save the PDF right now.';
+			toast.error(pdfSubmitError);
+		} finally {
+			savingPdf = false;
+		}
+	}
+
+	async function openItem(item: EducationVideo) {
+		activeItem = item;
+		if (item.itemType === 'pdf') {
+			setPdfFrameLoading(item.id, 'overlay', true);
+		}
 		await tick();
 
 		try {
@@ -215,7 +444,7 @@
 		}
 	}
 
-	async function closeVideo() {
+	async function closeActiveItem() {
 		if (document.fullscreenElement === fullscreenContainer) {
 			try {
 				await document.exitFullscreen();
@@ -224,86 +453,81 @@
 			}
 		}
 
-		activeVideo = null;
+		activeItem = null;
+	}
+
+	function openAdjacentItem(direction: -1 | 1) {
+		if (activeItemIndex < 0) return;
+
+		const nextItem = filteredItems[activeItemIndex + direction];
+		if (!nextItem) return;
+
+		activeItem = nextItem;
+		if (nextItem.itemType === 'pdf') {
+			setPdfFrameLoading(nextItem.id, 'overlay', true);
+		}
 	}
 
 	function handleWindowKeydown(event: KeyboardEvent) {
-		if (!activeVideo) return;
+		if (!activeItem) return;
 
 		if (event.key === 'Escape') {
-			activeVideo = null;
+			void closeActiveItem();
 			return;
 		}
 
 		if (event.key === 'ArrowLeft') {
-			openAdjacentVideo(-1);
+			openAdjacentItem(-1);
 			return;
 		}
 
 		if (event.key === 'ArrowRight') {
-			openAdjacentVideo(1);
+			openAdjacentItem(1);
 		}
-	}
-
-	function getVideoThumbnailUrl(video: EducationVideo): string | null {
-		if (!video.driveFileId || thumbnailFailures[video.id]) return null;
-		return getGoogleDriveThumbnailUrl(video.driveFileId);
-	}
-
-	function markThumbnailFailed(videoId: string) {
-		thumbnailFailures = { ...thumbnailFailures, [videoId]: true };
-	}
-
-	const activeVideoIndex = $derived.by(() => {
-		const currentVideo = activeVideo;
-		if (!currentVideo) return -1;
-
-		return filteredVideos.findIndex((video) => video.id === currentVideo.id);
-	});
-
-	const canGoToPreviousVideo = $derived(activeVideoIndex > 0);
-	const canGoToNextVideo = $derived(
-		activeVideoIndex >= 0 && activeVideoIndex < filteredVideos.length - 1
-	);
-
-	function openAdjacentVideo(direction: -1 | 1) {
-		if (activeVideoIndex < 0) return;
-
-		const nextVideo = filteredVideos[activeVideoIndex + direction];
-		if (!nextVideo) return;
-
-		activeVideo = nextVideo;
 	}
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
 
-<div class="pt-2">
+<div class="mb-6 pt-2">
 	<SecurePageHeader
 		title="Education Module"
-		description="Internal video library for training, walkthroughs, and onboarding content."
+		description="Internal learning library for training videos, walkthroughs, and PDF guides."
 	/>
 </div>
 
-<div class="flex flex-1 flex-col gap-5 p-6">
+<div class="flex flex-1 flex-col gap-5 px-6 pb-6">
 	<div class="rounded-2xl border border-[#E7ECEA] bg-white p-5 shadow-sm">
 		<div class="flex flex-col gap-4">
 			<div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 				<div class="flex flex-col gap-1">
-					<p class="text-sm font-medium text-foreground">{filteredVideos.length} / {allVideos.length} videos</p>
+					<p class="text-sm font-medium text-foreground">
+						{filteredItems.length} / {allItems.length} {formatCountLabel()}
+					</p>
 					<p class="text-xs text-muted-foreground">
-						Search across video title, tags, and subject metadata.
+						Search across title, tags, and subject metadata.
 					</p>
 				</div>
+
 				{#if canManage}
-					<Button.Root class="gap-2 self-start xl:self-auto" onclick={openCreateSheet}>
-						<PlusIcon class="size-4" />
-						Add Video
-					</Button.Root>
+					<div class="flex flex-wrap items-center gap-2">
+						<Button.Root
+							variant="outline"
+							class="gap-2 border-[#D9E1DE] bg-white"
+							onclick={openCreatePdfSheet}
+						>
+							<PlusIcon class="size-4" />
+							Add PDF
+						</Button.Root>
+						<Button.Root class="gap-2" onclick={openCreateVideoSheet}>
+							<PlusIcon class="size-4" />
+							Add Video
+						</Button.Root>
+					</div>
 				{/if}
 			</div>
 
-			<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+			<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px_auto]">
 				<div class="relative flex-1">
 					<SearchIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
@@ -327,11 +551,33 @@
 						<Select.Item value="title">Title A-Z</Select.Item>
 					</Select.Content>
 				</Select.Root>
+
+				<div class="inline-flex h-11 w-full items-center rounded-xl border border-[#E7ECEA] bg-[#F8FAF9] p-1 xl:w-auto">
+					{#each [
+						{ value: 'all', label: 'All' },
+						{ value: 'video', label: 'Videos' },
+						{ value: 'pdf', label: 'PDF' }
+					] as option (option.value)}
+						<button
+							type="button"
+							class={`inline-flex h-9 min-w-[82px] items-center justify-center rounded-lg px-4 text-sm font-medium transition ${
+								mediaFilter === option.value
+									? 'bg-white text-foreground shadow-xs'
+									: 'text-muted-foreground hover:text-foreground'
+							}`}
+							onclick={() => {
+								mediaFilter = option.value as EducationFilter;
+							}}
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
 			</div>
 		</div>
 	</div>
 
-	{#if filteredVideos.length === 0}
+	{#if filteredItems.length === 0}
 		<div class="rounded-2xl border border-dashed border-[#D8DFDD] bg-white px-6 py-12">
 			<Empty.Root class="mx-auto max-w-xl text-center">
 				<Empty.Header>
@@ -339,74 +585,115 @@
 						<GraduationCapIcon class="size-7" />
 					</Empty.Media>
 					<Empty.Title class="mt-4 text-xl font-semibold text-foreground">
-						{searchQuery.trim() ? 'No matching videos found' : 'No videos in the library yet'}
+						{getEmptyTitle()}
 					</Empty.Title>
 					<Empty.Description class="mt-2 text-sm text-muted-foreground">
-						{searchQuery.trim()
-							? 'Try adjusting your search terms or sort order.'
-							: 'Admins can add Google Drive video links to start building the Education Module.'}
+						{getEmptyDescription()}
 					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
 		</div>
 	{:else}
 		<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-			{#each filteredVideos as video (video.id)}
+			{#each filteredItems as item (item.id)}
 				<Card.Root class="gap-0 overflow-hidden border-[#E7ECEA] py-0 shadow-sm transition-transform duration-200 hover:-translate-y-0.5">
 					<div class="border-b border-[#ECE7E1]">
-						<button
-							type="button"
-							class="group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black/15 text-white transition hover:bg-black/25"
-							onclick={() => openVideo(video)}
-							aria-label={`Play ${video.title}`}
-						>
-							{#if getVideoThumbnailUrl(video)}
-								<img
-									src={getVideoThumbnailUrl(video) ?? undefined}
-									alt={`${video.title} thumbnail`}
-									class="absolute inset-0 h-full w-full object-cover"
-									loading="lazy"
-									onerror={() => markThumbnailFailed(video.id)}
-								/>
-								<div class="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-black/15"></div>
-							{/if}
+						{#if item.itemType === 'video'}
+							<button
+								type="button"
+								class="group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black/15 text-white transition hover:bg-black/25"
+								onclick={() => openItem(item)}
+								aria-label={`Play ${item.title}`}
+							>
+								{#if getVideoThumbnailUrl(item)}
+									<img
+										src={getVideoThumbnailUrl(item) ?? undefined}
+										alt={`${item.title} thumbnail`}
+										class="absolute inset-0 h-full w-full object-cover"
+										loading="lazy"
+										onerror={() => markThumbnailFailed(item.id)}
+									/>
+									<div class="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-black/15"></div>
+								{/if}
 
-							<div class="flex flex-col items-center gap-2">
-								<CirclePlayIcon class="size-12 transition group-hover:scale-105" />
-								<span class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-[0.2em] uppercase">
-									Play Video
-								</span>
-							</div>
-						</button>
+								<div class="absolute top-3 left-3">
+									<Badge class="rounded-full bg-white/14 px-2.5 py-1 text-white backdrop-blur-sm">
+										Video
+									</Badge>
+								</div>
+
+								<div class="flex flex-col items-center gap-2">
+									<CirclePlayIcon class="size-12 transition group-hover:scale-105" />
+									<span class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-[0.2em] uppercase">
+										Play Video
+									</span>
+								</div>
+							</button>
+						{:else}
+							<button
+								type="button"
+								class="group relative block aspect-video w-full overflow-hidden bg-[#F4F6F5]"
+								onclick={() => openItem(item)}
+								aria-label={`Open ${item.title}`}
+							>
+								<iframe
+									src={getPdfPreviewUrl(item, 'card')}
+									title={`${item.title} preview`}
+									class="pointer-events-none absolute inset-0 h-full w-full bg-white"
+									onload={() => setPdfFrameLoading(item.id, 'card', false)}
+								></iframe>
+								{#if isPdfFrameLoading(item.id, 'card')}
+									<div class="absolute inset-0 flex items-center justify-center bg-[#F6F8F7]">
+										<div class="flex flex-col items-center gap-2 text-[#5D6B68]">
+											<div class="flex size-12 items-center justify-center rounded-full bg-white shadow-sm">
+												<LoaderCircleIcon class="size-5 animate-spin" />
+											</div>
+											<span class="text-xs font-medium tracking-[0.18em] uppercase">
+												Loading PDF
+											</span>
+										</div>
+									</div>
+								{/if}
+								<div class="absolute inset-0 bg-linear-to-t from-black/28 via-transparent to-black/8"></div>
+								<div class="absolute top-3 left-3">
+									<Badge class="rounded-full bg-white px-2.5 py-1 text-[#1E2A4A]">
+										PDF
+									</Badge>
+								</div>
+								<div class="absolute right-3 bottom-3 flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+									<FileTextIcon class="size-4" />
+									Open PDF
+								</div>
+							</button>
+						{/if}
 					</div>
 
 					<Card.Content class="space-y-2 px-4 pt-2 pb-3">
 						<div class="flex items-start justify-between gap-2.5">
 							<div class="min-w-0">
-								<h2 class="truncate text-base font-semibold text-foreground">{video.title}</h2>
-								<p class="mt-0 text-xs text-muted-foreground">
-									Added by {video.createdByEmail || 'Admin'} on {formatDate(video.createdAt)}
+								<h2 class="truncate text-base font-semibold text-foreground">{item.title}</h2>
+								<p class="mt-0 line-clamp-2 text-sm text-muted-foreground">
+									{item.subject?.trim() || 'No subject added'}
 								</p>
 							</div>
-							<div class="flex items-center gap-1.5">
-								{#if canManage}
-									<Button.Root
-										type="button"
-										variant="ghost"
-										size="icon"
-										class="size-8 text-[#F04C06] hover:bg-[#FFF1E6] hover:text-[#F04C06]"
-										onclick={() => openEditSheet(video)}
-										aria-label={`Edit ${video.title}`}
-									>
-										<PencilIcon class="size-4" />
-									</Button.Root>
-								{/if}
-							</div>
+
+							{#if canManage}
+								<Button.Root
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0 text-[#F04C06] hover:bg-[#FFF1E6] hover:text-[#F04C06]"
+									onclick={() => (item.itemType === 'video' ? openEditVideoSheet(item) : openEditPdfSheet(item))}
+									aria-label={`Edit ${item.title}`}
+								>
+									<PencilIcon class="size-4" />
+								</Button.Root>
+							{/if}
 						</div>
 
 						<div class="flex flex-wrap gap-1">
-							{#if video.tags.length > 0}
-								{#each video.tags as tag (tag)}
+							{#if item.tags.length > 0}
+								{#each item.tags as tag (tag)}
 									<Badge class="rounded-full bg-[#FFF1E6] px-2.5 py-1 text-[#A84B08]">
 										{tag}
 									</Badge>
@@ -436,13 +723,17 @@
 				</Sheet.Description>
 			</Sheet.Header>
 
-			<form class="flex flex-1 flex-col" onsubmit={handleCreateVideoSubmit}>
+			<form class="flex flex-1 flex-col" onsubmit={handleVideoSubmit}>
 				<div class="flex-1 space-y-6 px-6 py-5">
 					<Field.Field>
-						<Field.Label for="education-title">Video title</Field.Label>
-						<Input id="education-title" bind:value={title} placeholder="e.g. Weekly sales process walkthrough" />
-						{#if titleError}
-							<Field.Error>{titleError}</Field.Error>
+						<Field.Label for="education-video-title">Video title</Field.Label>
+						<Input
+							id="education-video-title"
+							bind:value={videoTitle}
+							placeholder="e.g. Weekly sales process walkthrough"
+						/>
+						{#if videoTitleError}
+							<Field.Error>{videoTitleError}</Field.Error>
 						{/if}
 					</Field.Field>
 
@@ -454,7 +745,7 @@
 							placeholder="https://drive.google.com/file/d/.../view"
 						/>
 						<Field.Description>
-							Only Google Drive file links are supported in v1. Open/public links remain shareable outside the app.
+							Only Google Drive file links are supported for videos. Open/public links remain shareable outside the app.
 						</Field.Description>
 						{#if driveLinkError}
 							<Field.Error>{driveLinkError}</Field.Error>
@@ -500,22 +791,22 @@
 					<Field.Field>
 						<div class="flex items-center justify-between">
 							<Field.Label>Tags</Field.Label>
-							<Button.Root type="button" variant="outline" size="sm" class="gap-2" onclick={addTagField}>
+							<Button.Root type="button" variant="outline" size="sm" class="gap-2" onclick={addVideoTagField}>
 								<PlusIcon class="size-4" />
 								Add tag
 							</Button.Root>
 						</div>
 						<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-							{#each tagInputs as _, index (index)}
+							{#each videoTagInputs as _, index (index)}
 								<div class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2">
 									<Input
-										bind:value={tagInputs[index]}
+										bind:value={videoTagInputs[index]}
 										placeholder={`Tag ${index + 1}`}
 										class="border-0 bg-transparent shadow-none focus-visible:ring-0"
 										oninput={(event) => {
 											const value = (event.currentTarget as HTMLInputElement).value;
-											tagInputs[index] = value;
-											tagInputs = [...tagInputs];
+											videoTagInputs[index] = value;
+											videoTagInputs = [...videoTagInputs];
 										}}
 									/>
 									{#if index >= 3}
@@ -524,7 +815,7 @@
 											variant="ghost"
 											size="icon"
 											class="shrink-0"
-											onclick={() => removeTagField(index)}
+											onclick={() => removeVideoTagField(index)}
 											aria-label={`Remove tag ${index + 1}`}
 										>
 											<XIcon class="size-4" />
@@ -536,18 +827,18 @@
 					</Field.Field>
 
 					<Field.Field>
-						<Field.Label for="education-subject">Subject</Field.Label>
+						<Field.Label for="education-video-subject">Subject</Field.Label>
 						<Textarea
-							id="education-subject"
-							bind:value={subject}
+							id="education-video-subject"
+							bind:value={videoSubject}
 							rows={7}
 							placeholder="Add context, talking points, or a longer description for search."
 						/>
 					</Field.Field>
 
-					{#if submitError}
+					{#if videoSubmitError}
 						<div class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-							{submitError}
+							{videoSubmitError}
 						</div>
 					{/if}
 				</div>
@@ -562,13 +853,13 @@
 							variant="outline"
 							onclick={() => {
 								addVideoOpen = false;
-								resetCreateForm();
+								resetVideoForm();
 							}}
 						>
 							Cancel
 						</Button.Root>
-						<Button.Root type="submit" disabled={creatingVideo}>
-							{creatingVideo ? 'Saving...' : editingVideoId ? 'Update Video' : 'Save Video'}
+						<Button.Root type="submit" disabled={savingVideo}>
+							{savingVideo ? 'Saving...' : editingVideoId ? 'Update Video' : 'Save Video'}
 						</Button.Root>
 					</div>
 				</Sheet.Footer>
@@ -577,7 +868,136 @@
 	</Sheet.Content>
 </Sheet.Root>
 
-{#if activeVideo}
+<Sheet.Root bind:open={addPdfOpen}>
+	<Sheet.Content side="right" class="w-full overflow-y-auto p-0 sm:max-w-2xl">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="border-b border-border px-6 py-5 text-left">
+				<Sheet.Title class="text-2xl font-semibold">
+					{editingPdfId ? 'Edit PDF' : 'Add PDF'}
+				</Sheet.Title>
+				<Sheet.Description>
+					Upload a PDF up to 50 MB. The file stays inside the Education Module and opens inline for reading.
+				</Sheet.Description>
+			</Sheet.Header>
+
+			<form class="flex flex-1 flex-col" onsubmit={handlePdfSubmit}>
+				<div class="flex-1 space-y-6 px-6 py-5">
+					<Field.Field>
+						<Field.Label for="education-pdf-title">PDF title</Field.Label>
+						<Input
+							id="education-pdf-title"
+							bind:value={pdfTitle}
+							placeholder="e.g. Sales onboarding handbook"
+						/>
+						{#if pdfTitleError}
+							<Field.Error>{pdfTitleError}</Field.Error>
+						{/if}
+					</Field.Field>
+
+					<Field.Field>
+						<Field.Label for="education-pdf-file">Upload PDF</Field.Label>
+						{#key pdfFileInputKey}
+							<Input
+								id="education-pdf-file"
+								type="file"
+								accept="application/pdf,.pdf"
+								onchange={handlePdfFileChange}
+							/>
+						{/key}
+						<Field.Description>
+							PDF only, up to 50 MB. Browser-level share/download controls are hidden where supported.
+						</Field.Description>
+						{#if currentPdfFileName}
+							<p class="text-xs text-muted-foreground">
+								Current file: {currentPdfFileName}
+							</p>
+						{/if}
+						{#if pdfFileError}
+							<Field.Error>{pdfFileError}</Field.Error>
+						{/if}
+					</Field.Field>
+
+					<Field.Field>
+						<div class="flex items-center justify-between">
+							<Field.Label>Tags</Field.Label>
+							<Button.Root type="button" variant="outline" size="sm" class="gap-2" onclick={addPdfTagField}>
+								<PlusIcon class="size-4" />
+								Add tag
+							</Button.Root>
+						</div>
+						<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+							{#each pdfTagInputs as _, index (index)}
+								<div class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2">
+									<Input
+										bind:value={pdfTagInputs[index]}
+										placeholder={`Tag ${index + 1}`}
+										class="border-0 bg-transparent shadow-none focus-visible:ring-0"
+										oninput={(event) => {
+											const value = (event.currentTarget as HTMLInputElement).value;
+											pdfTagInputs[index] = value;
+											pdfTagInputs = [...pdfTagInputs];
+										}}
+									/>
+									{#if index >= 3}
+										<Button.Root
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="shrink-0"
+											onclick={() => removePdfTagField(index)}
+											aria-label={`Remove tag ${index + 1}`}
+										>
+											<XIcon class="size-4" />
+										</Button.Root>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</Field.Field>
+
+					<Field.Field>
+						<Field.Label for="education-pdf-subject">Subject</Field.Label>
+						<Textarea
+							id="education-pdf-subject"
+							bind:value={pdfSubject}
+							rows={7}
+							placeholder="Add context, key points, or a longer description for search."
+						/>
+					</Field.Field>
+
+					{#if pdfSubmitError}
+						<div class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+							{pdfSubmitError}
+						</div>
+					{/if}
+				</div>
+
+				<Sheet.Footer class="border-t border-border px-6 py-4 sm:justify-between">
+					<p class="text-xs leading-5 text-muted-foreground">
+						PDF reading stays inside the app viewer, but browser support for fully hiding built-in actions can vary.
+					</p>
+					<div class="flex items-center gap-3">
+						<Button.Root
+							type="button"
+							variant="outline"
+							onclick={() => {
+								addPdfOpen = false;
+								resetPdfForm();
+							}}
+						>
+							Cancel
+						</Button.Root>
+						<Button.Root type="submit" disabled={savingPdf}>
+							{savingPdf ? 'Saving...' : editingPdfId ? 'Update PDF' : 'Save PDF'}
+						</Button.Root>
+					</div>
+				</Sheet.Footer>
+			</form>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+{#if activeItem}
 	<div
 		bind:this={fullscreenContainer}
 		class="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-black/90 p-4"
@@ -586,15 +1006,15 @@
 			<div class="flex items-start justify-between gap-4 text-white">
 				<div>
 					<p class="text-xs font-medium tracking-[0.24em] uppercase text-white/70">Education Module</p>
-					<h2 class="mt-1 text-2xl font-semibold">{activeVideo.title}</h2>
+					<h2 class="mt-1 text-2xl font-semibold">{activeItem.title}</h2>
 				</div>
 				<div class="flex items-center gap-3">
 					<Button.Root
 						type="button"
 						variant="outline"
 						class="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-						disabled={!canGoToPreviousVideo}
-						onclick={() => openAdjacentVideo(-1)}
+						disabled={!canGoToPreviousItem}
+						onclick={() => openAdjacentItem(-1)}
 					>
 						<ChevronLeftIcon class="mr-2 size-4" />
 						Previous
@@ -603,8 +1023,8 @@
 						type="button"
 						variant="outline"
 						class="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-						disabled={!canGoToNextVideo}
-						onclick={() => openAdjacentVideo(1)}
+						disabled={!canGoToNextItem}
+						onclick={() => openAdjacentItem(1)}
 					>
 						Next
 						<ChevronRightIcon class="ml-2 size-4" />
@@ -613,7 +1033,7 @@
 						type="button"
 						variant="outline"
 						class="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-						onclick={closeVideo}
+						onclick={closeActiveItem}
 					>
 						<XIcon class="mr-2 size-4" />
 						Close
@@ -622,15 +1042,43 @@
 			</div>
 
 			<div class="min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
-				<iframe
-					src={activeVideo.embedUrl}
-					title={activeVideo.title}
-					class="h-full min-h-[70vh] w-full"
-					allow="autoplay; fullscreen"
-					allowfullscreen
-					referrerpolicy="strict-origin-when-cross-origin"
-					sandbox="allow-same-origin allow-scripts allow-presentation"
-				></iframe>
+				{#if activeItem.itemType === 'video'}
+					<iframe
+						src={activeItem.embedUrl}
+						title={activeItem.title}
+						class="h-full min-h-[70vh] w-full"
+						allow="autoplay; fullscreen"
+						allowfullscreen
+						referrerpolicy="strict-origin-when-cross-origin"
+						sandbox="allow-same-origin allow-scripts allow-presentation"
+					></iframe>
+				{:else}
+					<div class="relative h-full min-h-[70vh] w-full bg-white">
+						<iframe
+							src={getPdfPreviewUrl(activeItem, 'overlay')}
+							title={activeItem.title}
+							class="h-full min-h-[70vh] w-full bg-white"
+							onload={() => {
+								if (activeItem) {
+									setPdfFrameLoading(activeItem.id, 'overlay', false);
+								}
+							}}
+						></iframe>
+						{#if isPdfFrameLoading(activeItem.id, 'overlay')}
+							<div class="absolute inset-0 flex items-center justify-center bg-white">
+								<div class="flex flex-col items-center gap-4 text-[#1F2B49]">
+									<div class="relative flex size-16 items-center justify-center rounded-full border border-[#E4E9F0] bg-[#F8FAFD] shadow-sm">
+										<LoaderCircleIcon class="size-7 animate-spin" />
+									</div>
+									<div class="space-y-1 text-center">
+										<p class="text-base font-semibold">Loading PDF</p>
+										<p class="text-sm text-muted-foreground">Please wait while the document opens.</p>
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>
