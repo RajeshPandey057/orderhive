@@ -389,7 +389,7 @@
 							</Table.Cell>
 						</Table.Row>
 					{:else}
-						{#each filteredData as role (role.id || role.uid || role.email)}
+						{#each filteredData as role (role.uid || role.email)}
 							<Table.Row>
 								<Table.Cell class="font-medium">
 									{getDisplayName(role)}

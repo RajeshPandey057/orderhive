@@ -33,7 +33,7 @@ export const handle: Handle = ({ event, resolve }) => {
 				locals.user = {
 					uid: userData.uid,
 					email: userData.email,
-					role: userData.role,
+					role: userData.role as NonNullable<App.Locals['user']>['role'],
 					...(userData.managedTeamIds && { managedTeamIds: userData.managedTeamIds })
 				};
 			}

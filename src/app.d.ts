@@ -3,6 +3,29 @@ import 'unplugin-icons/types/svelte';
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
+	type EducationVideo = {
+		id: string;
+		itemType: 'video' | 'pdf';
+		title: string;
+		subject: string;
+		tags: string[];
+		sourceType: 'google-drive' | 'upload';
+		sourceUrl: string;
+		embedUrl: string;
+		driveFileId: string;
+		filePath?: string;
+		fileName?: string;
+		fileSize?: number;
+		contentType?: string;
+		lastModified?: number;
+		searchText: string;
+		searchTokens: string[];
+		status: 'ready' | 'invalid' | 'archived';
+		createdAt: string;
+		updatedAt: string;
+		createdByUid: string;
+		createdByEmail: string;
+	};
 	type Role = {
 		uid?: string;
 		email: string;

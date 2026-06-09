@@ -22,11 +22,20 @@ interface MenuItem {
 	external?: boolean;
 }
 
+const EDUCATION_ACCESS_ROLES: AccessType[] = [
+	'admin',
+	'agent',
+	'manager',
+	'senior-manager',
+	'super-admin'
+];
+
 // Route prefixes allowed for each role
 export const ROLE_ROUTES: Record<AccessType, string[]> = {
 	admin: [
 		'/admin',
 		'/listing',
+		'/education',
 		'/dashboard',
 		'/profile',
 		'/hr',
@@ -35,10 +44,20 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/leave',
 		'/holidays'
 	],
-	agent: ['/agent', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave', '/holidays'],
+	agent: [
+		'/agent',
+		'/listing',
+		'/education',
+		'/dashboard',
+		'/profile',
+		'/my-attendance',
+		'/leave',
+		'/holidays'
+	],
 	manager: [
 		'/agent',
 		'/listing',
+		'/education',
 		'/dashboard',
 		'/profile',
 		'/my-attendance',
@@ -48,6 +67,7 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 	'senior-manager': [
 		'/agent',
 		'/listing',
+		'/education',
 		'/dashboard',
 		'/profile',
 		'/my-attendance',
@@ -69,6 +89,7 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/admin',
 		'/agent',
 		'/listing',
+		'/education',
 		'/compliance',
 		'/finance',
 		'/dashboard',
@@ -90,6 +111,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'All Sales', url: '/admin/all-sales' },
 		// { title: 'Team Management', url: '/admin/team-management' },
 		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'Attendance Record', url: '/attendance' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
@@ -101,6 +123,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' },
@@ -111,6 +134,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' },
@@ -121,6 +145,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' },
@@ -167,6 +192,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Compliance Dashboard', url: '/compliance/dashboard' },
 		{ title: 'Finance Dashboard', url: '/finance/dashboard' },
 		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'Attendance Record', url: '/attendance' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
@@ -177,6 +203,14 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 // Get menu items for a role
 export function getMenuItems(role: AccessType): MenuItem[] {
 	return roleMenuItems[role] || [];
+}
+
+export function canAccessEducationModule(role: AccessType | null | undefined): boolean {
+	return !!role && EDUCATION_ACCESS_ROLES.includes(role);
+}
+
+export function canManageEducationVideos(role: AccessType | null | undefined): boolean {
+	return role === 'admin' || role === 'super-admin';
 }
 
 // Get default route for a role

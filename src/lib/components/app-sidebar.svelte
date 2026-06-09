@@ -8,6 +8,7 @@
 	import LucideClock from '~icons/lucide/clock';
 	import LucideUploadCloud from '~icons/lucide/cloud-upload';
 	import LucideFileText from '~icons/lucide/file-text';
+	import LucideGraduationCap from '~icons/lucide/graduation-cap';
 	import LucideLayoutPanelTop from '~icons/lucide/layout-panel-top';
 	import LucideList from '~icons/lucide/list';
 	import LucideReceipt from '~icons/lucide/receipt';
@@ -26,6 +27,7 @@
 		'All Sales': LucideReceipt,
 		'Team Management': LucideUsers,
 		'Employee Management': LucideUsers,
+		'Education Module': LucideGraduationCap,
 		'Pending Sales': LucideClipboardCheck,
 		'Approved Sales': LucideClipboardCheck,
 		"Next Month's Sales": LucideCalendarClock,
@@ -153,6 +155,10 @@
 					},
 					navMap.get('/holidays')
 				])
+			},
+			{
+				title: 'Learning',
+				items: compact([navMap.get('/education')])
 			}
 		];
 	});
