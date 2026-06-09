@@ -1,7 +1,7 @@
 import {
 	buildEducationSearchIndex,
-	type EducationVideoStatus,
-	type EducationVideoSourceType
+	type EducationVideoSourceType,
+	type EducationVideoStatus
 } from '$lib/education';
 import { firestore } from '$lib/server/firebase';
 
@@ -30,10 +30,7 @@ type EducationVideoRecord = {
 
 export const educationVideosCollection = firestore.collection('educationVideos');
 
-export function serializeEducationVideo(
-	id: string,
-	record: EducationVideoRecord
-): EducationVideo {
+export function serializeEducationVideo(id: string, record: EducationVideoRecord): EducationVideo {
 	const tags = Array.isArray(record.tags) ? record.tags.filter(Boolean) : [];
 	const searchIndex = record.searchText
 		? {

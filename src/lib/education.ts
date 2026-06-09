@@ -50,12 +50,16 @@ export function buildEducationSearchIndex(input: {
 		.filter(Boolean)
 		.join(' ');
 
-	const searchTokens = [...new Set(searchText.split(/[^a-z0-9]+/).filter((token) => token.length > 1))];
+	const searchTokens = [
+		...new Set(searchText.split(/[^a-z0-9]+/).filter((token) => token.length > 1))
+	];
 
 	return { searchText, searchTokens };
 }
 
-export function normalizeGoogleDriveVideoSource(rawUrl: string): NormalizedGoogleDriveSource | null {
+export function normalizeGoogleDriveVideoSource(
+	rawUrl: string
+): NormalizedGoogleDriveSource | null {
 	const trimmedUrl = rawUrl.trim();
 	if (!trimmedUrl) return null;
 

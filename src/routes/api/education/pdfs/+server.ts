@@ -1,12 +1,12 @@
+import { canManageEducationVideos } from '$lib/constants';
 import {
 	MAX_EDUCATION_PDF_SIZE,
 	buildEducationSearchIndex,
 	isSupportedEducationPdf,
 	normalizeEducationTags
 } from '$lib/education';
-import { canManageEducationVideos } from '$lib/constants';
 import { educationVideosCollection } from '$lib/server/education';
-import { uploadFileWithLink } from '$lib/server/firebase';
+import { storage, uploadFileWithLink } from '$lib/server/firebase';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -133,6 +133,16 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		const uploaded = await uploadFileWithLink(pdfFile, `education/${user.uid}/pdfs`);
 		if (!uploaded) {
 			throw error(400, 'Unable to upload PDF');
+		}
+
+		// Delete the old file from storage to avoid orphan accumulation
+		const oldPath = typeof existingData.filePath === 'string' ? existingData.filePath : '';
+		if (oldPath) {
+			try {
+				await storage.bucket().file(oldPath).delete();
+			} catch {
+				// Non-fatal: old file may already be missing; proceed with the update
+			}
 		}
 
 		nextFileData = {

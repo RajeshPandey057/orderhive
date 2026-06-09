@@ -39,12 +39,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	}
 
 	const [buffer] = await file.download();
-	const fileName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
+	const rawName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
+	// RFC 5987 encoding for non-ASCII / special character safe Content-Disposition
+	const encodedName = encodeURIComponent(rawName);
 
 	return new Response(new Uint8Array(buffer), {
 		headers: {
 			'Content-Type': 'application/pdf',
-			'Content-Disposition': `inline; filename="${fileName.replaceAll('"', '')}"`,
+			'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
 			'Cache-Control': 'private, no-store, max-age=0'
 		}
 	});

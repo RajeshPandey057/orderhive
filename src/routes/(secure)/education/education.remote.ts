@@ -21,6 +21,10 @@ const updateEducationVideoSchema = createEducationVideoSchema.extend({
 	id: z.string().trim().min(1, 'Video id is required')
 });
 
+const archiveEducationItemSchema = z.object({
+	id: z.string().trim().min(1, 'Item id is required')
+});
+
 function requireEducationVideoManager() {
 	const { locals } = getRequestEvent();
 	const user = locals.user;
@@ -91,6 +95,11 @@ export const updateEducationVideo = command(updateEducationVideoSchema, async (d
 		throw error(404, 'Education video not found');
 	}
 
+	// Guard: only update items that are actually videos
+	if (existing.data()?.itemType !== 'video') {
+		throw error(400, 'The selected item is not a video');
+	}
+
 	const tags = normalizeEducationTags(data.tags);
 	const title = data.title.trim();
 	const subject = data.subject.trim();
@@ -121,4 +130,27 @@ export const updateEducationVideo = command(updateEducationVideoSchema, async (d
 	);
 
 	return { success: true, id: docRef.id };
+});
+
+export const archiveEducationItem = command(archiveEducationItemSchema, async (data) => {
+	const user = requireEducationVideoManager();
+
+	const docRef = educationVideosCollection.doc(data.id);
+	const existing = await docRef.get();
+
+	if (!existing.exists) {
+		throw error(404, 'Education item not found');
+	}
+
+	await docRef.set(
+		{
+			status: 'archived',
+			updatedAt: FieldValue.serverTimestamp(),
+			updatedByUid: user.uid,
+			updatedByEmail: user.email
+		},
+		{ merge: true }
+	);
+
+	return { success: true };
 });
