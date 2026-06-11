@@ -302,7 +302,7 @@
 
 	// Date filter
 	let dateFilter = $state<'all' | 'this-month'>('all');
-	const filteredData = $derived(() => {
+	const filteredData = $derived.by(() => {
 		if (dateFilter === 'all') return data;
 		const now = new Date();
 		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -321,7 +321,7 @@
 
 	const table = createSvelteTable({
 		get data() {
-			return filteredData();
+			return filteredData;
 		},
 		columns,
 		getCoreRowModel: getCoreRowModel(),
