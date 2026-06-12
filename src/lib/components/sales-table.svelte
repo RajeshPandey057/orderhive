@@ -13,7 +13,6 @@
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { getEffectiveSaleRevenue } from '$lib/sales';
-	import { Calendar, ChevronDown, Search } from '@lucide/svelte';
 	import {
 		type ColumnDef,
 		type ColumnFiltersState,
@@ -28,6 +27,9 @@
 		getSortedRowModel
 	} from '@tanstack/table-core';
 	import { createRawSnippet } from 'svelte';
+	import Calendar from '~icons/lucide/calendar';
+	import ChevronDown from '~icons/lucide/chevron-down';
+	import Search from '~icons/lucide/search';
 	import SaleDetailSheet from './sale-detail-sheet.svelte';
 
 	interface Props {
