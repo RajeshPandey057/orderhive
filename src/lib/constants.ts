@@ -11,6 +11,7 @@ export type AccessType =
 	| 'agent'
 	| 'compliance'
 	| 'finance'
+	| 'hr-assignee'
 	| 'super-admin'
 	| 'manager'
 	| 'senior-manager'
@@ -84,6 +85,7 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/holidays'
 	],
 	finance: ['/finance', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave'],
+	'hr-assignee': ['/hr', '/attendance', '/my-attendance', '/leave', '/holidays', '/profile'],
 	general: ['/general', '/profile', '/my-attendance', '/leave', '/holidays'],
 	'super-admin': [
 		'/admin',
@@ -174,6 +176,13 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' }
 	],
+	'hr-assignee': [
+		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Attendance Record', url: '/attendance' },
+		{ title: 'My Attendance', url: '/my-attendance' },
+		{ title: 'My Leaves', url: '/leave' },
+		{ title: 'Holiday Management', url: '/holidays' }
+	],
 	general: [
 		{ title: 'Dashboard', url: '/general/dashboard' },
 		{ title: 'My Attendance', url: '/my-attendance' },
@@ -227,6 +236,8 @@ export function getDefaultRoute(role: AccessType): string {
 			return '/compliance/dashboard';
 		case 'finance':
 			return '/finance/dashboard';
+		case 'hr-assignee':
+			return '/hr/employees';
 		case 'general':
 			return '/general/dashboard';
 		default:

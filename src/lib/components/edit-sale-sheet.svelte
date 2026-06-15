@@ -559,18 +559,27 @@
 <div class="mx-auto w-full max-w-7xl p-4 sm:p-6">
 	<form
 		enctype="multipart/form-data"
-		{...updateSale.enhance(async ({ form, submit }) => {
+		{...updateSale.enhance(async ({ submit }) => {
 			try {
 				await submit();
-
-				// Only reset and close if submission was successful (no validation errors)
+				// Server redirects on success — if we reach here, check for validation issues
 				const issues = updateSale.fields.allIssues();
-				if (!issues?.length) {
-					form.reset();
-					toast.success('Sale updated successfully!');
+				if (issues?.length) {
+					toast.error(issues[0]?.message || 'Please correct the highlighted fields');
 				}
-			} catch {
-				toast.error('Failed to update sale');
+			} catch (err) {
+				const message = err instanceof Error ? err.message : '';
+				if (message.includes('403') || message.toLowerCase().includes('permission')) {
+					toast.error('You do not have permission to update this sale');
+				} else if (message.includes('404')) {
+					toast.error('Sale not found');
+				} else if (message.includes('500') || message.toLowerCase().includes('server')) {
+					toast.error('Server error while saving. Please try again.');
+				} else if (message) {
+					toast.error(message);
+				} else {
+					toast.error('Failed to update sale. Please try again.');
+				}
 			}
 		})}
 	>

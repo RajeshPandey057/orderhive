@@ -10,6 +10,7 @@ const ACCESS_TYPES = [
 	'agent',
 	'compliance',
 	'finance',
+	'hr-assignee',
 	'super-admin',
 	'manager',
 	'senior-manager'

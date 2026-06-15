@@ -1,0 +1,276 @@
+asyncapi: 2.6.0
+
+info:
+  title: Orderhive Attendance — iClock Push Channel
+  version: 1.0.0
+  description: |
+    AsyncAPI specification for the ZKTeco iClock / ADMS HTTP Push protocol
+    implemented by Orderhive.
+
+    The iClock protocol is an event-driven push pattern: the **device (or
+    any iClock-compatible software client) initiates** and pushes attendance
+    punch events to the server over HTTP. This spec documents the messages
+    exchanged on that channel.
+
+    For the full request/response REST API (handshake, reconcile), see the
+    companion OpenAPI spec: [`openapi.yaml`](./openapi.yaml).
+
+    ### Integration Flow
+
+    ```
+    Device/Client                           Orderhive Server
+        |                                         |
+        |-- GET /iclock/cdata?SN=<sn> ----------->|   (handshake — fetch config)
+        |<-- 200 text/plain config --------------- |
+        |                                         |
+        |-- POST /iclock/cdata?SN=<sn>            |
+        |   &table=ATTLOG                          |
+        |   Body: tab-separated punch lines ------>|   (push attendance events)
+        |<-- 200 "OK: N" ----------------------- |
+        |                                         |
+        |-- GET /iclock/getrequest?SN=<sn> ------->|   (heartbeat / command poll)
+        |<-- 200 "OK" -------------------------- |
+    ```
+
+    ### Security Model
+    Device identity is verified by matching the `SN` query parameter against
+    a server-side whitelist (`ZKTECO_DEVICE_SN` env var). There is no
+    cryptographic signature on individual messages; the server relies on the
+    whitelist and HTTPS transport security.
+
+  contact:
+    name: Orderhive Engineering
+    url: https://orderhive.indglobalrealty.com
+
+servers:
+  production:
+    url: orderhive.indglobalrealty.com
+    protocol: https
+    description: Production server
+    security:
+      - deviceSn: []
+
+defaultContentType: text/plain
+
+channels:
+  /iclock/cdata:
+    description: |
+      Main ADMS data channel. The client sends attendance push records here
+      and receives server configuration on first contact.
+    parameters:
+      SN:
+        $ref: '#/components/parameters/SN'
+    subscribe:
+      operationId: receiveAttendancePunches
+      summary: Server receives attendance punch events from a device
+      description: |
+        The server listens on this channel for `ATTLOG` table pushes.
+        Each message contains one or more tab-separated punch records.
+
+        Only `table=ATTLOG` messages result in punch processing. Other
+        `table` values (e.g. `OPERLOG`, `OPTIONS`) are acknowledged but
+        ignored.
+      tags:
+        - name: attendance
+        - name: iclock
+      message:
+        $ref: '#/components/messages/AttlogPush'
+
+    publish:
+      operationId: sendDeviceConfig
+      summary: Server publishes ADMS configuration to the device
+      description: |
+        Sent in response to the device's GET handshake. Contains key=value
+        pairs that configure the device's push behaviour (timezone, sync
+        interval, retry delay, etc.).
+      tags:
+        - name: iclock
+        - name: config
+      message:
+        $ref: '#/components/messages/AdmsConfig'
+
+  /iclock/getrequest:
+    description: |
+      Heartbeat and server-to-device command channel. The device polls this
+      endpoint periodically to check for pending commands.
+    parameters:
+      SN:
+        $ref: '#/components/parameters/SN'
+    subscribe:
+      operationId: receiveHeartbeat
+      summary: Server receives a device heartbeat
+      description: |
+        The device sends an empty GET to this channel to signal liveness and
+        request any queued commands. The server acknowledges with `OK`.
+      tags:
+        - name: heartbeat
+        - name: iclock
+      message:
+        $ref: '#/components/messages/HeartbeatPoll'
+
+    publish:
+      operationId: sendCommand
+      summary: Server publishes a command to the device (future use)
+      description: |
+        Currently always returns `OK` (no pending command). This channel is
+        reserved for future server-to-device commands (e.g. user sync,
+        firmware upgrade trigger).
+      tags:
+        - name: iclock
+        - name: command
+      message:
+        $ref: '#/components/messages/CommandResponse'
+
+components:
+  messages:
+    AttlogPush:
+      name: AttlogPush
+      title: Attendance log push
+      summary: One or more attendance punch records pushed from a device
+      description: |
+        Plain-text body containing one punch per line, fields separated by a
+        single tab character (`\t`).
+
+        **Line format:**
+        ```
+        userID<TAB>YYYY-MM-DD HH:mm:ss<TAB>inOutMode<TAB>verifyType[<TAB>...]
+        ```
+
+        Lines with fewer than 4 fields or an invalid timestamp are silently
+        skipped by the server. The server responds with `OK: N` where N is
+        the number of valid punches processed.
+
+        **Idempotency:** Each punch is stored with a deterministic document
+        ID (`{SN}_{userID}_{timestamp_compact}`). Re-posting the same punch
+        has no effect.
+      contentType: text/plain
+      payload:
+        $ref: '#/components/schemas/AttlogBody'
+      examples:
+        - name: Two punches (check-in and check-out)
+          payload: "INDG0194\t2026-06-12 08:57:42\t0\t1\nINDG0194\t2026-06-12 18:03:11\t1\t1\n"
+        - name: Multiple employees, mixed verify types
+          payload: "INDG0194\t2026-06-12 08:57:42\t0\t1\nINDG0226\t2026-06-12 09:02:00\t0\t15\nINDG0052\t2026-06-12 09:15:33\t0\t3\n"
+
+    AdmsConfig:
+      name: AdmsConfig
+      title: ADMS device configuration
+      summary: Server configuration response to device handshake (GET /iclock/cdata)
+      contentType: text/plain
+      payload:
+        $ref: '#/components/schemas/AdmsConfigBody'
+      examples:
+        - name: Standard config
+          payload: |
+            GET OPTION FROM: JJA1253301000
+            ATTLOGStamp=9999
+            OPERLOGStamp=9999
+            ATTPHOTOStamp=9999
+            ErrorDelay=30
+            Delay=10
+            TransTimes=00:00;23:59
+            TransInterval=1
+            TransFlag=TransData AttLog
+            TimeZone=4.00
+            Realtime=1
+            Encrypt=None
+
+    HeartbeatPoll:
+      name: HeartbeatPoll
+      title: Device heartbeat
+      summary: Periodic liveness signal from device (GET /iclock/getrequest)
+      contentType: text/plain
+      payload:
+        type: string
+        description: Empty body — the presence of the request is the signal
+        example: ''
+
+    CommandResponse:
+      name: CommandResponse
+      title: Server command response
+      summary: Server reply to device heartbeat
+      contentType: text/plain
+      payload:
+        type: string
+        description: |
+          `OK` when no commands are pending. Future extensions may return
+          structured command strings.
+        example: OK
+
+  schemas:
+    AttlogBody:
+      type: string
+      description: |
+        One or more attendance records, one per line, tab-separated.
+        Format per line: `userID<TAB>YYYY-MM-DD HH:mm:ss<TAB>inOutMode<TAB>verifyType`
+      example: "INDG0194\t2026-06-12 08:57:42\t0\t1\nINDG0194\t2026-06-12 18:03:11\t1\t1\n"
+
+    AttlogLine:
+      type: object
+      description: A single parsed attendance punch (server-side representation)
+      properties:
+        userID:
+          type: string
+          description: Employee code as enrolled on the device (must match employee.code in the system)
+          example: INDG0194
+        timestamp:
+          type: string
+          description: Punch timestamp in YYYY-MM-DD HH:mm:ss format
+          example: '2026-06-12 08:57:42'
+        inOutMode:
+          type: integer
+          description: |
+            Punch direction:
+            - `0` — Check-in
+            - `1` — Check-out
+            - `2` — Break out
+            - `3` — Break in
+            - `4` — Overtime in
+            - `5` — Overtime out
+          enum: [0, 1, 2, 3, 4, 5]
+          example: 0
+        verifyType:
+          type: integer
+          description: |
+            Verification method used:
+            - `1` — Fingerprint
+            - `2` — Password
+            - `3` — Card
+            - `15` — Face recognition
+          enum: [1, 2, 3, 15]
+          example: 1
+
+    AdmsConfigBody:
+      type: string
+      description: |
+        Plain-text key=value configuration lines sent to the device.
+        Fields of interest:
+
+        | Key | Description |
+        |-----|-------------|
+        | `ATTLOGStamp` | Last attendance log stamp the server has (9999 = send all) |
+        | `Delay` | Seconds between push attempts |
+        | `TransInterval` | Sync interval in minutes |
+        | `TimeZone` | UTC offset for device RTC sync (e.g. `4.00` = UTC+4) |
+        | `Realtime` | `1` = push immediately on punch, `0` = batch |
+        | `Encrypt` | Encryption mode (`None` = plaintext HTTPS) |
+
+  parameters:
+    SN:
+      description: |
+        Device serial number. Must be pre-registered in the server's
+        `ZKTECO_DEVICE_SN` environment variable (comma-separated whitelist).
+        Requests from unregistered serial numbers are rejected with HTTP 401.
+      schema:
+        type: string
+        example: JJA1253301000
+
+  securitySchemes:
+    deviceSn:
+      type: httpApiKey
+      in: query
+      name: SN
+      description: |
+        Device serial number passed as the `SN` query parameter on every
+        request. The server validates it against a pre-registered whitelist.
+        This is the sole authentication mechanism for iClock endpoints.

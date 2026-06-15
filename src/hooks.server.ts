@@ -13,6 +13,7 @@ const VALID_ROLES: AccessType[] = [
 	'agent',
 	'compliance',
 	'finance',
+	'hr-assignee',
 	'super-admin',
 	'manager',
 	'senior-manager',

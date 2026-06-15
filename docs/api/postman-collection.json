@@ -1,0 +1,361 @@
+{
+	"info": {
+		"_postman_id": "orderhive-attendance-api-v1",
+		"name": "Orderhive Attendance API",
+		"description": "Integration collection for the Orderhive Attendance module.\n\nTwo groups:\n- **iClock / ADMS** — ZKTeco-compatible device push protocol (`/iclock/*`)\n- **REST API** — JSON endpoints for reconciliation (`/api/*`)\n\n## Setup\n1. Set `baseUrl` variable to `https://orderhive.indglobalrealty.com`\n2. Set `deviceSn` to your registered device serial number\n3. Set `cronSecret` to the value of `ZKTECO_CRON_SECRET`\n4. Set `employeeCode` to a valid employee code (e.g. `INDG0194`)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://orderhive.indglobalrealty.com",
+			"description": "Production base URL"
+		},
+		{
+			"key": "deviceSn",
+			"value": "JJA1253301000",
+			"description": "Registered device serial number"
+		},
+		{
+			"key": "cronSecret",
+			"value": "",
+			"description": "Value of ZKTECO_CRON_SECRET env var"
+		},
+		{
+			"key": "employeeCode",
+			"value": "INDG0001",
+			"description": "A valid employee code enrolled on the device"
+		},
+		{
+			"key": "testDate",
+			"value": "2026-06-12",
+			"description": "Date to use in test requests (YYYY-MM-DD)"
+		}
+	],
+	"item": [
+		{
+			"name": "iClock / ADMS Protocol",
+			"description": "ZKTeco iClock HTTP Push (ADMS) endpoints. Compatible with any iClock-capable device or software.",
+			"item": [
+				{
+					"name": "Handshake — GET /iclock/cdata",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/iclock/cdata?SN={{deviceSn}}&options=all",
+							"host": ["{{baseUrl}}"],
+							"path": ["iclock", "cdata"],
+							"query": [
+								{
+									"key": "SN",
+									"value": "{{deviceSn}}",
+									"description": "Device serial number (must be registered)"
+								},
+								{
+									"key": "options",
+									"value": "all",
+									"description": "Options flag (informational)"
+								}
+							]
+						},
+						"description": "Called by the device on boot and periodically. Returns plain-text ADMS configuration.\n\nExpect a `200` with config lines like `ATTLOGStamp=9999`, `TimeZone=4.00`, etc.\n\nA `401` means the SN is not in the server whitelist."
+					},
+					"response": [
+						{
+							"name": "200 OK — Config",
+							"originalRequest": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/iclock/cdata?SN={{deviceSn}}&options=all",
+									"host": ["{{baseUrl}}"],
+									"path": ["iclock", "cdata"],
+									"query": [
+										{ "key": "SN", "value": "{{deviceSn}}" },
+										{ "key": "options", "value": "all" }
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [{ "key": "Content-Type", "value": "text/plain" }],
+							"body": "GET OPTION FROM: JJA1253301000\nATTLOGStamp=9999\nOPERLOGStamp=9999\nATTPHOTOStamp=9999\nErrorDelay=30\nDelay=10\nTransTimes=00:00;23:59\nTransInterval=1\nTransFlag=TransData AttLog\nTimeZone=4.00\nRealtime=1\nEncrypt=None\n"
+						}
+					]
+				},
+				{
+					"name": "Push Punches — POST /iclock/cdata",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "text/plain"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{{employeeCode}}\t{{testDate}} 08:57:42\t0\t1\n{{employeeCode}}\t{{testDate}} 18:03:11\t1\t1\n",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/iclock/cdata?SN={{deviceSn}}&table=ATTLOG",
+							"host": ["{{baseUrl}}"],
+							"path": ["iclock", "cdata"],
+							"query": [
+								{
+									"key": "SN",
+									"value": "{{deviceSn}}",
+									"description": "Device serial number"
+								},
+								{
+									"key": "table",
+									"value": "ATTLOG",
+									"description": "Use ATTLOG for attendance records"
+								}
+							]
+						},
+						"description": "Push attendance punch records.\n\n**Body format** (tab-separated, one punch per line):\n```\nuserID<TAB>YYYY-MM-DD HH:mm:ss<TAB>inOutMode<TAB>verifyType\n```\n\n**inOutMode**: 0=check-in, 1=check-out, 2=break-out, 3=break-in, 4=OT-in, 5=OT-out\n**verifyType**: 1=fingerprint, 2=password, 3=card, 15=face\n\nPunches are idempotent — re-posting the same punch has no effect."
+					},
+					"response": [
+						{
+							"name": "200 OK — Accepted",
+							"originalRequest": {
+								"method": "POST",
+								"header": [{ "key": "Content-Type", "value": "text/plain" }],
+								"body": {
+									"mode": "raw",
+									"raw": "INDG0194\t2026-06-12 08:57:42\t0\t1\nINDG0194\t2026-06-12 18:03:11\t1\t1\n"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/iclock/cdata?SN={{deviceSn}}&table=ATTLOG",
+									"host": ["{{baseUrl}}"],
+									"path": ["iclock", "cdata"],
+									"query": [
+										{ "key": "SN", "value": "{{deviceSn}}" },
+										{ "key": "table", "value": "ATTLOG" }
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [{ "key": "Content-Type", "value": "text/plain" }],
+							"body": "OK: 2"
+						}
+					]
+				},
+				{
+					"name": "Heartbeat — GET /iclock/getrequest",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/iclock/getrequest?SN={{deviceSn}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["iclock", "getrequest"],
+							"query": [
+								{
+									"key": "SN",
+									"value": "{{deviceSn}}",
+									"description": "Device serial number"
+								},
+								{
+									"key": "INFO",
+									"value": "Ver 8.0.4.3-20220708,148,263,29324,192.168.1.10",
+									"description": "Device firmware/network info (optional)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "The device polls this periodically for pending server commands. Should always return `OK`."
+					},
+					"response": [
+						{
+							"name": "200 OK — No commands",
+							"originalRequest": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/iclock/getrequest?SN={{deviceSn}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["iclock", "getrequest"],
+									"query": [{ "key": "SN", "value": "{{deviceSn}}" }]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [{ "key": "Content-Type", "value": "text/plain" }],
+							"body": "OK"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "REST API",
+			"description": "Standard JSON endpoints. Protected by Bearer token (`ZKTECO_CRON_SECRET`).",
+			"item": [
+				{
+					"name": "Reconcile — POST /api/zkteco/reconcile (specific date)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Default testDate to yesterday (server timezone offset: UTC+4)",
+									"// Override by setting the testDate collection variable manually.",
+									"const existing = pm.collectionVariables.get('testDate');",
+									"if (!existing || existing === 'YYYY-MM-DD') {",
+									"  const d = new Date();",
+									"  d.setDate(d.getDate() - 1);",
+									"  const yyyy = d.getUTCFullYear();",
+									"  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');",
+									"  const dd = String(d.getUTCDate()).padStart(2, '0');",
+									"  pm.collectionVariables.set('testDate', `${yyyy}-${mm}-${dd}`);",
+									"  console.log('testDate auto-set to yesterday:', pm.collectionVariables.get('testDate'));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cronSecret}}",
+								"description": "ZKTECO_CRON_SECRET value"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"date\": \"{{testDate}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/zkteco/reconcile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "zkteco", "reconcile"]
+						},
+						"description": "Reconcile biometric punches and mark absences for a specific date.\n\n**Step 1** — For every employee with a punch on `date`, re-compute their attendance log.\n\n**Step 2** — For every active employee with no log: mark `holiday`, `on-leave`, or `absent`.\n\nRecords with `corrected: true` are never overwritten.\n\n**Response fields:**\n- `reconciled` — employees whose log was updated\n- `absent` — employees marked absent\n- `onLeave` — subset of absent who have approved leave\n- `holiday` — whether the date was a holiday"
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{ "key": "Authorization", "value": "Bearer {{cronSecret}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\"date\": \"2026-06-11\"}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/zkteco/reconcile",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "zkteco", "reconcile"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [{ "key": "Content-Type", "value": "application/json" }],
+							"body": "{\n  \"date\": \"2026-06-11\",\n  \"reconciled\": 18,\n  \"absent\": 3,\n  \"onLeave\": 1,\n  \"holiday\": false\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\"date\": \"2026-06-11\"}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/zkteco/reconcile",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "zkteco", "reconcile"]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [{ "key": "Content-Type", "value": "text/plain" }],
+							"body": "Unauthorized"
+						}
+					]
+				},
+				{
+					"name": "Reconcile — POST /api/zkteco/reconcile (yesterday)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Compute yesterday and log it so you can verify which date the server will process.",
+									"// The server computes yesterday independently — this is purely for visibility.",
+									"const d = new Date();",
+									"d.setDate(d.getDate() - 1);",
+									"const yyyy = d.getUTCFullYear();",
+									"const mm = String(d.getUTCMonth() + 1).padStart(2, '0');",
+									"const dd = String(d.getUTCDate()).padStart(2, '0');",
+									"const yesterday = `${yyyy}-${mm}-${dd}`;",
+									"pm.collectionVariables.set('_computedYesterday', yesterday);",
+									"console.log('Server will reconcile yesterday =', yesterday, '(UTC). Server is UTC+4, so actual date may differ if run before 04:00 UTC.');"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Response has reconciled field', () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json).to.have.property('reconciled');",
+									"  pm.expect(json).to.have.property('date');",
+									"  console.log('Reconciled:', json.reconciled, 'Absent:', json.absent, 'Date:', json.date);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cronSecret}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/zkteco/reconcile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "zkteco", "reconcile"]
+						},
+						"description": "Reconcile yesterday (no body needed — server defaults to yesterday in server local time). Use this for the nightly Cloud Scheduler job.\n\nThe pre-request script logs which date will be processed. The post-response test validates the 200 status and prints reconcile counts to the console."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

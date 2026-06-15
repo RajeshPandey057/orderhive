@@ -41,6 +41,7 @@ declare global {
 			| 'agent'
 			| 'finance'
 			| 'compliance'
+			| 'hr-assignee'
 			| 'super-admin'
 			| 'manager'
 			| 'senior-manager'
@@ -444,9 +445,11 @@ declare global {
 					| 'agent'
 					| 'compliance'
 					| 'finance'
+					| 'hr-assignee'
 					| 'super-admin'
 					| 'manager'
-					| 'senior-manager';
+					| 'senior-manager'
+					| 'general';
 				managedTeamIds?: string[];
 			} | null;
 		}

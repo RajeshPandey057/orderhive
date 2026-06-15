@@ -9,17 +9,31 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
+	import { getAttendancePeriodRange, type AttendancePeriod } from '$lib/date-period';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	let { data } = $props<{ data: { rows: AttendanceLog[]; holidayCount: number } }>();
 
-	let period = $state('this-month');
+	let period = $state<AttendancePeriod>('this-month');
 	const rows: AttendanceLog[] = $derived(data.rows ?? []);
+	const today = new SvelteDate();
+	const selectedRange = $derived(getAttendancePeriodRange(period, today));
+	const filteredRows: AttendanceLog[] = $derived.by(() => {
+		return rows.filter((row) => row.date >= selectedRange.start && row.date <= selectedRange.end);
+	});
 	const presentRows = $derived(
-		rows.filter((row) => row.status === 'present' || row.status === 'late')
+		filteredRows.filter((row) => row.status === 'present' || row.status === 'late')
 	);
-	const onTimeRows = $derived(rows.filter((row) => row.status === 'present'));
-	const leaveRows = $derived(rows.filter((row) => row.status === 'on-leave'));
-	const workingDays = $derived(rows.filter((row) => row.status !== 'holiday').length);
+	const onTimeRows = $derived(filteredRows.filter((row) => row.status === 'present'));
+	const leaveRows = $derived(filteredRows.filter((row) => row.status === 'on-leave'));
+	const workingDays = $derived(filteredRows.filter((row) => row.status !== 'holiday').length);
+	const periodLabel = $derived(
+		period === 'this-week' ? 'This week' : period === 'last-week' ? 'Last week' : 'This month'
+	);
+	const holidayCountForPeriod = $derived.by(() => {
+		if (period === 'this-month') return data.holidayCount;
+		return filteredRows.filter((row) => row.status === 'holiday').length;
+	});
 	const onTimeRate = $derived(
 		presentRows.length ? Math.round((onTimeRows.length / presentRows.length) * 100) : 0
 	);
@@ -39,13 +53,9 @@
 		<div class="mb-4 flex items-center justify-between gap-3">
 			<Select.Root type="single" bind:value={period}>
 				<Select.Trigger
-					class="h-8 w-[140px] border border-[#D4D9D9] bg-white text-[13px] text-[#222626]"
+					class="h-8 w-35 border border-[#D4D9D9] bg-white text-[13px] text-[#222626]"
 				>
-					{period === 'this-week'
-						? 'This week'
-						: period === 'last-week'
-							? 'Last week'
-							: 'This month'}
+					{periodLabel}
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="this-week">This week</Select.Item>
@@ -77,8 +87,8 @@
 				<div class="mt-3 text-2xl leading-8 font-medium">{leaveRows.length}</div>
 			</div>
 			<div class="rounded-md border border-[#EBEEEE] bg-white p-3">
-				<p class="text-[13px] text-[#687976]">Holidays</p>
-				<div class="mt-3 text-2xl leading-8 font-medium">{data.holidayCount}</div>
+				<p class="text-[13px] text-[#687976]">Holidays ({periodLabel})</p>
+				<div class="mt-3 text-2xl leading-8 font-medium">{holidayCountForPeriod}</div>
 			</div>
 		</div>
 	</div>
@@ -97,14 +107,14 @@
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{#if rows.length === 0}
+				{#if filteredRows.length === 0}
 					<TableRow
 						><TableCell colspan={7} class="h-24 text-center text-[13px] text-[#687976]"
 							>No attendance records found.</TableCell
 						></TableRow
 					>
 				{:else}
-					{#each rows as row, index (row.id)}
+					{#each filteredRows as row, index (row.id)}
 						<TableRow class="h-13">
 							<TableCell class="text-[13px]">{index + 1}</TableCell>
 							<TableCell class="text-[13px]">{row.date}</TableCell>

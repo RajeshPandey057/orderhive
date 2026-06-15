@@ -7,9 +7,12 @@ import { z } from 'zod';
 // Define the schema for the invite user form using Zod
 const inviteUserSchema = z.object({
 	email: z.email('Valid email is required'),
-	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
-		message: 'Access type is required'
-	}),
+	accessType: z.enum(
+		['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager', 'hr-assignee'],
+		{
+			message: 'Access type is required'
+		}
+	),
 	// Manager-specific fields
 	managedTeamIds: z.array(z.string()).optional()
 });
@@ -17,9 +20,12 @@ const inviteUserSchema = z.object({
 // Define the schema for update user form
 const updateUserSchema = z.object({
 	email: z.email('Valid email is required'),
-	accessType: z.enum(['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'], {
-		message: 'Access type is required'
-	}),
+	accessType: z.enum(
+		['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager', 'hr-assignee'],
+		{
+			message: 'Access type is required'
+		}
+	),
 	// Manager-specific fields
 	managedTeamIds: z.array(z.string()).optional()
 });

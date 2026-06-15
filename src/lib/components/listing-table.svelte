@@ -74,45 +74,47 @@
 	}
 </script>
 
-<div class="flex flex-wrap items-center gap-3">
-	<div class="relative min-w-60 flex-1">
-		<Search class="pointer-events-none absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-		<Input class="pl-8" placeholder="Search listings..." bind:value={searchQuery} />
+<div class="overflow-x-auto pb-1">
+	<div class="flex min-w-max items-center gap-3">
+		<div class="relative min-w-60 flex-1">
+			<Search class="pointer-events-none absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+			<Input class="pl-8" placeholder="Search listings..." bind:value={searchQuery} />
+		</div>
+		<select
+			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
+			bind:value={selectedDeveloper}
+		>
+			{#each developerOptions as option (option)}
+				<option value={option}>
+					{option === 'all' ? 'All Developers' : option}
+				</option>
+			{/each}
+		</select>
+		<select
+			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
+			bind:value={selectedAgent}
+		>
+			{#each agentOptions as option (option)}
+				<option value={option}>
+					{option === 'all' ? 'All Agents' : option}
+				</option>
+			{/each}
+		</select>
+		<select
+			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
+			bind:value={selectedUnitType}
+		>
+			{#each unitTypeOptions as option (option)}
+				<option value={option}>
+					{option === 'all' ? 'All Unit Types' : option}
+				</option>
+			{/each}
+		</select>
 	</div>
-	<select
-		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-		bind:value={selectedDeveloper}
-	>
-		{#each developerOptions as option (option)}
-			<option value={option}>
-				{option === 'all' ? 'All Developers' : option}
-			</option>
-		{/each}
-	</select>
-	<select
-		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-		bind:value={selectedAgent}
-	>
-		{#each agentOptions as option (option)}
-			<option value={option}>
-				{option === 'all' ? 'All Agents' : option}
-			</option>
-		{/each}
-	</select>
-	<select
-		class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-		bind:value={selectedUnitType}
-	>
-		{#each unitTypeOptions as option (option)}
-			<option value={option}>
-				{option === 'all' ? 'All Unit Types' : option}
-			</option>
-		{/each}
-	</select>
 </div>
 
 <div class="rounded-md border bg-card">
-	<Table.Root>
+	<Table.Root class="min-w-300">
 		<Table.Header>
 			<Table.Row class="border-b bg-gray-200/40">
 				<Table.Head>Listing ID</Table.Head>
@@ -125,7 +127,7 @@
 				<Table.Head>Created By</Table.Head>
 				<Table.Head>Listing Type</Table.Head>
 				{#if hasActions}
-					<Table.Head class="w-24 text-right">Actions</Table.Head>
+					<Table.Head class="w-28 text-right">Actions</Table.Head>
 				{/if}
 			</Table.Row>
 		</Table.Header>

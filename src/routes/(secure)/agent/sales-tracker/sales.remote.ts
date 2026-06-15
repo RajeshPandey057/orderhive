@@ -177,7 +177,11 @@ const saleSchema = z
 		unitValue: z.string().min(1, 'Unit value is required'),
 		saleDate: z.string().min(1, 'Sale date is required'),
 		nationality: z.string().optional(),
-		residentStatus: z.enum(['resident', 'non-resident']).optional(),
+		residentStatus: z
+			.string()
+			.optional()
+			.transform((v) => (v === '' || v === undefined ? undefined : v))
+			.pipe(z.enum(['resident', 'non-resident']).optional()),
 		commissionPercentage: z
 			.number()
 			.min(0, 'Commission % must be at least 0')
@@ -621,7 +625,11 @@ const updateSaleSchema = z
 		unitValue: z.string().min(1, 'Unit value is required'),
 		saleDate: z.string().min(1, 'Sale date is required'),
 		nationality: z.string().optional(),
-		residentStatus: z.enum(['resident', 'non-resident']).optional(),
+		residentStatus: z
+			.string()
+			.optional()
+			.transform((v) => (v === '' || v === undefined ? undefined : v))
+			.pipe(z.enum(['resident', 'non-resident']).optional()),
 		commissionPercentage: z
 			.number()
 			.min(0, 'Commission % must be at least 0')

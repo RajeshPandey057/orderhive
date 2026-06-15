@@ -12,6 +12,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+	import { isDateWithinThisMonth } from '$lib/date-period';
 	import { getEffectiveSaleRevenue } from '$lib/sales';
 	import {
 		type ColumnDef,
@@ -306,9 +307,6 @@
 	let dateFilter = $state<'all' | 'this-month'>('all');
 	const filteredData = $derived.by(() => {
 		if (dateFilter === 'all') return data;
-		const now = new Date();
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 		return data.filter((sale) => {
 			if (!sale.createdAt) return false;
 			// Firestore FieldValue is Timestamp at runtime — has .toDate()
@@ -317,7 +315,7 @@
 				typeof ts.toDate === 'function'
 					? ts.toDate()
 					: new Date(sale.createdAt as unknown as string);
-			return date >= startOfMonth && date <= endOfMonth;
+			return isDateWithinThisMonth(date);
 		});
 	});
 
@@ -398,7 +396,7 @@
 <div class="w-full space-y-4">
 	<!-- Filters and search bar -->
 	<div class="flex flex-col gap-4">
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<div class="relative max-w-sm flex-1">
 				<Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 				<Input
@@ -414,11 +412,11 @@
 				/>
 			</div>
 
-			<div class="ml-auto flex items-center gap-2">
+			<div class="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
-							<Button {...props} variant="outline" size="sm" class="h-9 gap-1">
+							<Button {...props} variant="outline" size="sm" class="h-9 shrink-0 gap-1">
 								Columns
 								<ChevronDown class="h-4 w-4 opacity-50" />
 							</Button>
@@ -439,7 +437,7 @@
 				<Button
 					variant={dateFilter === 'this-month' ? 'default' : 'outline'}
 					size="sm"
-					class="h-9 gap-2"
+					class="h-9 shrink-0 gap-2"
 					onclick={() => {
 						dateFilter = dateFilter === 'this-month' ? 'all' : 'this-month';
 						pagination = { ...pagination, pageIndex: 0 };

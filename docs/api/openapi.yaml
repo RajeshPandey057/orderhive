@@ -1,0 +1,438 @@
+openapi: 3.0.3
+
+info:
+  title: Orderhive Attendance API
+  version: 1.0.0
+  description: |
+    API for integrating external systems with Orderhive's attendance module.
+
+    There are two endpoint groups:
+
+    **iClock / ADMS Protocol** (`/iclock/*`)
+    Implements the ZKTeco iClock HTTP Push (ADMS) protocol. Any device or
+    software compatible with this protocol can push attendance punches. The
+    device serial number (`SN` query parameter) must be pre-registered in the
+    server's `ZKTECO_DEVICE_SN` environment variable.
+
+    **REST API** (`/api/*`)
+    Standard JSON endpoints for triggering server-side reconciliation.
+    Protected by a shared Bearer token.
+
+    ### Employee Code Mapping
+    Each punch carries a `userID` field that must match the `code` field of an
+    employee record in the system (e.g. `INDG0194`). Punches with unrecognised
+    codes are stored as unresolved and can be back-filled later.
+
+    ### Reconciliation Rules
+    - **punchIn** — first punch of the day (HH:MM)
+    - **punchOut** — last punch of the day (HH:MM)
+    - **workingMinutes** — `punchOut − punchIn`, minimum 0
+    - **overtimeMinutes** — `max(0, workingMinutes − 480)`
+    - **status** — `present` if punchIn ≤ `LATE_THRESHOLD_TIME`, else `late`
+    - Records flagged `corrected: true` are never overwritten by biometric data
+  contact:
+    name: Orderhive Engineering
+    url: https://orderhive.indglobalrealty.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://orderhive.indglobalrealty.com
+    description: Production
+
+tags:
+  - name: iClock
+    description: >
+      ZKTeco iClock / ADMS HTTP Push Protocol.
+      Used by physical biometric devices and any iClock-compatible software.
+  - name: Reconciliation
+    description: >
+      REST endpoints for triggering attendance reconciliation and absence marking.
+
+paths:
+  /iclock/cdata:
+    get:
+      operationId: iclockHandshake
+      tags: [iClock]
+      summary: Device handshake — fetch server configuration
+      description: |
+        Called by the device on boot and periodically thereafter. Returns
+        plain-text key=value configuration that controls push behaviour
+        (timezone, sync interval, etc.).
+
+        The request is rejected with 401 if the `SN` value is not in the
+        server's registered device whitelist.
+      parameters:
+        - $ref: '#/components/parameters/SN'
+        - name: options
+          in: query
+          description: Options flag sent by the device (e.g. `all`). Informational only.
+          required: false
+          schema:
+            type: string
+            example: all
+      responses:
+        '200':
+          description: ADMS configuration accepted by the device
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                GET OPTION FROM: JJA1253301000
+                ATTLOGStamp=9999
+                OPERLOGStamp=9999
+                ATTPHOTOStamp=9999
+                ErrorDelay=30
+                Delay=10
+                TransTimes=00:00;23:59
+                TransInterval=1
+                TransFlag=TransData AttLog
+                TimeZone=4.00
+                Realtime=1
+                Encrypt=None
+        '401':
+          $ref: '#/components/responses/UnauthorizedDevice'
+
+    post:
+      operationId: iclockPushPunches
+      tags: [iClock]
+      summary: Push attendance punches
+      description: |
+        Called by the device (or an iClock-compatible integration) to deliver
+        attendance punch records. Only requests with `table=ATTLOG` are
+        processed; other table values receive an acknowledgement but no
+        further action.
+
+        **Body format** — plain text, one punch per line, fields
+        tab-separated:
+
+        ```
+        userID<TAB>YYYY-MM-DD HH:mm:ss<TAB>inOutMode<TAB>verifyType
+        ```
+
+        Lines with fewer than 4 tab-separated fields, or with an invalid
+        timestamp, are silently skipped.
+
+        **inOutMode values**
+        | Value | Meaning |
+        |-------|---------|
+        | 0 | Check-in |
+        | 1 | Check-out |
+        | 2 | Break out |
+        | 3 | Break in |
+        | 4 | Overtime in |
+        | 5 | Overtime out |
+
+        **verifyType values**
+        | Value | Meaning |
+        |-------|---------|
+        | 1 | Fingerprint |
+        | 2 | Password |
+        | 3 | Card |
+        | 15 | Face |
+
+        Punch documents are written to Firestore with a deterministic ID
+        (`{SN}_{userID}_{timestamp}`), so repeated POSTs of the same punch
+        are idempotent.
+      parameters:
+        - $ref: '#/components/parameters/SN'
+        - name: table
+          in: query
+          description: Record type. Pass `ATTLOG` for attendance data.
+          required: false
+          schema:
+            type: string
+            enum: [ATTLOG, OPERLOG, ATTPHOTO, OPTIONS]
+            example: ATTLOG
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              description: >
+                One punch per line, tab-separated:
+                `userID<TAB>YYYY-MM-DD HH:mm:ss<TAB>inOutMode<TAB>verifyType`
+            example: "INDG0194\t2026-06-12 08:57:42\t0\t1\nINDG0194\t2026-06-12 18:03:11\t1\t1\nINDG0226\t2026-06-12 09:05:00\t0\t15\n"
+      responses:
+        '200':
+          description: Punches accepted (and count of processed records)
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: 'OK: 3'
+        '401':
+          $ref: '#/components/responses/UnauthorizedDevice'
+
+  /iclock/getrequest:
+    get:
+      operationId: iclockGetRequest
+      tags: [iClock]
+      summary: Heartbeat / command poll
+      description: |
+        Called periodically by the device to check for pending server
+        commands (firmware updates, user sync, etc.).
+
+        Currently responds with `OK`. The framework is in place for future
+        server-to-device command delivery.
+      parameters:
+        - $ref: '#/components/parameters/SN'
+        - name: INFO
+          in: query
+          description: >
+            Device information string (firmware version, IP, port, etc.)
+            sent by the device. Informational only — not validated.
+          required: false
+          schema:
+            type: string
+            example: 'Ver 8.0.4.3-20220708,148,263,29324,192.168.1.10,10,-1,0,0,101,2,0,0'
+      responses:
+        '200':
+          description: No pending commands
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/zkteco/reconcile:
+    post:
+      operationId: reconcileAttendance
+      tags: [Reconciliation]
+      summary: Reconcile punches and mark absences for a date
+      description: |
+        Intended for use as a nightly cron job (e.g. Cloud Scheduler).
+
+        **Step 1 — Reconcile punched employees**
+        For every employee who has at least one biometric punch on `date`,
+        re-compute their attendance log (punchIn, punchOut, workingMinutes,
+        status).
+
+        **Step 2 — Mark remaining employees**
+        For every active employee who has no attendance log for `date`:
+        - `holiday` if a holiday is configured for that date
+        - `on-leave` if an approved leave request exists for that date
+        - `absent` otherwise
+
+        Existing records flagged `corrected: true` are never overwritten.
+
+        **Authentication**
+        Requires `Authorization: Bearer {ZKTECO_CRON_SECRET}` header.
+        Returns 401 if the header is missing, wrong, or if the secret is
+        not configured on the server.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconcileRequest'
+            examples:
+              yesterday:
+                summary: Reconcile yesterday (default)
+                value: {}
+              specificDate:
+                summary: Reconcile a specific date
+                value:
+                  date: '2026-06-11'
+      responses:
+        '200':
+          description: Reconciliation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconcileResponse'
+              example:
+                date: '2026-06-11'
+                reconciled: 18
+                absent: 3
+                onLeave: 1
+                holiday: false
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Unauthorized
+
+components:
+  parameters:
+    SN:
+      name: SN
+      in: query
+      description: >
+        Device serial number. Must be pre-registered in the server's
+        `ZKTECO_DEVICE_SN` environment variable (comma-separated list).
+        Requests from unregistered serial numbers are rejected with 401.
+      required: true
+      schema:
+        type: string
+        example: JJA1253301000
+
+  schemas:
+    ReconcileRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: >
+            Date to reconcile in `YYYY-MM-DD` format. Defaults to
+            yesterday (server local time) when omitted.
+          example: '2026-06-11'
+
+    ReconcileResponse:
+      type: object
+      required: [date, reconciled, absent, onLeave, holiday]
+      properties:
+        date:
+          type: string
+          format: date
+          description: The date that was reconciled
+          example: '2026-06-11'
+        reconciled:
+          type: integer
+          description: Number of employees whose attendance log was updated
+          example: 18
+        absent:
+          type: integer
+          description: Number of employees marked absent
+          example: 3
+        onLeave:
+          type: integer
+          description: Number of those absent employees who were on approved leave
+          example: 1
+        holiday:
+          type: boolean
+          description: Whether the date was a configured holiday
+          example: false
+
+    BiometricPunch:
+      type: object
+      description: A raw attendance punch stored in the system
+      properties:
+        id:
+          type: string
+          description: Deterministic deduplication key — `{SN}_{userID}_{timestamp_compact}`
+          example: JJA1253301000_INDG0194_20260612085742
+        deviceSn:
+          type: string
+          example: JJA1253301000
+        deviceUserId:
+          type: string
+          description: Employee code as enrolled on the device (e.g. `INDG0194`)
+          example: INDG0194
+        employeeEmail:
+          type: string
+          nullable: true
+          description: Resolved employee email. `null` if the code has no matching employee.
+          example: rajesh@indglobalrealty.com
+        employeeName:
+          type: string
+          nullable: true
+          example: Rajesh Pandey
+        date:
+          type: string
+          format: date
+          example: '2026-06-12'
+        timeStr:
+          type: string
+          description: Punch time in `HH:MM` format
+          example: '08:57'
+        timestamp:
+          type: string
+          description: Full punch timestamp as received from device (`YYYY-MM-DD HH:mm:ss`)
+          example: '2026-06-12 08:57:42'
+        inOutMode:
+          type: integer
+          description: '0=check-in 1=check-out 2=break-out 3=break-in 4=OT-in 5=OT-out'
+          example: 0
+        verifyType:
+          type: integer
+          description: '1=fingerprint 2=password 3=card 15=face'
+          example: 1
+        branch:
+          type: string
+          description: Office/branch name derived from device SN mapping
+          example: Business Bay
+        processed:
+          type: boolean
+          description: Whether this punch has been reconciled into an attendance log
+          example: true
+
+    AttendanceLog:
+      type: object
+      description: Computed attendance record for an employee on a given date
+      properties:
+        id:
+          type: string
+          description: '{email_normalised}_{YYYY-MM-DD}'
+          example: rajesh_indglobalrealty.com_2026-06-12
+        employeeEmail:
+          type: string
+          example: rajesh@indglobalrealty.com
+        employeeName:
+          type: string
+          example: Rajesh Pandey
+        employeeCode:
+          type: string
+          example: INDG0194
+        date:
+          type: string
+          format: date
+          example: '2026-06-12'
+        branch:
+          type: string
+          example: Business Bay
+        punchIn:
+          type: string
+          nullable: true
+          description: First punch of day in HH:MM
+          example: '08:57'
+        punchOut:
+          type: string
+          nullable: true
+          description: Last punch of day in HH:MM
+          example: '18:03'
+        workingMinutes:
+          type: integer
+          example: 546
+        overtimeMinutes:
+          type: integer
+          example: 66
+        shortByMinutes:
+          type: integer
+          example: 0
+        status:
+          type: string
+          enum: [present, late, absent, on-leave, holiday]
+          example: present
+        source:
+          type: string
+          enum: [biometric, manual, import]
+          example: biometric
+        corrected:
+          type: boolean
+          description: If true, this record was manually corrected and will not be overwritten
+          example: false
+
+  responses:
+    UnauthorizedDevice:
+      description: Device serial number not registered
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: Unauthorized
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Value of the `ZKTECO_CRON_SECRET` environment variable configured
+        on the server. Minimum 16 characters.

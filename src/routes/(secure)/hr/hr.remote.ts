@@ -29,6 +29,7 @@ const accessTypeSchema = z.enum([
 	'agent',
 	'finance',
 	'compliance',
+	'hr-assignee',
 	'manager',
 	'senior-manager',
 	'general'
@@ -85,7 +86,7 @@ function requireUser() {
 
 function requireHrAdmin() {
 	const user = requireUser();
-	if (user.role !== 'admin' && user.role !== 'super-admin') {
+	if (user.role !== 'admin' && user.role !== 'super-admin' && user.role !== 'hr-assignee') {
 		throw error(403, 'You do not have permission to manage HR');
 	}
 	return user;

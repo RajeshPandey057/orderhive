@@ -23,7 +23,8 @@
 		| 'finance'
 		| 'compliance'
 		| 'manager'
-		| 'senior-manager';
+		| 'senior-manager'
+		| 'hr-assignee';
 
 	// Fetch roles collection from Firebase
 	const rolesCollection = firekitCollection<Role>('roles');
@@ -31,7 +32,14 @@
 	// State for filters
 	let searchQuery = $state('');
 	let selectedFilter = $state<
-		'all' | 'admin' | 'agent' | 'compliance' | 'finance' | 'manager' | 'senior-manager'
+		| 'all'
+		| 'admin'
+		| 'agent'
+		| 'compliance'
+		| 'finance'
+		| 'manager'
+		| 'senior-manager'
+		| 'hr-assignee'
 	>('all');
 
 	// Dialog state
@@ -73,7 +81,8 @@
 		{ value: 'compliance', label: 'Compliance' },
 		{ value: 'finance', label: 'Finance' },
 		{ value: 'manager', label: 'Manager' },
-		{ value: 'senior-manager', label: 'Senior Manager' }
+		{ value: 'senior-manager', label: 'Senior Manager' },
+		{ value: 'hr-assignee', label: 'HR Assignee' }
 	];
 
 	// Derived labels for invite form
@@ -151,6 +160,8 @@
 				return 'bg-purple-100 text-purple-700';
 			case 'super-admin':
 				return 'bg-orange-100 text-orange-700';
+			case 'hr-assignee':
+				return 'bg-amber-100 text-amber-700';
 			default:
 				return 'bg-gray-100 text-gray-700';
 		}
@@ -309,6 +320,13 @@
 				onclick={() => (selectedFilter = 'senior-manager')}
 			>
 				Senior Manager
+			</Button>
+			<Button
+				variant={selectedFilter === 'hr-assignee' ? 'default' : 'outline'}
+				size="sm"
+				onclick={() => (selectedFilter = 'hr-assignee')}
+			>
+				HR Assignee
 			</Button>
 		</div>
 	</div>

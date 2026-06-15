@@ -16,6 +16,12 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
+	import {
+		formatDateInput,
+		getPeriodRange,
+		parseDateInput,
+		type DateFilterPeriod
+	} from '$lib/date-period';
 	import { Download, Radio, Search } from '@lucide/svelte';
 	import { collection, getFirestore, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 	import { toast } from 'svelte-sonner';
@@ -119,8 +125,7 @@
 	let correctionTime = $state('10:00');
 	let correctionPunchOut = $state('');
 	let correctionReason = $state('');
-	type FilterPeriod = 'today' | 'monthly' | 'custom';
-	let filterPeriod = $state<FilterPeriod>('today');
+	let filterPeriod = $state<DateFilterPeriod>('today');
 	let searchQuery = $state('');
 	let selectedAttendanceDate = $state(todayStr());
 	let customRangeFrom = $state(todayStr());
@@ -130,42 +135,14 @@
 	let syncing = $state(false);
 
 	// ── Period range helper ───────────────────────────────────────────────────────
-	function formatDateInput(date: Date) {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		return `${year}-${month}-${day}`;
-	}
-
-	function parseDateInput(value: string) {
-		const [year, month, day] = value.split('-').map(Number);
-		if (!year || !month || !day) return new Date();
-		return new Date(year, month - 1, day);
-	}
-
-	function getPeriodRange(period: FilterPeriod, refDate: Date): { start: string; end: string } {
-		if (period === 'today') {
-			const d = formatDateInput(refDate);
-			return { start: d, end: d };
-		} else if (period === 'monthly') {
-			const start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
-			const end = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
-			return { start: formatDateInput(start), end: formatDateInput(end) };
-		}
-
-		const from = customRangeFrom || todayStr();
-		const to = customRangeTo || from;
-		return from <= to ? { start: from, end: to } : { start: to, end: from };
-	}
-
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
 	const activeEmployees = $derived(data.activeEmployees ?? []);
 	const selectedRange = $derived.by(() => {
 		const refDate =
-			filterPeriod === 'monthly'
+			filterPeriod === 'this-month'
 				? new Date()
 				: parseDateInput(selectedAttendanceDate || todayStr());
-		return getPeriodRange(filterPeriod, refDate);
+		return getPeriodRange(filterPeriod, refDate, customRangeFrom, customRangeTo);
 	});
 
 	// Period-filtered base. This is also the source for CSV exports.
@@ -403,11 +380,15 @@
 			<div class="flex flex-wrap items-center gap-3">
 				<Select.Root type="single" bind:value={filterPeriod}>
 					<Select.Trigger class="h-8 w-35">
-						{filterPeriod === 'today' ? 'Today' : filterPeriod === 'monthly' ? 'Monthly' : 'Custom'}
+						{filterPeriod === 'today'
+							? 'Today'
+							: filterPeriod === 'this-month'
+								? 'This Month'
+								: 'Custom'}
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="today">Today</Select.Item>
-						<Select.Item value="monthly">Monthly</Select.Item>
+						<Select.Item value="this-month">This Month</Select.Item>
 						<Select.Item value="custom">Custom</Select.Item>
 					</Select.Content>
 				</Select.Root>
@@ -418,11 +399,11 @@
 						bind:value={selectedAttendanceDate}
 						max={todayStr()}
 					/>
-				{:else if filterPeriod === 'monthly'}
+				{:else if filterPeriod === 'this-month'}
 					<div
 						class="flex h-8 items-center rounded-md border border-[#D4D9D9] px-3 text-[13px] text-[#687976]"
 					>
-						This month
+						This Month
 					</div>
 				{:else}
 					<div class="flex flex-wrap items-center gap-2">
