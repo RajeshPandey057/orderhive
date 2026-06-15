@@ -1,8 +1,14 @@
 import { firestore } from '$lib/server/firebase';
 
+const LISTING_PAGE_LIMIT = 300;
+
 export async function load() {
 	try {
-		const snap = await firestore.collection('listings').get();
+		const snap = await firestore
+			.collection('listings')
+			.orderBy('createdAt', 'desc')
+			.limit(LISTING_PAGE_LIMIT)
+			.get();
 
 		const listings: Listing[] = snap.docs
 			.filter((doc) => !doc.data().isDeleted)
@@ -62,8 +68,7 @@ export async function load() {
 				};
 			});
 
-		listings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
+		// Ordering is handled by Firestore (createdAt desc), so no client-side sort needed.
 		return { listings };
 	} catch {
 		return { listings: [] };

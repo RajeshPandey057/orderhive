@@ -11,6 +11,19 @@ export const attendanceLogsCollection = firestore.collection('attendanceLogs');
 export const SICK_LEAVE_TYPE = 'Sick Leave';
 export const PROBATION_MONTHS = 3;
 
+// Short-lived in-process cache so rapid navigations that call listEmployeesWithAccess()
+// within the same Node process don't trigger duplicate full-collection Firestore reads.
+const EMPLOYEE_ACCESS_CACHE_TTL_MS = 30_000;
+let _employeeAccessCacheExpiresAt = 0;
+let _employeeAccessCacheValue: Employee[] | null = null;
+let _employeeAccessCachePending: Promise<Employee[]> | null = null;
+
+export function invalidateEmployeeAccessCache() {
+	_employeeAccessCacheExpiresAt = 0;
+	_employeeAccessCacheValue = null;
+	_employeeAccessCachePending = null;
+}
+
 export function normalizeEmail(email: string) {
 	return email.trim().toLowerCase();
 }
@@ -108,47 +121,72 @@ export function roleToEmployeeAccess(role?: FirebaseFirestore.DocumentData | nul
 	};
 }
 
-export async function listEmployeesWithAccess(): Promise<Employee[]> {
-	const [employeesSnap, rolesSnap] = await Promise.all([
-		employeeCollection.get(),
-		rolesCollection.get()
-	]);
+export async function listEmployeesWithAccess(options?: {
+	forceRefresh?: boolean;
+}): Promise<Employee[]> {
+	const forceRefresh = options?.forceRefresh ?? false;
 
-	const rolesByEmail = new Map<string, FirebaseFirestore.DocumentData>();
-	for (const doc of rolesSnap.docs) {
-		const data = doc.data();
-		rolesByEmail.set(normalizeEmail(data.email ?? doc.id), data);
+	// Return cached result if still fresh.
+	if (!forceRefresh && _employeeAccessCacheValue && Date.now() < _employeeAccessCacheExpiresAt) {
+		return _employeeAccessCacheValue;
 	}
 
-	const seen = new Set<string>();
-	const employees = employeesSnap.docs.map((doc) => {
-		const employee = serializeEmployeeDoc(doc.id, doc.data());
-		const role = rolesByEmail.get(employee.email);
-		seen.add(employee.email);
-		return {
-			...employee,
-			...roleToEmployeeAccess(role)
-		};
-	});
+	// Deduplicate concurrent callers: reuse in-flight fetch.
+	if (_employeeAccessCachePending) {
+		return _employeeAccessCachePending;
+	}
 
-	for (const [email, role] of rolesByEmail.entries()) {
-		if (seen.has(email)) continue;
-		employees.push({
-			id: email,
-			email,
-			name:
-				role.displayName ??
-				([role.firstName, role.lastName].filter(Boolean).join(' ') || email.split('@')[0]),
-			code: '',
-			department: '',
-			designation: '',
-			location: '',
-			status: 'active',
-			...roleToEmployeeAccess(role)
+	const fetchPromise = (async (): Promise<Employee[]> => {
+		const [employeesSnap, rolesSnap] = await Promise.all([
+			employeeCollection.get(),
+			rolesCollection.get()
+		]);
+
+		const rolesByEmail = new Map<string, FirebaseFirestore.DocumentData>();
+		for (const doc of rolesSnap.docs) {
+			const data = doc.data();
+			rolesByEmail.set(normalizeEmail(data.email ?? doc.id), data);
+		}
+
+		const seen = new Set<string>();
+		const employees = employeesSnap.docs.map((doc) => {
+			const employee = serializeEmployeeDoc(doc.id, doc.data());
+			const role = rolesByEmail.get(employee.email);
+			seen.add(employee.email);
+			return {
+				...employee,
+				...roleToEmployeeAccess(role)
+			};
 		});
-	}
 
-	return employees;
+		for (const [email, role] of rolesByEmail.entries()) {
+			if (seen.has(email)) continue;
+			employees.push({
+				id: email,
+				email,
+				name:
+					role.displayName ??
+					([role.firstName, role.lastName].filter(Boolean).join(' ') || email.split('@')[0]),
+				code: '',
+				department: '',
+				designation: '',
+				location: '',
+				status: 'active',
+				...roleToEmployeeAccess(role)
+			});
+		}
+
+		_employeeAccessCacheValue = employees;
+		_employeeAccessCacheExpiresAt = Date.now() + EMPLOYEE_ACCESS_CACHE_TTL_MS;
+		return employees;
+	})();
+
+	_employeeAccessCachePending = fetchPromise;
+	try {
+		return await fetchPromise;
+	} finally {
+		_employeeAccessCachePending = null;
+	}
 }
 
 export async function getEmployeeByEmail(email: string): Promise<Employee | null> {
@@ -225,6 +263,8 @@ export async function upsertEmployeeAccess(
 		},
 		{ merge: true }
 	);
+
+	invalidateEmployeeAccessCache();
 }
 
 export async function disableEmployeeAccess(email: string, actorEmail: string) {
@@ -241,6 +281,8 @@ export async function disableEmployeeAccess(email: string, actorEmail: string) {
 		},
 		{ merge: true }
 	);
+
+	invalidateEmployeeAccessCache();
 }
 
 export function serializeHoliday(id: string, data: FirebaseFirestore.DocumentData): Holiday {

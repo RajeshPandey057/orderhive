@@ -12,7 +12,7 @@ export async function load({ locals }) {
 	}
 
 	const [attendanceSnap, employees] = await Promise.all([
-		attendanceLogsCollection.orderBy('date', 'desc').limit(500).get(),
+		attendanceLogsCollection.orderBy('date', 'desc').limit(100).get(),
 		listEmployeesWithAccess()
 	]);
 	const activeEmployees = employees.filter((employee) => employee.status === 'active');

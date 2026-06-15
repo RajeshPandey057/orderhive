@@ -33,6 +33,7 @@
 		{ value: 'agent', label: 'Agent' },
 		{ value: 'finance', label: 'Finance' },
 		{ value: 'compliance', label: 'Compliance' },
+		{ value: 'hr-assignee', label: 'HR Assignee' },
 		{ value: 'manager', label: 'Manager' },
 		{ value: 'senior-manager', label: 'Senior Manager' },
 		{ value: 'general', label: 'General' }
@@ -217,6 +218,7 @@
 				| 'agent'
 				| 'finance'
 				| 'compliance'
+				| 'hr-assignee'
 				| 'manager'
 				| 'senior-manager'
 				| 'general',

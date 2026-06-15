@@ -99,9 +99,6 @@
 	let handoverYear = $state('');
 	let handoverQuarter = $state('');
 	let paymentPlan = $state('');
-	let originalPrice = $state<number | ''>('');
-	let purchasePrice = $state<number | ''>('');
-	let amountPaid = $state<number | ''>('');
 
 	// Track whether a new file was picked for each attachment (so we can clear the existing display)
 	let titleDeedReplaced = $state(false);
@@ -338,9 +335,6 @@
 		handoverYear = l.handoverYear ?? '';
 		handoverQuarter = l.handoverQuarter ?? '';
 		paymentPlan = l.paymentPlan ?? '';
-		originalPrice = l.originalPrice ?? l.originalPrice ?? '';
-		purchasePrice = l.purchasePrice ?? l.purchasePrice ?? '';
-		amountPaid = l.amountPaid ?? l.amountPaid ?? '';
 		titleDeedReplaced = false;
 		passportReplaced = false;
 		emiratesIdReplaced = false;
@@ -573,6 +567,8 @@
 						open = false;
 						toast.success('Listing updated successfully');
 						await invalidateAll();
+					} else {
+						toast.error('Please fix validation errors before saving.');
 					}
 				} catch {
 					toast.error('Failed to update listing. Please try again.');
@@ -612,9 +608,9 @@
 			<input type="hidden" name="handoverYear" value={handoverYear} />
 			<input type="hidden" name="handoverQuarter" value={handoverQuarter} />
 			<input type="hidden" name="paymentPlan" value={paymentPlan} />
-			<input type="hidden" name="originalPrice" value={originalPrice} />
-			<input type="hidden" name="purchasePrice" value={purchasePrice} />
-			<input type="hidden" name="amountPaid" value={amountPaid} />
+			<input type="hidden" name="originalPrice" value={dxbPrice} />
+			<input type="hidden" name="purchasePrice" value={buyingPrice} />
+			<input type="hidden" name="amountPaid" value={liquidityInvested} />
 			<input type="hidden" name="price" value={sellingPrice} />
 			<input type="hidden" name="retainedMediaUrls" value={JSON.stringify(retainedMediaUrls)} />
 			<input
@@ -1198,7 +1194,7 @@
 									<Input name="area" bind:value={area} placeholder="Area" />
 								</Field.Field>
 								<Field.Field>
-									<Input name="city" bind:value={city} placeholder="City" />
+									<Input name="addressCity" bind:value={city} placeholder="City" />
 								</Field.Field>
 								<Field.Field>
 									<Input name="country" bind:value={country} placeholder="Country" />
