@@ -116,7 +116,8 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 // Menu items for each role
 const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	admin: [
-		{ title: 'Dashboard', url: '/admin/dashboard' },
+		{ title: 'Sales Dashboard', url: '/admin/dashboard' },
+		{ title: 'AML Dashboard', url: '/admin/aml-dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },
@@ -199,7 +200,8 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Holiday Calendar', url: '/holidays' }
 	],
 	'super-admin': [
-		{ title: 'Dashboard', url: '/admin/dashboard' },
+		{ title: 'Sales Dashboard', url: '/admin/dashboard' },
+		{ title: 'AML Dashboard', url: '/admin/aml-dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'All Sales', url: '/admin/all-sales' },

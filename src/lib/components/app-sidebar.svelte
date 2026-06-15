@@ -20,6 +20,8 @@
 	const iconMap: Record<string, typeof LucideLayoutPanelTop> = {
 		Dashboard: LucideLayoutPanelTop,
 		'Sales Tracker': LucideBookMarked,
+		'Sales Dashboard': LucideLayoutPanelTop,
+		'AML Dashboard': LucideShield,
 		Notifications: LucideBell,
 		'Access Management': LucideShield,
 		'Listing Management': LucideBuilding2,
@@ -57,15 +59,18 @@
 </script>
 
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { getDefaultRoute, getMenuItems, isMenuItemActive, type AccessType } from '$lib/constants';
 	import FullLogoDark from '@/svg/full-logo-dark.svelte';
 	import LogoDark from '@/svg/logo-dark.svelte';
 	import type { ComponentProps } from 'svelte';
+	import { onMount } from 'svelte';
 	import { firekitUser } from 'svelte-firekit';
 	import NavMain from './nav-main.svelte';
 	import NavUser from './nav-user.svelte';
@@ -79,6 +84,76 @@
 		data: { user: { uid: string; email: string; role: AccessType } | null };
 	} = $props();
 
+	type SidebarNavItem = {
+		title: string;
+		url: string;
+		icon?: typeof LucideLayoutPanelTop;
+		isActive?: boolean;
+		external?: boolean;
+	};
+
+	type SidebarNavSection = {
+		title: string;
+		items: SidebarNavItem[];
+	};
+
+	type AdminSidebarMode = 'control-panel' | 'dashboard-panel';
+
+	const ADMIN_SIDEBAR_MODE_STORAGE_KEY = 'admin-sidebar-mode';
+	const adminSidebarModeOptions: { value: AdminSidebarMode; label: string }[] = [
+		{ value: 'control-panel', label: 'Control Panel' },
+		{ value: 'dashboard-panel', label: 'Dashboard Panel' }
+	];
+
+	const adminSidebarModeDefaultRoutes: Record<AdminSidebarMode, string> = {
+		'control-panel': '/admin/dashboard',
+		'dashboard-panel': '/admin/aml-dashboard'
+	};
+
+	const adminDashboardPanelRoutes = new Set(['/admin/aml-dashboard']);
+
+	let adminSidebarMode = $state<AdminSidebarMode>('control-panel');
+
+	const isAdminSidebarRole = $derived(
+		data?.user?.role === 'admin' || data?.user?.role === 'super-admin'
+	);
+
+	onMount(() => {
+		if (!browser || !isAdminSidebarRole) return;
+
+		const storedMode = localStorage.getItem(ADMIN_SIDEBAR_MODE_STORAGE_KEY);
+		if (storedMode === 'control-panel' || storedMode === 'dashboard-panel') {
+			adminSidebarMode = storedMode;
+		}
+	});
+
+	$effect(() => {
+		if (!browser || !isAdminSidebarRole) return;
+		localStorage.setItem(ADMIN_SIDEBAR_MODE_STORAGE_KEY, adminSidebarMode);
+	});
+
+	$effect(() => {
+		if (!browser || !isAdminSidebarRole) return;
+
+		const currentPath = page.url.pathname;
+		if (!currentPath.startsWith('/admin')) return;
+
+		const currentPathMode = adminDashboardPanelRoutes.has(currentPath)
+			? 'dashboard-panel'
+			: 'control-panel';
+
+		if (currentPathMode !== adminSidebarMode) {
+			goto(adminSidebarModeDefaultRoutes[adminSidebarMode], { replaceState: true });
+		}
+	});
+
+	function handleAdminSidebarModeChange(value: string) {
+		if (value !== 'control-panel' && value !== 'dashboard-panel') return;
+
+		adminSidebarMode = value;
+		goto(adminSidebarModeDefaultRoutes[value], { replaceState: true });
+	}
+
 	const navBaseItems = $derived(
 		data?.user?.role
 			? getMenuItems(data.user.role).map((item) => ({
@@ -91,15 +166,16 @@
 	);
 
 	const navItems = $derived(
-		navBaseItems.map((item) => ({
-			...item,
-			isActive: isMenuItemActive(item.url, page.url.pathname)
-		}))
+		navBaseItems.map(
+			(item): SidebarNavItem => ({
+				...item,
+				isActive: isMenuItemActive(item.url, page.url.pathname)
+			})
+		)
 	);
 
-	const navSections = $derived.by(() => {
-		if (!data?.user?.role) return [];
-		if (data.user.role !== 'admin' && data.user.role !== 'super-admin') return [];
+	const adminControlPanelSections = $derived.by((): SidebarNavSection[] => {
+		if (!isAdminSidebarRole) return [];
 
 		const navMap = new Map(
 			navItems.map((item) => [
@@ -169,6 +245,49 @@
 			}
 		];
 	});
+
+	const adminDashboardPanelSections = $derived.by((): SidebarNavSection[] => {
+		if (!isAdminSidebarRole) return [];
+
+		const navMap = new Map(
+			navItems.map((item) => [
+				item.url,
+				{
+					title: item.title,
+					url: item.url,
+					isActive: item.isActive,
+					icon: item.icon,
+					external: item.external
+				}
+			])
+		);
+
+		return [
+			{
+				title: 'Dashboards',
+				items: compact([navMap.get('/admin/aml-dashboard')])
+			}
+		];
+	});
+
+	const activeAdminSidebarModeLabel = $derived(
+		adminSidebarModeOptions.find((option) => option.value === adminSidebarMode)?.label ||
+			'Control Panel'
+	);
+
+	const activeNavItems = $derived(isAdminSidebarRole ? [] : navItems);
+
+	const activeNavSections = $derived.by((): SidebarNavSection[] => {
+		if (!isAdminSidebarRole) return [];
+		return adminSidebarMode === 'control-panel'
+			? adminControlPanelSections
+			: adminDashboardPanelSections;
+	});
+
+	const emptyStateMessage = $derived.by(() => {
+		if (!isAdminSidebarRole) return undefined;
+		return 'No menus are available for this panel yet.';
+	});
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
@@ -186,9 +305,29 @@
 				{/if}
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
+		{#if isAdminSidebarRole}
+			<div class="px-2 pb-2 group-data-[collapsible=icon]:hidden">
+				<Select.Root
+					type="single"
+					bind:value={adminSidebarMode}
+					onValueChange={handleAdminSidebarModeChange}
+				>
+					<Select.Trigger
+						class="h-10 w-full border-white/10 bg-white/5 font-medium text-white hover:bg-white/10 focus-visible:border-white/20 focus-visible:ring-white/20"
+					>
+						{activeAdminSidebarModeLabel}
+					</Select.Trigger>
+					<Select.Content>
+						{#each adminSidebarModeOptions as option (option.value)}
+							<Select.Item value={option.value}>{option.label}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
+		{/if}
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<NavMain items={navItems} sections={navSections} />
+		<NavMain items={activeNavItems} sections={activeNavSections} {emptyStateMessage} />
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<NavUser
