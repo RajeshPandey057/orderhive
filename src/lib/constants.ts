@@ -23,6 +23,15 @@ interface MenuItem {
 	external?: boolean;
 }
 
+export type DefaultRoute =
+	| '/admin/dashboard'
+	| '/agent/dashboard'
+	| '/compliance/dashboard'
+	| '/finance/dashboard'
+	| '/hr/employees'
+	| '/general/dashboard'
+	| '/dashboard';
+
 const EDUCATION_ACCESS_ROLES: AccessType[] = [
 	'admin',
 	'agent',
@@ -223,7 +232,7 @@ export function canManageEducationVideos(role: AccessType | null | undefined): b
 }
 
 // Get default route for a role
-export function getDefaultRoute(role: AccessType): string {
+export function getDefaultRoute(role: AccessType): DefaultRoute {
 	switch (role) {
 		case 'admin':
 		case 'super-admin':

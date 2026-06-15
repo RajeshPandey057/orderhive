@@ -51,10 +51,14 @@
 	function getIconForMenuItem(title: string): typeof LucideLayoutPanelTop {
 		return iconMap[title] || LucideLayoutPanelTop;
 	}
+
+	const compact = <T,>(items: (T | undefined)[]) =>
+		items.filter((item): item is T => Boolean(item));
 </script>
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
@@ -75,17 +79,22 @@
 		data: { user: { uid: string; email: string; role: AccessType } | null };
 	} = $props();
 
-	// Build navigation items dynamically based on role
-	const navItems = $derived(
+	const navBaseItems = $derived(
 		data?.user?.role
 			? getMenuItems(data.user.role).map((item) => ({
 					title: item.title,
 					url: item.url,
 					icon: getIconForMenuItem(item.title),
-					isActive: isMenuItemActive(item.url, page.url.pathname),
 					external: item.external
 				}))
 			: []
+	);
+
+	const navItems = $derived(
+		navBaseItems.map((item) => ({
+			...item,
+			isActive: isMenuItemActive(item.url, page.url.pathname)
+		}))
 	);
 
 	const navSections = $derived.by(() => {
@@ -104,8 +113,6 @@
 				}
 			])
 		);
-		const compact = <T,>(items: (T | undefined)[]) =>
-			items.filter((item): item is T => Boolean(item));
 
 		return [
 			{
@@ -170,7 +177,7 @@
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
 				class="flex justify-center overflow-hidden px-2 py-6 group-data-[collapsible=icon]:px-0"
-				onclick={() => data?.user?.role && goto(getDefaultRoute(data.user.role))}
+				onclick={() => data?.user?.role && goto(resolve(getDefaultRoute(data.user.role)))}
 			>
 				{#if sidebar.open}
 					<FullLogoDark />

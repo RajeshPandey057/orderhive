@@ -45,6 +45,36 @@
 			| 'senior-manager';
 	}
 
+	const wholeNumberFormatter = new Intl.NumberFormat('en-US', {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0
+	});
+
+	const DEFAULT_STATUS_BADGE = 'text-blue-700 bg-blue-100';
+
+	function getDealStatusBadgeColor(status: string) {
+		const lower = status.toLowerCase();
+		if (lower.includes('review')) return DEFAULT_STATUS_BADGE;
+		if (lower.includes('verified')) return 'text-green-700 bg-green-100';
+		if (lower.includes('update')) return 'text-red-700 bg-red-100';
+		return DEFAULT_STATUS_BADGE;
+	}
+
+	function getDealStatusLabel(status: string) {
+		if (status.includes('Review')) return 'Review';
+		if (status.includes('Verified')) return 'Verified';
+		if (status.includes('Update')) return 'Update';
+		return status;
+	}
+
+	function getInvoiceStatusBadgeColor(status: string) {
+		const lower = status.toLowerCase();
+		if (lower.includes('approved')) return 'text-green-700 bg-green-100';
+		if (lower.includes('next month')) return 'text-orange-700 bg-orange-100';
+		if (lower.includes('review')) return DEFAULT_STATUS_BADGE;
+		return DEFAULT_STATUS_BADGE;
+	}
+
 	let { data = [], role }: Props = $props();
 
 	// State for detail sheet
@@ -171,13 +201,9 @@
 			},
 			enableSorting: true,
 			cell: ({ row }) => {
-				const formatter = new Intl.NumberFormat('en-US', {
-					minimumFractionDigits: 0,
-					maximumFractionDigits: 0
-				});
 				const cellSnippet = createRawSnippet<[{ value: number }]>((getValue) => {
 					const { value } = getValue();
-					const formatted = formatter.format(value);
+					const formatted = wholeNumberFormatter.format(value);
 					return {
 						render: () => `<div class="font-medium">${formatted}</div>`
 					};
@@ -195,24 +221,17 @@
 					row.original.dealStage === 'cancelled' ? 'Cancelled Deal' : row.original.dealStage;
 				const payment = row.original.paymentValue;
 
-				const getStatusBadgeColor = (s: string) => {
-					const lower = s.toLowerCase();
-					if (lower.includes('review')) return 'text-blue-700 bg-blue-100';
-					if (lower.includes('verified')) return 'text-green-700 bg-green-100';
-					if (lower.includes('update')) return 'text-red-700 bg-red-100';
-					return 'text-blue-700 bg-blue-100';
-				};
-
 				const cellSnippet = createRawSnippet<[{ status: string; payment: number }]>((getData) => {
 					const { status, payment } = getData();
-					const badgeColor = getStatusBadgeColor(status);
+					const badgeColor = getDealStatusBadgeColor(status);
+					const badgeLabel = getDealStatusLabel(status);
 					return {
 						render: () => `
 							<div>
 								<div class="font-medium">${status}</div>
 								<div class="text-sm text-muted-foreground">${payment}% Paid</div>
 								<div class="mt-1.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${badgeColor}">
-									${status.includes('Review') ? 'Review' : status.includes('Verified') ? 'Verified' : status.includes('Update') ? 'Update' : status}
+									${badgeLabel}
 								</div>
 							</div>
 						`
@@ -234,18 +253,10 @@
 							? 'Review'
 							: 'Next Month';
 
-				const getStatusBadgeColor = (s: string) => {
-					const lower = s.toLowerCase();
-					if (lower.includes('approved')) return 'text-green-700 bg-green-100';
-					if (lower.includes('next month')) return 'text-orange-700 bg-orange-100';
-					if (lower.includes('review')) return 'text-blue-700 bg-blue-100';
-					return 'text-blue-700 bg-blue-100';
-				};
-
 				const cellSnippet = createRawSnippet<[{ stage: string; payment: string; status: string }]>(
 					(getData) => {
 						const { stage, payment, status } = getData();
-						const badgeColor = getStatusBadgeColor(status);
+						const badgeColor = getInvoiceStatusBadgeColor(status);
 						return {
 							render: () => `
 							<div>
@@ -277,13 +288,9 @@
 			},
 			enableSorting: true,
 			cell: ({ row }) => {
-				const formatter = new Intl.NumberFormat('en-US', {
-					minimumFractionDigits: 0,
-					maximumFractionDigits: 0
-				});
 				const cellSnippet = createRawSnippet<[{ value: number }]>((getValue) => {
 					const { value } = getValue();
-					const formatted = formatter.format(value);
+					const formatted = wholeNumberFormatter.format(value);
 					return {
 						render: () => `<div class="text-right font-medium">${formatted}</div>`
 					};
