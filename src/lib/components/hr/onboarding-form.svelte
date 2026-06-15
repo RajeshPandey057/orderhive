@@ -12,12 +12,11 @@
 	import { toast } from 'svelte-sonner';
 	import Loader2 from '~icons/lucide/loader-2';
 	import UserRound from '~icons/lucide/user-round';
-	import
-		{
-			createEmployee,
-			updateEmployee,
-			updateEmployeeAccess
-		} from '../../../routes/(secure)/hr/hr.remote';
+	import {
+		createEmployee,
+		updateEmployee,
+		updateEmployeeAccess
+	} from '../../../routes/(secure)/hr/hr.remote';
 	import { searchUsers as searchUsersRemote } from '../../../routes/(secure)/users.remote';
 
 	let {
@@ -202,6 +201,7 @@
 	function calculateProbationEndingDate(doj: string) {
 		const start = new Date(`${doj}T00:00:00`);
 		if (Number.isNaN(start.getTime())) return '';
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const end = new Date(start);
 		end.setMonth(end.getMonth() + 3);
 		end.setDate(end.getDate() - 1);
