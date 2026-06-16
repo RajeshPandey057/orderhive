@@ -13,6 +13,7 @@
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { isDateWithinThisMonth } from '$lib/date-period';
+	import { SALE_DEVELOPER_OPTIONS } from '$lib/listing-options';
 	import { getEffectiveSaleRevenue } from '$lib/sales';
 	import {
 		type ColumnDef,
@@ -305,18 +306,152 @@
 
 	// Date filter
 	let dateFilter = $state<'all' | 'this-month'>('all');
+	let developerFilter = $state('');
+	let saleDateFrom = $state('');
+	let saleDateTo = $state('');
+	let seniorManagerFilter = $state('');
+	let orderSort = $state<'default' | 'most-recent'>('default');
+	const developerLabelMap = new Map(
+		SALE_DEVELOPER_OPTIONS.map((option) => [option.value, option.label])
+	);
+	const developerOptions = $derived.by(() => {
+		const developers = new Set(data.map((sale) => sale.developer).filter(Boolean));
+		return [...developers]
+			.map((value) => ({ value, label: developerLabelMap.get(value) ?? value }))
+			.sort((a, b) => a.label.localeCompare(b.label));
+	});
+	const seniorManagerOptions = $derived.by(() => {
+		const seniorManagers = new Set<string>();
+		for (const sale of data) {
+			for (const seniorManager of getSeniorManagerEmails(sale)) {
+				seniorManagers.add(seniorManager);
+			}
+		}
+		return [...seniorManagers].sort((a, b) => a.localeCompare(b));
+	});
+	const selectedDeveloperLabel = $derived(
+		developerOptions.find((option) => option.value === developerFilter)?.label ?? 'Developer'
+	);
+	const selectedSeniorManagerLabel = $derived(seniorManagerFilter || 'Senior Manager');
+	const hasActiveFilters = $derived(
+		columnFilters.length > 0 ||
+			!!globalFilter ||
+			dateFilter !== 'all' ||
+			!!developerFilter ||
+			!!saleDateFrom ||
+			!!saleDateTo ||
+			!!seniorManagerFilter ||
+			orderSort !== 'default'
+	);
+
+	function getSaleDateValue(sale: Sale): string {
+		return sale.saleDate?.slice(0, 10) ?? '';
+	}
+
+	function getClientSearchValue(sale: Sale): string {
+		return `${sale.clientDetails.firstName} ${sale.clientDetails.lastName}`.trim();
+	}
+
+	function getPropertySearchValue(sale: Sale): string {
+		return [sale.project, sale.developer, sale.unitNo, sale.community].filter(Boolean).join(' ');
+	}
+
+	function getSeniorManagerEmails(sale: Sale): string[] {
+		const seniorManagers: string[] = [];
+
+		function addSeniorManager(value: string | undefined): void {
+			const seniorManager = value?.trim();
+			if (!seniorManager || seniorManagers.includes(seniorManager)) return;
+			seniorManagers.push(seniorManager);
+		}
+
+		for (const split of sale.splits ?? []) {
+			addSeniorManager(split.seniorManagerEmail);
+		}
+
+		for (const owner of sale.dealOwners ?? []) {
+			addSeniorManager(
+				(owner as Sale['dealOwners'][number] & { seniorManagerEmail?: string })
+					.seniorManagerEmail
+			);
+		}
+
+		addSeniorManager(sale.callerSeniorManagerEmail);
+		addSeniorManager(sale.closerSeniorManagerEmail);
+
+		return seniorManagers;
+	}
+
+	function resetFilters() {
+		table.resetColumnFilters();
+		globalFilter = '';
+		dateFilter = 'all';
+		developerFilter = '';
+		saleDateFrom = '';
+		saleDateTo = '';
+		seniorManagerFilter = '';
+		orderSort = 'default';
+		sorting = [{ id: 'id', desc: true }];
+		pagination = { ...pagination, pageIndex: 0 };
+	}
+
+	function setMostRecentSort() {
+		orderSort = orderSort === 'most-recent' ? 'default' : 'most-recent';
+		sorting = orderSort === 'most-recent' ? [] : [{ id: 'id', desc: true }];
+		pagination = { ...pagination, pageIndex: 0 };
+	}
+
 	const filteredData = $derived.by(() => {
-		if (dateFilter === 'all') return data;
-		return data.filter((sale) => {
-			if (!sale.createdAt) return false;
-			// Firestore FieldValue is Timestamp at runtime — has .toDate()
-			const ts = sale.createdAt as unknown as { toDate(): Date };
-			const date =
-				typeof ts.toDate === 'function'
-					? ts.toDate()
-					: new Date(sale.createdAt as unknown as string);
-			return isDateWithinThisMonth(date);
-		});
+		let result = data;
+
+		if (dateFilter === 'this-month') {
+			result = result.filter((sale) => {
+				if (!sale.createdAt) return false;
+				// Firestore FieldValue is Timestamp at runtime — has .toDate()
+				const ts = sale.createdAt as unknown as { toDate(): Date };
+				const date =
+					typeof ts.toDate === 'function'
+						? ts.toDate()
+						: new Date(sale.createdAt as unknown as string);
+				return isDateWithinThisMonth(date);
+			});
+		}
+
+		if (developerFilter) {
+			result = result.filter((sale) => sale.developer === developerFilter);
+		}
+
+		const search = globalFilter.trim().toLowerCase();
+		if (search) {
+			result = result.filter((sale) => {
+				const saleId = sale.id.toLowerCase();
+				const clientName = getClientSearchValue(sale).toLowerCase();
+				const property = getPropertySearchValue(sale).toLowerCase();
+				return saleId.includes(search) || clientName.includes(search) || property.includes(search);
+			});
+		}
+
+		if (saleDateFrom) {
+			result = result.filter((sale) => getSaleDateValue(sale) >= saleDateFrom);
+		}
+
+		if (saleDateTo) {
+			result = result.filter((sale) => getSaleDateValue(sale) <= saleDateTo);
+		}
+
+		if (seniorManagerFilter) {
+			result = result.filter((sale) => getSeniorManagerEmails(sale).includes(seniorManagerFilter));
+		}
+
+		if (orderSort === 'most-recent') {
+			result = [...result].sort((a, b) => {
+				const dateCompare = getSaleDateValue(b).localeCompare(getSaleDateValue(a));
+				if (dateCompare !== 0) return dateCompare;
+				return b.id.localeCompare(a.id);
+			});
+		}
+
+		return result;
 	});
 
 	const table = createSvelteTable({
@@ -363,13 +498,6 @@
 				rowSelection = updater;
 			}
 		},
-		onGlobalFilterChange: (updater: Updater<string>) => {
-			if (typeof updater === 'function') {
-				globalFilter = updater(globalFilter);
-			} else {
-				globalFilter = updater;
-			}
-		},
 		state: {
 			get pagination() {
 				return pagination;
@@ -385,9 +513,6 @@
 			},
 			get rowSelection() {
 				return rowSelection;
-			},
-			get globalFilter() {
-				return globalFilter;
 			}
 		}
 	});
@@ -395,24 +520,27 @@
 
 <div class="w-full space-y-4">
 	<!-- Filters and search bar -->
-	<div class="flex flex-col gap-4">
-		<div class="flex flex-wrap items-center gap-2">
-			<div class="relative max-w-sm flex-1">
+	<div class="rounded-lg border bg-card/60 p-3 shadow-sm">
+		<div class="flex flex-col gap-3">
+			<div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+				<div class="relative w-full xl:max-w-xl">
 				<Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 				<Input
-					placeholder="Search all columns..."
+					placeholder="Search sale ID, client, or property..."
 					value={globalFilter}
 					oninput={(e) => {
 						globalFilter = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
 					}}
 					onchange={(e) => {
 						globalFilter = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
 					}}
 					class="pl-8"
 				/>
 			</div>
 
-			<div class="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+				<div class="flex flex-wrap items-center gap-2 xl:justify-end">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
@@ -446,39 +574,142 @@
 					<Calendar class="h-4 w-4" />
 					This Month
 				</Button>
+
+				<Button
+					variant={orderSort === 'most-recent' ? 'default' : 'outline'}
+					size="sm"
+					class="h-9 shrink-0 gap-2"
+					onclick={setMostRecentSort}
+				>
+					Most Recent
+				</Button>
+
+				{#if hasActiveFilters}
+					<Button variant="ghost" size="sm" class="h-9" onclick={resetFilters}>
+						Clear filters
+					</Button>
+				{/if}
 			</div>
-		</div>
+			</div>
 
-		<!-- Column-specific filters -->
-		<div class="flex flex-wrap items-center gap-2">
-			<Input
-				placeholder="Filter by client..."
-				value={(table.getColumn('client')?.getFilterValue() as string) ?? ''}
-				oninput={(e) => {
-					table.getColumn('client')?.setFilterValue(e.currentTarget.value);
-				}}
-				onchange={(e) => {
-					table.getColumn('client')?.setFilterValue(e.currentTarget.value);
-				}}
-				class="h-9 max-w-40"
-			/>
+			<!-- Column-specific filters -->
+			<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(170px,0.8fr)_minmax(310px,1.2fr)_minmax(220px,1fr)_minmax(160px,0.75fr)]">
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
+							<span class="truncate">{selectedDeveloperLabel}</span>
+							{#if developerFilter}
+								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+									1
+								</span>
+							{/if}
+							<ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="start" class="max-h-80 w-64 overflow-y-auto">
+					<DropdownMenu.Item
+						onclick={() => {
+							developerFilter = '';
+							pagination = { ...pagination, pageIndex: 0 };
+						}}
+					>
+						All Developers
+					</DropdownMenu.Item>
+					<DropdownMenu.Separator />
+					{#each developerOptions as developer (developer.value)}
+						<DropdownMenu.Item
+							onclick={() => {
+								developerFilter = developer.value;
+								pagination = { ...pagination, pageIndex: 0 };
+							}}
+						>
+							{developer.label}
+						</DropdownMenu.Item>
+					{:else}
+						<DropdownMenu.Item disabled>No developers found</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 
-			<Input
-				placeholder="Filter by property..."
-				value={(table.getColumn('property')?.getFilterValue() as string) ?? ''}
-				oninput={(e) => {
-					table.getColumn('property')?.setFilterValue(e.currentTarget.value);
-				}}
-				onchange={(e) => {
-					table.getColumn('property')?.setFilterValue(e.currentTarget.value);
-				}}
-				class="h-9 max-w-40"
-			/>
+			<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+				<Input
+					type="date"
+					aria-label="Sale date from"
+					value={saleDateFrom}
+					max={saleDateTo || undefined}
+					oninput={(e) => {
+						saleDateFrom = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
+					}}
+					onchange={(e) => {
+						saleDateFrom = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
+					}}
+					class="h-9 w-full min-w-0"
+				/>
+				<span class="text-sm text-muted-foreground">to</span>
+				<Input
+					type="date"
+					aria-label="Sale date to"
+					value={saleDateTo}
+					min={saleDateFrom || undefined}
+					oninput={(e) => {
+						saleDateTo = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
+					}}
+					onchange={(e) => {
+						saleDateTo = e.currentTarget.value;
+						pagination = { ...pagination, pageIndex: 0 };
+					}}
+					class="h-9 w-full min-w-0"
+				/>
+			</div>
 
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="h-9 gap-1">
+						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
+							<span class="truncate">{selectedSeniorManagerLabel}</span>
+							{#if seniorManagerFilter}
+								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+									1
+								</span>
+							{/if}
+							<ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="start" class="max-h-80 w-72 overflow-y-auto">
+					<DropdownMenu.Item
+						onclick={() => {
+							seniorManagerFilter = '';
+							pagination = { ...pagination, pageIndex: 0 };
+						}}
+					>
+						All Senior Managers
+					</DropdownMenu.Item>
+					<DropdownMenu.Separator />
+					{#each seniorManagerOptions as seniorManager (seniorManager)}
+						<DropdownMenu.Item
+							onclick={() => {
+								seniorManagerFilter = seniorManager;
+								pagination = { ...pagination, pageIndex: 0 };
+							}}
+						>
+							{seniorManager}
+						</DropdownMenu.Item>
+					{:else}
+						<DropdownMenu.Item disabled>No senior managers found</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
 							Deal Status
 							{#if table.getColumn('dealStatus')?.getFilterValue()}
 								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
@@ -491,42 +722,37 @@
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start">
 					<DropdownMenu.Item
-						onclick={() => table.getColumn('dealStatus')?.setFilterValue(undefined)}
+						onclick={() => {
+							table.getColumn('dealStatus')?.setFilterValue(undefined);
+							pagination = { ...pagination, pageIndex: 0 };
+						}}
 					>
 						All
 					</DropdownMenu.Item>
 					<DropdownMenu.Separator />
-					<DropdownMenu.Item onclick={() => table.getColumn('dealStatus')?.setFilterValue('EOI')}>
+					<DropdownMenu.Item
+						onclick={() => {
+							table.getColumn('dealStatus')?.setFilterValue('EOI');
+							pagination = { ...pagination, pageIndex: 0 };
+						}}
+					>
 						EOI
 					</DropdownMenu.Item>
 					<DropdownMenu.Item
-						onclick={() => table.getColumn('dealStatus')?.setFilterValue('Booking')}
+						onclick={() => {
+							table.getColumn('dealStatus')?.setFilterValue('Booking');
+							pagination = { ...pagination, pageIndex: 0 };
+						}}
 					>
 						Booking
 					</DropdownMenu.Item>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
+		</div>
 
-			{#if columnFilters.length > 0 || globalFilter || dateFilter !== 'all'}
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-9"
-					onclick={() => {
-						table.resetColumnFilters();
-						globalFilter = '';
-						dateFilter = 'all';
-					}}
-				>
-					Clear filters
-				</Button>
-			{/if}
-
-			<div class="ml-auto text-sm text-muted-foreground">
+			<div class="flex justify-end text-sm text-muted-foreground">
 				{table.getFilteredSelectedRowModel().rows.length} of
-				{table.getFilteredRowModel().rows.length} row(s) {columnFilters.length > 0 || globalFilter
-					? 'filtered'
-					: 'total'}
+				{table.getFilteredRowModel().rows.length} row(s) {hasActiveFilters ? 'filtered' : 'total'}
 			</div>
 		</div>
 	</div>
@@ -577,23 +803,16 @@
 									</Empty.Media>
 									<Empty.Title>No Sales Found</Empty.Title>
 									<Empty.Description>
-										{#if columnFilters.length > 0 || globalFilter}
+										{#if hasActiveFilters}
 											No sales match your current filters. Try adjusting your search criteria.
 										{:else}
 											No sales data available yet. Start by adding your first sale.
 										{/if}
 									</Empty.Description>
 								</Empty.Header>
-								{#if columnFilters.length > 0 || globalFilter}
+								{#if hasActiveFilters}
 									<Empty.Content>
-										<Button
-											variant="outline"
-											size="sm"
-											onclick={() => {
-												table.resetColumnFilters();
-												globalFilter = '';
-											}}
-										>
+										<Button variant="outline" size="sm" onclick={resetFilters}>
 											Clear Filters
 										</Button>
 									</Empty.Content>
