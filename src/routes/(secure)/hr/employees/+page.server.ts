@@ -11,7 +11,8 @@ export async function load({ locals, url }) {
 	const page = Number.isFinite(pageParam) ? pageParam : 1;
 	const employeePage = await listEmployeesWithAccessPage({
 		page,
-		filter: parseEmployeeDirectoryFilter(url.searchParams.get('filter'))
+		filter: parseEmployeeDirectoryFilter(url.searchParams.get('filter')),
+		search: url.searchParams.get('q') ?? ''
 	});
 
 	return {
@@ -21,7 +22,8 @@ export async function load({ locals, url }) {
 			pageSize: employeePage.pageSize,
 			totalCount: employeePage.totalCount,
 			totalPages: employeePage.totalPages,
-			filter: employeePage.filter
+			filter: employeePage.filter,
+			search: employeePage.search
 		},
 		user: locals.user
 			? {

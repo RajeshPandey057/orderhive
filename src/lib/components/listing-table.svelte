@@ -8,17 +8,20 @@
 
 	let {
 		listings = [],
+		searchValue = '',
+		onSearch,
 		onEdit,
 		onDelete
 	}: {
 		listings: Listing[];
+		searchValue?: string;
+		onSearch?: (value: string) => void;
 		onEdit?: (listing: Listing) => void;
 		onDelete?: (listing: Listing) => void;
 	} = $props();
 
 	const hasActions = $derived(!!onEdit || !!onDelete);
 
-	let searchQuery = $state('');
 	let selectedDeveloper = $state('all');
 	let selectedAgent = $state('all');
 	let selectedUnitType = $state('all');
@@ -37,22 +40,13 @@
 	]);
 
 	const filteredListings = $derived.by(() => {
-		const query = searchQuery.trim().toLowerCase();
-
 		return listings.filter((listing) => {
-			const matchesSearch =
-				!query ||
-				listing.projectName.toLowerCase().includes(query) ||
-				listing.developerName.toLowerCase().includes(query) ||
-				listing.unitNo.toLowerCase().includes(query) ||
-				listing.agentEmail.toLowerCase().includes(query);
-
 			const matchesDeveloper =
 				selectedDeveloper === 'all' || listing.developerName === selectedDeveloper;
 			const matchesAgent = selectedAgent === 'all' || listing.agentEmail === selectedAgent;
 			const matchesUnitType = selectedUnitType === 'all' || listing.unitType === selectedUnitType;
 
-			return matchesSearch && matchesDeveloper && matchesAgent && matchesUnitType;
+			return matchesDeveloper && matchesAgent && matchesUnitType;
 		});
 	});
 
@@ -78,7 +72,12 @@
 	<div class="flex min-w-max items-center gap-3">
 		<div class="relative min-w-60 flex-1">
 			<Search class="pointer-events-none absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-			<Input class="pl-8" placeholder="Search listings..." bind:value={searchQuery} />
+			<Input
+				class="pl-8"
+				placeholder="Search listings..."
+				value={searchValue}
+				oninput={(event) => onSearch?.((event.target as HTMLInputElement).value)}
+			/>
 		</div>
 		<select
 			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"

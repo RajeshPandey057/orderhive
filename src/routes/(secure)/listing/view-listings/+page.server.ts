@@ -1,76 +1,39 @@
-import { firestore } from '$lib/server/firebase';
+import { listListingsPage } from '$lib/server/listings';
 
-const LISTING_PAGE_LIMIT = 300;
+const VIEW_LISTINGS_PAGE_SIZE = 15;
 
-export async function load() {
+export async function load({ url }) {
 	try {
-		const snap = await firestore
-			.collection('listings')
-			.orderBy('createdAt', 'desc')
-			.limit(LISTING_PAGE_LIMIT)
-			.get();
+		const pageParam = Number(url.searchParams.get('page') ?? '1');
+		const page = Number.isFinite(pageParam) ? pageParam : 1;
+		const listingPage = await listListingsPage({
+			page,
+			pageSize: VIEW_LISTINGS_PAGE_SIZE,
+			search: url.searchParams.get('q') ?? ''
+		});
 
-		const listings: Listing[] = snap.docs
-			.filter((doc) => !doc.data().isDeleted)
-			.map((doc) => {
-				const d = doc.data();
-				const propertyAddress = d.propertyAddress ?? {};
-				return {
-					id: doc.id,
-					listingType: d.listingType ?? 'internal',
-					availableFor: d.availableFor,
-					furnishing: d.furnishing,
-					city: d.city ?? '',
-					location: d.location ?? '',
-					agentEmail: d.agentEmail ?? '',
-					agentMobile: d.agentMobile,
-					reportingManager: d.reportingManager,
-					seniorManager: d.seniorManager,
-					clientName: '',
-					clientPhone: '',
-					clientEmail: '',
-					developerName: d.developerName ?? '',
-					projectName: d.projectName ?? '',
-					unitNo: d.unitNo ?? '',
-					projectType: d.projectType,
-					unitType: d.unitType,
-					unitTypeOther: d.unitTypeOther,
-					bedrooms: d.bedrooms,
-					unitArea: d.unitArea,
-					internalArea: d.internalArea,
-					balconyArea: d.balconyArea,
-					plotSize: d.plotSize,
-					builtUpArea: d.builtUpArea,
-					unitStatus: d.unitStatus,
-					paymentType: d.paymentType,
-					rentAmount: d.rentAmount ?? null,
-					vacantDate: d.vacantDate ?? null,
-					handoverYear: d.handoverYear,
-					handoverQuarter: d.handoverQuarter,
-					paymentPlan: d.paymentPlan,
-					originalPrice: d.originalPrice ?? null,
-					purchasePrice: d.purchasePrice ?? null,
-					amountPaid: d.amountPaid ?? null,
-					propertyAddress: {
-						...propertyAddress,
-						area: d.location ?? '',
-						city: d.city ?? ''
-					},
-					titleDeedFileName: d.titleDeedFileName ?? null,
-					passportFileName: d.passportFileName ?? null,
-					emiratesIdFileName: d.emiratesIdFileName ?? null,
-					mediaAssets: d.mediaAssets ?? [],
-					floorPlanAssets: d.floorPlanAssets ?? [],
-					price: d.price ?? 0,
-					createdAt: d.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
-					createdByUid: d.createdByUid ?? '',
-					createdByEmail: d.createdByEmail ?? ''
-				};
-			});
-
-		// Ordering is handled by Firestore (createdAt desc), so no client-side sort needed.
-		return { listings };
+		return {
+			listings: listingPage.listings,
+			pagination: {
+				page: listingPage.page,
+				pageSize: listingPage.pageSize,
+				hasNextPage: listingPage.hasNextPage,
+				totalCount: listingPage.totalCount,
+				totalPages: listingPage.totalPages,
+				search: listingPage.search
+			}
+		};
 	} catch {
-		return { listings: [] };
+		return {
+			listings: [],
+			pagination: {
+				page: 1,
+				pageSize: VIEW_LISTINGS_PAGE_SIZE,
+				hasNextPage: false,
+				totalCount: 0,
+				totalPages: 1,
+				search: ''
+			}
+		};
 	}
 }

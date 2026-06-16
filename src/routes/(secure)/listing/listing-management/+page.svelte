@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import AddListingSheet from '$lib/components/add-listing-sheet.svelte';
 	import ListingTable from '$lib/components/listing-table.svelte';
+	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { toast } from 'svelte-sonner';
@@ -12,10 +14,50 @@
 	let editSheetOpen = $state(false);
 	let deleteDialogOpen = $state(false);
 	let selectedListing = $state<Listing | null>(null);
+	let searchQuery = $state('');
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const currentUserUid = $derived(data?.user?.uid ?? '');
 	const currentUserRole = $derived(data?.user?.role ?? '');
 	const isAdmin = $derived(currentUserRole === 'admin' || currentUserRole === 'super-admin');
+	const pagination = $derived(
+		data?.pagination ?? {
+			page: 1,
+			pageSize: 20,
+			hasNextPage: false,
+			totalCount: 0,
+			totalPages: 1,
+			search: ''
+		}
+	);
+	const pageStart = $derived(
+		pagination.totalCount === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1
+	);
+	const pageEnd = $derived(Math.min(pagination.page * pagination.pageSize, pagination.totalCount));
+
+	$effect(() => {
+		if (searchDebounceTimer) return;
+		const serverSearch = pagination.search ?? '';
+		if (searchQuery !== serverSearch) searchQuery = serverSearch;
+	});
+
+	function listingManagementPageUrl(page: number) {
+		const params = new URLSearchParams();
+		const q = searchQuery.trim();
+		if (page > 1) params.set('page', String(page));
+		if (q) params.set('q', q);
+		const query = params.toString();
+		return query ? `/listing/listing-management?${query}` : '/listing/listing-management';
+	}
+
+	function handleSearch(value: string) {
+		searchQuery = value;
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(async () => {
+			await goto(listingManagementPageUrl(1));
+			searchDebounceTimer = undefined;
+		}, 300);
+	}
 
 	function canManage(listing: Listing): boolean {
 		return isAdmin || listing.createdByUid === currentUserUid;
@@ -57,7 +99,55 @@
 </header>
 
 <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-	<ListingTable listings={data.listings ?? []} onEdit={handleEdit} onDelete={handleDelete} />
+	<ListingTable
+		listings={data.listings ?? []}
+		searchValue={searchQuery}
+		onSearch={handleSearch}
+		onEdit={handleEdit}
+		onDelete={handleDelete}
+	/>
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<p class="text-sm text-muted-foreground">
+			Showing {pageStart}-{pageEnd} of {pagination.totalCount} records
+		</p>
+		<Pagination.Root
+			count={pagination.totalCount}
+			perPage={pagination.pageSize}
+			page={pagination.page}
+			onPageChange={(page) => goto(listingManagementPageUrl(page))}
+			class="mx-0 w-auto justify-end"
+		>
+			{#snippet children({ pages, currentPage })}
+				<Pagination.Content class="gap-2">
+					<Pagination.Item>
+						<Pagination.Previous class="text-base text-[#222626] disabled:text-[#8A908E]" />
+					</Pagination.Item>
+					{#each pages as page (page.key)}
+						{#if page.type === 'ellipsis'}
+							<Pagination.Item>
+								<Pagination.Ellipsis class="text-[#222626]" />
+							</Pagination.Item>
+						{:else}
+							<Pagination.Item>
+								<Pagination.Link
+									{page}
+									isActive={currentPage === page.value}
+									class={currentPage === page.value
+										? 'h-10 w-10 rounded-xl border-[#E7D8C8] bg-[#FBF7F1] text-base text-[#222626] shadow-sm'
+										: 'h-10 w-10 text-base text-[#222626] hover:bg-[#FBF9F8]'}
+								>
+									{page.value}
+								</Pagination.Link>
+							</Pagination.Item>
+						{/if}
+					{/each}
+					<Pagination.Item>
+						<Pagination.Next class="text-base text-[#222626] disabled:text-[#8A908E]" />
+					</Pagination.Item>
+				</Pagination.Content>
+			{/snippet}
+		</Pagination.Root>
+	</div>
 </div>
 
 {#if selectedListing}

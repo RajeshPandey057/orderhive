@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import * as Pagination from '$lib/components/ui/pagination/index.js';
+	import { Separator } from '$lib/components/ui/separator/index.js';
 	import {
 		BEDROOM_OPTIONS,
 		DUBAI_COMMUNITIES,
@@ -10,7 +13,6 @@
 		LISTING_DEVELOPERS,
 		UNIT_TYPES
 	} from '$lib/listing-options';
-	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import BedDoubleIcon from '~icons/lucide/bed-double';
 	import Building2Icon from '~icons/lucide/building-2';
@@ -33,7 +35,30 @@
 	let priceMax = $state('');
 	let distressFilter = $state('');
 	let sortFilter = $state('new');
+	let searchQuery = $state('');
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let initializedFromUrl = $state(false);
+
+	const pagination = $derived(
+		data?.pagination ?? {
+			page: 1,
+			pageSize: 15,
+			hasNextPage: false,
+			totalCount: 0,
+			totalPages: 1,
+			search: ''
+		}
+	);
+	const pageStart = $derived(
+		pagination.totalCount === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1
+	);
+	const pageEnd = $derived(Math.min(pagination.page * pagination.pageSize, pagination.totalCount));
+
+	$effect(() => {
+		if (searchDebounceTimer) return;
+		const serverSearch = pagination.search ?? '';
+		if (searchQuery !== serverSearch) searchQuery = serverSearch;
+	});
 
 	function formatPrice(price: number): string {
 		return new Intl.NumberFormat('en-AE').format(price);
@@ -154,9 +179,36 @@
 		sortFilter = 'new';
 	}
 
+	function viewListingsPageUrl(page: number) {
+		const params = new URLSearchParams(browser ? window.location.search : '');
+		const q = searchQuery.trim();
+		if (page > 1) {
+			params.set('page', String(page));
+		} else {
+			params.delete('page');
+		}
+		if (q) {
+			params.set('q', q);
+		} else {
+			params.delete('q');
+		}
+		const query = params.toString();
+		return query ? `/listing/view-listings?${query}` : '/listing/view-listings';
+	}
+
+	function handleListingSearch(value: string) {
+		searchQuery = value;
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(async () => {
+			await goto(viewListingsPageUrl(1));
+			searchDebounceTimer = undefined;
+		}, 300);
+	}
+
 	$effect(() => {
 		if (!browser || initializedFromUrl) return;
 		const params = new URLSearchParams(window.location.search);
+		searchQuery = params.get('q') ?? '';
 		developerFilter = params.get('developer') ?? '';
 		projectFilter = params.get('project') ?? '';
 		cityFilter = params.get('city') ?? '';
@@ -175,6 +227,8 @@
 	$effect(() => {
 		if (!browser || !initializedFromUrl) return;
 		const params = new URLSearchParams();
+		if (pagination.page > 1) params.set('page', String(pagination.page));
+		if (searchQuery) params.set('q', searchQuery);
 		if (developerFilter) params.set('developer', developerFilter);
 		if (projectFilter) params.set('project', projectFilter);
 		if (cityFilter) params.set('city', cityFilter);
@@ -202,7 +256,7 @@
 			<h1 class="text-2xl font-medium">View Listings</h1>
 		</div>
 		<span class="mr-4 ml-auto text-sm text-muted-foreground">
-			{filteredListings.length} / {allListings.length} listings
+			{filteredListings.length} / {allListings.length} listings on page {pagination.page}
 		</span>
 	</div>
 </header>
@@ -211,6 +265,18 @@
 	<!-- Filters bar -->
 	<div class="rounded-xl border border-border bg-card p-4">
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+			<div class="relative">
+				<SearchIcon
+					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+				/>
+				<input
+					type="search"
+					placeholder="Search listings..."
+					value={searchQuery}
+					oninput={(event) => handleListingSearch((event.target as HTMLInputElement).value)}
+					class="h-10 w-full rounded-lg border border-input bg-background px-3 pl-9 text-sm"
+				/>
+			</div>
 			<select
 				bind:value={developerFilter}
 				class="h-10 rounded-lg border border-input bg-background px-3 text-sm"
@@ -441,4 +507,47 @@
 			{/each}
 		</div>
 	{/if}
+
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<p class="text-sm text-muted-foreground">
+			Showing {pageStart}-{pageEnd} of {pagination.totalCount} records
+		</p>
+		<Pagination.Root
+			count={pagination.totalCount}
+			perPage={pagination.pageSize}
+			page={pagination.page}
+			onPageChange={(page) => goto(viewListingsPageUrl(page))}
+			class="mx-0 w-auto justify-end"
+		>
+			{#snippet children({ pages, currentPage })}
+				<Pagination.Content class="gap-2">
+					<Pagination.Item>
+						<Pagination.Previous class="text-base text-[#222626] disabled:text-[#8A908E]" />
+					</Pagination.Item>
+					{#each pages as page (page.key)}
+						{#if page.type === 'ellipsis'}
+							<Pagination.Item>
+								<Pagination.Ellipsis class="text-[#222626]" />
+							</Pagination.Item>
+						{:else}
+							<Pagination.Item>
+								<Pagination.Link
+									{page}
+									isActive={currentPage === page.value}
+									class={currentPage === page.value
+										? 'h-10 w-10 rounded-xl border-[#E7D8C8] bg-[#FBF7F1] text-base text-[#222626] shadow-sm'
+										: 'h-10 w-10 text-base text-[#222626] hover:bg-[#FBF9F8]'}
+								>
+									{page.value}
+								</Pagination.Link>
+							</Pagination.Item>
+						{/if}
+					{/each}
+					<Pagination.Item>
+						<Pagination.Next class="text-base text-[#222626] disabled:text-[#8A908E]" />
+					</Pagination.Item>
+				</Pagination.Content>
+			{/snippet}
+		</Pagination.Root>
+	</div>
 </div>

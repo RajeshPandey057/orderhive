@@ -40,6 +40,7 @@
 		totalCount: number;
 		totalPages: number;
 		filter: EmployeeDirectoryFilter;
+		search: string;
 	};
 
 	let { data } = $props<{
@@ -55,6 +56,7 @@
 	let selectedEmployee = $state<Employee | null>(null);
 	let profileEmployee = $state<Employee | null>(null);
 	let searchQuery = $state('');
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let exportingEmployees = $state(false);
 	let busyEmail = $state('');
 
@@ -75,18 +77,12 @@
 		data.user?.role === 'admin' || data.user?.role === 'super-admin'
 	);
 
-	const filteredEmployees = $derived.by(() => {
-		const q = searchQuery.trim().toLowerCase();
-		return employees.filter((employee) => {
-			if (!q) return true;
-			return (
-				employee.name.toLowerCase().includes(q) ||
-				employee.email.toLowerCase().includes(q) ||
-				employee.code.toLowerCase().includes(q) ||
-				employee.department.toLowerCase().includes(q) ||
-				employee.designation.toLowerCase().includes(q)
-			);
-		});
+	const filteredEmployees = $derived(employees);
+
+	$effect(() => {
+		if (searchDebounceTimer) return;
+		const serverSearch = pagination.search ?? '';
+		if (searchQuery !== serverSearch) searchQuery = serverSearch;
 	});
 
 	const filterOptions = [
@@ -104,15 +100,25 @@
 
 	function employeePageUrl(page: number, filter: EmployeeDirectoryFilter = selectedFilter) {
 		const params = new URLSearchParams();
+		const q = searchQuery.trim();
 		if (page > 1) params.set('page', String(page));
 		if (filter !== 'all') params.set('filter', filter);
+		if (q) params.set('q', q);
 		const query = params.toString();
 		return query ? `/hr/employees?${query}` : '/hr/employees';
 	}
 
 	async function changeFilter(filter: EmployeeDirectoryFilter) {
-		searchQuery = '';
 		await goto(employeePageUrl(1, filter));
+	}
+
+	function handleSearchInput(value: string) {
+		searchQuery = value;
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(async () => {
+			await goto(employeePageUrl(1));
+			searchDebounceTimer = undefined;
+		}, 300);
 	}
 
 	function openCreate() {
@@ -273,8 +279,9 @@
 				<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#859693]" />
 				<Input
 					class="h-8 border-[#D4D9D9] pl-10 text-[13px]"
-					placeholder="Search this page..."
-					bind:value={searchQuery}
+					placeholder="Search employees, roles, or email..."
+					value={searchQuery}
+					oninput={(event) => handleSearchInput((event.target as HTMLInputElement).value)}
 				/>
 			</div>
 			<div class="flex flex-wrap gap-2">

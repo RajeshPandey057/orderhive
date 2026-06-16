@@ -210,6 +210,7 @@ export type EmployeeDirectoryPage = {
 	totalCount: number;
 	totalPages: number;
 	filter: EmployeeDirectoryFilter;
+	search: string;
 };
 
 const EMPLOYEE_DIRECTORY_FILTERS = new Set<EmployeeDirectoryFilter>([
@@ -270,14 +271,68 @@ async function mergeEmployeePageWithAccess(
 	}));
 }
 
+function employeeMatchesDirectoryFilter(employee: Employee, filter: EmployeeDirectoryFilter) {
+	if (filter === 'all') return true;
+	if (filter === 'active' || filter === 'archived') return employee.status === filter;
+	if (filter === 'access-only') return !employee.code && employee.accessStatus === 'enabled';
+	return employee.accessType === filter;
+}
+
+function employeeMatchesDirectorySearch(employee: Employee, search: string) {
+	if (!search) return true;
+
+	return [
+		employee.name,
+		employee.email,
+		employee.code,
+		employee.department,
+		employee.designation,
+		employee.location,
+		employee.accessType,
+		employee.reportingManagerEmail,
+		employee.seniorManagerEmail
+	].some((value) =>
+		String(value ?? '')
+			.toLowerCase()
+			.includes(search)
+	);
+}
+
 export async function listEmployeesWithAccessPage(options?: {
 	page?: number;
 	pageSize?: number;
 	filter?: EmployeeDirectoryFilter;
+	search?: string;
 }): Promise<EmployeeDirectoryPage> {
 	const pageSize = options?.pageSize ?? EMPLOYEE_DIRECTORY_PAGE_SIZE;
 	const filter = options?.filter ?? 'all';
+	const search = options?.search?.trim().toLowerCase() ?? '';
 	const requestedPage = Math.max(1, Math.floor(options?.page ?? 1));
+
+	if (search) {
+		const employees = (await listEmployeesWithAccess({ forceRefresh: true }))
+			.filter((employee) => employeeMatchesDirectoryFilter(employee, filter))
+			.filter((employee) => employeeMatchesDirectorySearch(employee, search))
+			.sort((a, b) => {
+				const nameCompare = a.name.localeCompare(b.name);
+				if (nameCompare !== 0) return nameCompare;
+				return a.email.localeCompare(b.email);
+			});
+		const totalCount = employees.length;
+		const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+		const page = Math.min(requestedPage, totalPages);
+
+		return {
+			employees: employees.slice((page - 1) * pageSize, page * pageSize),
+			page,
+			pageSize,
+			totalCount,
+			totalPages,
+			filter,
+			search
+		};
+	}
+
 	const query = employeeDirectoryQuery(filter);
 
 	const countSnap = await query.count().get();
@@ -295,7 +350,8 @@ export async function listEmployeesWithAccessPage(options?: {
 		pageSize,
 		totalCount,
 		totalPages,
-		filter
+		filter,
+		search
 	};
 }
 
