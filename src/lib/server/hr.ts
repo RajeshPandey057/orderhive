@@ -1,6 +1,6 @@
 import type { AccessType } from '$lib/constants';
 import { firestore } from '$lib/server/firebase';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 export const employeeCollection = firestore.collection('employees');
 export const rolesCollection = firestore.collection('roles');
@@ -187,6 +187,116 @@ export async function listEmployeesWithAccess(options?: {
 	} finally {
 		_employeeAccessCachePending = null;
 	}
+}
+
+export const EMPLOYEE_DIRECTORY_PAGE_SIZE = 20;
+
+export type EmployeeDirectoryFilter =
+	| 'all'
+	| 'active'
+	| 'archived'
+	| 'admin'
+	| 'agent'
+	| 'finance'
+	| 'compliance'
+	| 'manager'
+	| 'senior-manager'
+	| 'access-only';
+
+export type EmployeeDirectoryPage = {
+	employees: Employee[];
+	page: number;
+	pageSize: number;
+	totalCount: number;
+	totalPages: number;
+	filter: EmployeeDirectoryFilter;
+};
+
+const EMPLOYEE_DIRECTORY_FILTERS = new Set<EmployeeDirectoryFilter>([
+	'all',
+	'active',
+	'archived',
+	'admin',
+	'agent',
+	'finance',
+	'compliance',
+	'manager',
+	'senior-manager',
+	'access-only'
+]);
+
+export function parseEmployeeDirectoryFilter(value: string | null): EmployeeDirectoryFilter {
+	return EMPLOYEE_DIRECTORY_FILTERS.has(value as EmployeeDirectoryFilter)
+		? (value as EmployeeDirectoryFilter)
+		: 'all';
+}
+
+function employeeDirectoryQuery(filter: EmployeeDirectoryFilter): FirebaseFirestore.Query {
+	const query = employeeCollection.orderBy(FieldPath.documentId());
+
+	if (filter === 'active' || filter === 'archived') {
+		return employeeCollection.where('status', '==', filter).orderBy(FieldPath.documentId());
+	}
+
+	if (filter === 'access-only') {
+		return employeeCollection.where('code', '==', '').orderBy(FieldPath.documentId());
+	}
+
+	if (filter !== 'all') {
+		return employeeCollection.where('accessType', '==', filter).orderBy(FieldPath.documentId());
+	}
+
+	return query;
+}
+
+async function mergeEmployeePageWithAccess(
+	docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): Promise<Employee[]> {
+	const employees = docs.map((doc) => serializeEmployeeDoc(doc.id, doc.data()));
+	if (employees.length === 0) return [];
+
+	const roleDocs = await firestore.getAll(
+		...employees.map((employee) => rolesCollection.doc(employee.email))
+	);
+	const rolesByEmail = new Map<string, FirebaseFirestore.DocumentData>();
+	for (const roleDoc of roleDocs) {
+		if (!roleDoc.exists) continue;
+		rolesByEmail.set(normalizeEmail(roleDoc.id), roleDoc.data() ?? {});
+	}
+
+	return employees.map((employee) => ({
+		...employee,
+		...roleToEmployeeAccess(rolesByEmail.get(employee.email))
+	}));
+}
+
+export async function listEmployeesWithAccessPage(options?: {
+	page?: number;
+	pageSize?: number;
+	filter?: EmployeeDirectoryFilter;
+}): Promise<EmployeeDirectoryPage> {
+	const pageSize = options?.pageSize ?? EMPLOYEE_DIRECTORY_PAGE_SIZE;
+	const filter = options?.filter ?? 'all';
+	const requestedPage = Math.max(1, Math.floor(options?.page ?? 1));
+	const query = employeeDirectoryQuery(filter);
+
+	const countSnap = await query.count().get();
+	const totalCount = countSnap.data().count;
+	const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+	const page = Math.min(requestedPage, totalPages);
+	const employeesSnap = await query
+		.offset((page - 1) * pageSize)
+		.limit(pageSize)
+		.get();
+
+	return {
+		employees: await mergeEmployeePageWithAccess(employeesSnap.docs),
+		page,
+		pageSize,
+		totalCount,
+		totalPages,
+		filter
+	};
 }
 
 export async function getEmployeeByEmail(email: string): Promise<Employee | null> {

@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import EmployeeProfileView from '$lib/components/hr/employee-profile-view.svelte';
 	import OnboardingForm from '$lib/components/hr/onboarding-form.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
+	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Sidebar from '$lib/components/ui/sidebar';
@@ -17,18 +18,11 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
-	import { Search, ShieldOff, UserPlus } from '@lucide/svelte';
+	import { Download, Search, ShieldOff, UserPlus } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { archiveEmployee, disableEmployeeAccess } from '../hr.remote';
 
-	let { data } = $props<{ data: { employees: Employee[] } }>();
-
-	let employeeSheetOpen = $state(false);
-	let profileSheetOpen = $state(false);
-	let selectedEmployee = $state<Employee | null>(null);
-	let profileEmployee = $state<Employee | null>(null);
-	let searchQuery = $state('');
-	let selectedFilter = $state<
+	type EmployeeDirectoryFilter =
 		| 'all'
 		| 'active'
 		| 'archived'
@@ -38,36 +32,52 @@
 		| 'compliance'
 		| 'manager'
 		| 'senior-manager'
-		| 'access-only'
-	>('all');
+		| 'access-only';
+
+	type EmployeePagination = {
+		page: number;
+		pageSize: number;
+		totalCount: number;
+		totalPages: number;
+		filter: EmployeeDirectoryFilter;
+	};
+
+	let { data } = $props<{
+		data: {
+			employees: Employee[];
+			pagination: EmployeePagination;
+			user: { role?: string } | null;
+		};
+	}>();
+
+	let employeeSheetOpen = $state(false);
+	let profileSheetOpen = $state(false);
+	let selectedEmployee = $state<Employee | null>(null);
+	let profileEmployee = $state<Employee | null>(null);
+	let searchQuery = $state('');
+	let exportingEmployees = $state(false);
 	let busyEmail = $state('');
 
 	const employees: Employee[] = $derived(data.employees ?? []);
-	const totalEmployees = $derived(employees.filter((e) => e.code).length);
+	const pagination = $derived(data.pagination);
+	const selectedFilter = $derived(pagination.filter);
+	const totalEmployees = $derived(pagination.totalCount);
 	const activeEmployees = $derived(employees.filter((e) => e.status === 'active' && e.code).length);
 	const accessOnlyCount = $derived(
 		employees.filter((e) => !e.code && e.accessStatus === 'enabled').length
 	);
 	const enabledAccessCount = $derived(employees.filter((e) => e.accessStatus === 'enabled').length);
+	const pageStart = $derived(
+		pagination.totalCount === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1
+	);
+	const pageEnd = $derived(Math.min(pagination.page * pagination.pageSize, pagination.totalCount));
+	const canExportEmployees = $derived(
+		data.user?.role === 'admin' || data.user?.role === 'super-admin'
+	);
 
 	const filteredEmployees = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
 		return employees.filter((employee) => {
-			if (selectedFilter === 'active' && employee.status !== 'active') return false;
-			if (selectedFilter === 'archived' && employee.status !== 'archived') return false;
-			if (
-				selectedFilter === 'access-only' &&
-				(employee.code || employee.accessStatus !== 'enabled')
-			)
-				return false;
-			if (
-				['admin', 'agent', 'finance', 'compliance', 'manager', 'senior-manager'].includes(
-					selectedFilter
-				) &&
-				employee.accessType !== selectedFilter
-			) {
-				return false;
-			}
 			if (!q) return true;
 			return (
 				employee.name.toLowerCase().includes(q) ||
@@ -91,6 +101,19 @@
 		{ value: 'senior-manager', label: 'Senior Manager' },
 		{ value: 'access-only', label: 'Access Only' }
 	] as const;
+
+	function employeePageUrl(page: number, filter: EmployeeDirectoryFilter = selectedFilter) {
+		const params = new URLSearchParams();
+		if (page > 1) params.set('page', String(page));
+		if (filter !== 'all') params.set('filter', filter);
+		const query = params.toString();
+		return query ? `/hr/employees?${query}` : '/hr/employees';
+	}
+
+	async function changeFilter(filter: EmployeeDirectoryFilter) {
+		searchQuery = '';
+		await goto(employeePageUrl(1, filter));
+	}
 
 	function openCreate() {
 		selectedEmployee = null;
@@ -136,6 +159,35 @@
 		}
 	}
 
+	async function exportEmployees() {
+		if (exportingEmployees) return;
+
+		exportingEmployees = true;
+		try {
+			const res = await fetch('/api/admin/employees-export');
+
+			if (!res.ok) {
+				toast.error('Failed to export employee list');
+				return;
+			}
+
+			const blob = await res.blob();
+			const today = new Date().toISOString().slice(0, 10);
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `employee-directory-${today}.csv`;
+			a.click();
+			URL.revokeObjectURL(url);
+
+			toast.success('Employee list exported successfully');
+		} catch {
+			toast.error('Failed to export employee list');
+		} finally {
+			exportingEmployees = false;
+		}
+	}
+
 	function accessLabel(employee: Employee) {
 		if (employee.accessStatus === 'missing') return 'No Access';
 		if (employee.accessStatus === 'disabled') return 'Disabled';
@@ -156,27 +208,40 @@
 					</p>
 				</div>
 			</div>
-			<Button
-				class="h-8 border border-black/5 bg-[#222626] px-3 text-sm font-normal text-white"
-				onclick={openCreate}
-			>
-				<UserPlus class="mr-2 h-4 w-4" />
-				Add Employee
-			</Button>
+			<div class="flex flex-wrap items-center justify-end gap-2">
+				{#if canExportEmployees}
+					<Button
+						variant="outline"
+						class="h-8 border-[#EBEEEE] px-3 text-sm font-normal"
+						onclick={exportEmployees}
+						disabled={exportingEmployees}
+					>
+						<Download class="mr-2 h-4 w-4" />
+						{exportingEmployees ? 'Exporting...' : 'Export Employee List'}
+					</Button>
+				{/if}
+				<Button
+					class="h-8 border border-black/5 bg-[#222626] px-3 text-sm font-normal text-white"
+					onclick={openCreate}
+				>
+					<UserPlus class="mr-2 h-4 w-4" />
+					Add Employee
+				</Button>
+			</div>
 		</div>
 
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-4">
 			<Card class="border-[#EBEEEE] shadow-none">
 				<CardHeader class="pb-2"
-					><CardTitle class="text-[13px] font-normal text-[#687976]">Employees</CardTitle
-					></CardHeader
+					><CardTitle class="text-[13px] font-normal text-[#687976]">Records</CardTitle></CardHeader
 				>
 				<CardContent><div class="text-2xl leading-8 font-medium">{totalEmployees}</div></CardContent
 				>
 			</Card>
 			<Card class="border-[#EBEEEE] shadow-none">
 				<CardHeader class="pb-2"
-					><CardTitle class="text-[13px] font-normal text-[#687976]">Active</CardTitle></CardHeader
+					><CardTitle class="text-[13px] font-normal text-[#687976]">Active on Page</CardTitle
+					></CardHeader
 				>
 				<CardContent
 					><div class="text-2xl leading-8 font-medium">{activeEmployees}</div></CardContent
@@ -184,7 +249,8 @@
 			</Card>
 			<Card class="border-[#EBEEEE] shadow-none">
 				<CardHeader class="pb-2"
-					><CardTitle class="text-[13px] font-normal text-[#687976]">Access Enabled</CardTitle
+					><CardTitle class="text-[13px] font-normal text-[#687976]"
+						>Access Enabled on Page</CardTitle
 					></CardHeader
 				>
 				<CardContent
@@ -193,7 +259,7 @@
 			</Card>
 			<Card class="border-[#EBEEEE] shadow-none">
 				<CardHeader class="pb-2"
-					><CardTitle class="text-[13px] font-normal text-[#687976]">Access Only</CardTitle
+					><CardTitle class="text-[13px] font-normal text-[#687976]">Access Only on Page</CardTitle
 					></CardHeader
 				>
 				<CardContent
@@ -207,7 +273,7 @@
 				<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#859693]" />
 				<Input
 					class="h-8 border-[#D4D9D9] pl-10 text-[13px]"
-					placeholder="Search employees, roles, or email..."
+					placeholder="Search this page..."
 					bind:value={searchQuery}
 				/>
 			</div>
@@ -219,7 +285,7 @@
 						class={selectedFilter === option.value
 							? 'h-8 bg-[#222626] text-white'
 							: 'h-8 border-[#EBEEEE]'}
-						onclick={() => (selectedFilter = option.value)}
+						onclick={() => changeFilter(option.value)}
 					>
 						{option.label}
 					</Button>
@@ -330,6 +396,43 @@
 					{/if}
 				</TableBody>
 			</Table>
+		</div>
+
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<p class="text-[13px] text-[#687976]">
+				Showing {pageStart}-{pageEnd} of {pagination.totalCount} records
+			</p>
+			<Pagination.Root
+				count={pagination.totalCount}
+				perPage={pagination.pageSize}
+				page={pagination.page}
+				onPageChange={(page) => goto(employeePageUrl(page))}
+				class="mx-0 w-auto"
+			>
+				{#snippet children({ pages, currentPage })}
+					<Pagination.Content>
+						<Pagination.Item>
+							<Pagination.Previous />
+						</Pagination.Item>
+						{#each pages as page (page.key)}
+							{#if page.type === 'ellipsis'}
+								<Pagination.Item>
+									<Pagination.Ellipsis />
+								</Pagination.Item>
+							{:else}
+								<Pagination.Item>
+									<Pagination.Link {page} isActive={currentPage === page.value}>
+										{page.value}
+									</Pagination.Link>
+								</Pagination.Item>
+							{/if}
+						{/each}
+						<Pagination.Item>
+							<Pagination.Next />
+						</Pagination.Item>
+					</Pagination.Content>
+				{/snippet}
+			</Pagination.Root>
 		</div>
 	</div>
 
