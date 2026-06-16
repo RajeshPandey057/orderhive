@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { onMount, tick } from 'svelte';
+	import SecurePageHeader from '$lib/components/secure-page-header.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Button from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import SecurePageHeader from '$lib/components/secure-page-header.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -19,6 +18,7 @@
 		normalizeGoogleDriveVideoSource,
 		type NormalizedGoogleDriveSource
 	} from '$lib/education';
+	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import ArchiveIcon from '~icons/lucide/archive';
 	import ChevronLeftIcon from '~icons/lucide/chevron-left';
@@ -87,12 +87,15 @@
 
 	const drivePreview = $derived.by(() => {
 		const trimmedLink = driveLink.trim();
-		if (\!trimmedLink) {
-			return { kind: 'idle' as const, message: 'Paste an open Google Drive file link to preview it.' };
+		if (!trimmedLink) {
+			return {
+				kind: 'idle' as const,
+				message: 'Paste an open Google Drive file link to preview it.'
+			};
 		}
 
 		const normalizedSource = normalizeGoogleDriveVideoSource(trimmedLink);
-		if (\!normalizedSource) {
+		if (!normalizedSource) {
 			return {
 				kind: 'invalid' as const,
 				message:
@@ -113,11 +116,11 @@
 
 		return [...allItems]
 			.filter((item) => {
-				if (mediaFilter \!== 'all' && item.itemType \!== mediaFilter) {
+				if (mediaFilter !== 'all' && item.itemType !== mediaFilter) {
 					return false;
 				}
 
-				if (\!query) return true;
+				if (!query) return true;
 				return item.searchText.includes(query);
 			})
 			.sort((left, right) => {
@@ -135,18 +138,20 @@
 
 	const activeItemIndex = $derived.by(() => {
 		const currentItem = activeItem;
-		if (\!currentItem) return -1;
+		if (!currentItem) return -1;
 
 		return filteredItems.findIndex((item) => item.id === currentItem.id);
 	});
 
 	const canGoToPreviousItem = $derived(activeItemIndex > 0);
-	const canGoToNextItem = $derived(activeItemIndex >= 0 && activeItemIndex < filteredItems.length - 1);
+	const canGoToNextItem = $derived(
+		activeItemIndex >= 0 && activeItemIndex < filteredItems.length - 1
+	);
 
 	// Fix: close overlay when user exits fullscreen via browser UI (ESC key consumed by browser)
 	onMount(() => {
 		function handleFullscreenChange() {
-			if (\!document.fullscreenElement) {
+			if (!document.fullscreenElement) {
 				activeItem = null;
 			}
 		}
@@ -193,7 +198,7 @@
 	}
 
 	function getVideoThumbnailUrl(item: EducationVideo): string | null {
-		if (item.itemType \!== 'video' || \!item.driveFileId || thumbnailFailures[item.id]) return null;
+		if (item.itemType !== 'video' || !item.driveFileId || thumbnailFailures[item.id]) return null;
 		return getGoogleDriveThumbnailUrl(item.driveFileId);
 	}
 
@@ -245,7 +250,7 @@
 	}
 
 	function removeVideoTagField(index: number) {
-		videoTagInputs = videoTagInputs.filter((_, tagIndex) => tagIndex \!== index);
+		videoTagInputs = videoTagInputs.filter((_, tagIndex) => tagIndex !== index);
 	}
 
 	function addPdfTagField() {
@@ -253,7 +258,7 @@
 	}
 
 	function removePdfTagField(index: number) {
-		pdfTagInputs = pdfTagInputs.filter((_, tagIndex) => tagIndex \!== index);
+		pdfTagInputs = pdfTagInputs.filter((_, tagIndex) => tagIndex !== index);
 	}
 
 	function resetVideoForm() {
@@ -292,7 +297,9 @@
 		driveLink = item.sourceUrl;
 		videoSubject = item.subject;
 		videoTagInputs =
-			item.tags.length > 0 ? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3)) : ['', '', ''];
+			item.tags.length > 0
+				? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3))
+				: ['', '', ''];
 		videoTitleError = '';
 		driveLinkError = '';
 		videoSubmitError = '';
@@ -311,7 +318,9 @@
 		pdfTitle = item.title;
 		pdfSubject = item.subject;
 		pdfTagInputs =
-			item.tags.length > 0 ? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3)) : ['', '', ''];
+			item.tags.length > 0
+				? [...item.tags, '', '', ''].slice(0, Math.max(item.tags.length, 3))
+				: ['', '', ''];
 		pdfFile = null;
 		currentPdfFileName = item.fileName ?? '';
 		pdfTitleError = '';
@@ -327,18 +336,18 @@
 		driveLinkError = '';
 		videoSubmitError = '';
 
-		if (\!videoTitle.trim()) {
+		if (!videoTitle.trim()) {
 			videoTitleError = 'Title is required.';
 		}
 
 		const normalizedSource = normalizeGoogleDriveVideoSource(driveLink);
-		if (\!driveLink.trim()) {
+		if (!driveLink.trim()) {
 			driveLinkError = 'Google Drive link is required.';
-		} else if (\!normalizedSource) {
+		} else if (!normalizedSource) {
 			driveLinkError = 'Please provide a valid embeddable Google Drive file link.';
 		}
 
-		if (videoTitleError || driveLinkError || \!normalizedSource) {
+		if (videoTitleError || driveLinkError || !normalizedSource) {
 			return null;
 		}
 
@@ -350,15 +359,15 @@
 		pdfFileError = '';
 		pdfSubmitError = '';
 
-		if (\!pdfTitle.trim()) {
+		if (!pdfTitle.trim()) {
 			pdfTitleError = 'Title is required.';
 		}
 
-		if (requireFile && \!pdfFile) {
+		if (requireFile && !pdfFile) {
 			pdfFileError = 'PDF file is required.';
 		}
 
-		if (pdfFile && \!isSupportedEducationPdf(pdfFile)) {
+		if (pdfFile && !isSupportedEducationPdf(pdfFile)) {
 			pdfFileError = 'Please upload a valid PDF file.';
 		}
 
@@ -366,14 +375,14 @@
 			pdfFileError = 'PDF file must be 50 MB or smaller.';
 		}
 
-		return \!(pdfTitleError || pdfFileError);
+		return !(pdfTitleError || pdfFileError);
 	}
 
 	async function handleVideoSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
 		const normalizedSource = validateVideoForm();
-		if (\!normalizedSource) return;
+		if (!normalizedSource) return;
 
 		savingVideo = true;
 
@@ -417,8 +426,8 @@
 	async function handlePdfSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		const requireFile = \!editingPdfId;
-		if (\!validatePdfForm(requireFile)) return;
+		const requireFile = !editingPdfId;
+		if (!validatePdfForm(requireFile)) return;
 
 		savingPdf = true;
 
@@ -444,7 +453,7 @@
 				body: formData
 			});
 
-			if (\!response.ok) {
+			if (!response.ok) {
 				const errorText = (await response.text()).trim();
 				throw new Error(errorText || 'Unable to save the PDF right now.');
 			}
@@ -508,7 +517,7 @@
 		if (activeItemIndex < 0) return;
 
 		const nextItem = filteredItems[activeItemIndex + direction];
-		if (\!nextItem) return;
+		if (!nextItem) return;
 
 		activeItem = nextItem;
 		if (nextItem.itemType === 'pdf') {
@@ -517,7 +526,7 @@
 	}
 
 	function handleWindowKeydown(event: KeyboardEvent) {
-		if (\!activeItem) return;
+		if (!activeItem) return;
 
 		if (event.key === 'Escape') {
 			void closeActiveItem();
@@ -550,7 +559,8 @@
 			<div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 				<div class="flex flex-col gap-1">
 					<p class="text-sm font-medium text-foreground">
-						{filteredItems.length} / {allItems.length} {formatCountLabel()}
+						{filteredItems.length} / {allItems.length}
+						{formatCountLabel()}
 					</p>
 					<p class="text-xs text-muted-foreground">
 						Search across title, tags, and subject metadata.
@@ -577,7 +587,9 @@
 
 			<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px_auto]">
 				<div class="relative flex-1">
-					<SearchIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+					<SearchIcon
+						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+					/>
 					<Input
 						bind:value={searchQuery}
 						class="h-11 pl-9"
@@ -600,12 +612,10 @@
 					</Select.Content>
 				</Select.Root>
 
-				<div class="inline-flex h-11 w-full items-center rounded-xl border border-[#E7ECEA] bg-[#F8FAF9] p-1 xl:w-auto">
-					{#each [
-						{ value: 'all', label: 'All' },
-						{ value: 'video', label: 'Videos' },
-						{ value: 'pdf', label: 'PDF' }
-					] as option (option.value)}
+				<div
+					class="inline-flex h-11 w-full items-center rounded-xl border border-[#E7ECEA] bg-[#F8FAF9] p-1 xl:w-auto"
+				>
+					{#each [{ value: 'all', label: 'All' }, { value: 'video', label: 'Videos' }, { value: 'pdf', label: 'PDF' }] as option (option.value)}
 						<button
 							type="button"
 							class={`inline-flex h-9 min-w-20.5 items-center justify-center rounded-lg px-4 text-sm font-medium transition ${
@@ -629,7 +639,9 @@
 		<div class="rounded-2xl border border-dashed border-[#D8DFDD] bg-white px-6 py-12">
 			<Empty.Root class="mx-auto max-w-xl text-center">
 				<Empty.Header>
-					<Empty.Media class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#FFF2E6] text-[#F04C06]">
+					<Empty.Media
+						class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#FFF2E6] text-[#F04C06]"
+					>
 						<GraduationCapIcon class="size-7" />
 					</Empty.Media>
 					<Empty.Title class="mt-4 text-xl font-semibold text-foreground">
@@ -644,7 +656,9 @@
 	{:else}
 		<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 			{#each filteredItems as item (item.id)}
-				<Card.Root class="gap-0 overflow-hidden border-[#E7ECEA] py-0 shadow-sm transition-transform duration-200 hover:-translate-y-0.5">
+				<Card.Root
+					class="gap-0 overflow-hidden border-[#E7ECEA] py-0 shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
+				>
 					<div class="border-b border-[#ECE7E1]">
 						{#if item.itemType === 'video'}
 							<button
@@ -661,7 +675,9 @@
 										loading="lazy"
 										onerror={() => markThumbnailFailed(item.id)}
 									/>
-									<div class="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-black/15"></div>
+									<div
+										class="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-black/15"
+									></div>
 								{/if}
 
 								<div class="absolute top-3 left-3">
@@ -672,7 +688,9 @@
 
 								<div class="flex flex-col items-center gap-2">
 									<CirclePlayIcon class="size-12 transition group-hover:scale-105" />
-									<span class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-[0.2em] uppercase">
+									<span
+										class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-[0.2em] uppercase"
+									>
 										Play Video
 									</span>
 								</div>
@@ -687,7 +705,7 @@
 								}}
 								aria-label={`Open ${item.title}`}
 							>
-								{#if \!isPdfFrameError(item.id, 'card')}
+								{#if !isPdfFrameError(item.id, 'card')}
 									<iframe
 										src={getPdfPreviewUrl(item, 'card')}
 										title={`${item.title} preview`}
@@ -699,7 +717,9 @@
 								{#if isPdfFrameLoading(item.id, 'card')}
 									<div class="absolute inset-0 flex items-center justify-center bg-[#F6F8F7]">
 										<div class="flex flex-col items-center gap-2 text-[#5D6B68]">
-											<div class="flex size-12 items-center justify-center rounded-full bg-white shadow-sm">
+											<div
+												class="flex size-12 items-center justify-center rounded-full bg-white shadow-sm"
+											>
 												<LoaderCircleIcon class="size-5 animate-spin" />
 											</div>
 											<span class="text-xs font-medium tracking-[0.18em] uppercase">
@@ -715,13 +735,15 @@
 										</div>
 									</div>
 								{/if}
-								<div class="absolute inset-0 bg-linear-to-t from-black/28 via-transparent to-black/8"></div>
+								<div
+									class="absolute inset-0 bg-linear-to-t from-black/28 via-transparent to-black/8"
+								></div>
 								<div class="absolute top-3 left-3">
-									<Badge class="rounded-full bg-white px-2.5 py-1 text-[#1E2A4A]">
-										PDF
-									</Badge>
+									<Badge class="rounded-full bg-white px-2.5 py-1 text-[#1E2A4A]">PDF</Badge>
 								</div>
-								<div class="absolute right-3 bottom-3 flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+								<div
+									class="absolute right-3 bottom-3 flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm"
+								>
 									<FileTextIcon class="size-4" />
 									Open PDF
 								</div>
@@ -745,7 +767,8 @@
 										variant="ghost"
 										size="icon"
 										class="size-8 text-[#F04C06] hover:bg-[#FFF1E6] hover:text-[#F04C06]"
-										onclick={() => (item.itemType === 'video' ? openEditVideoSheet(item) : openEditPdfSheet(item))}
+										onclick={() =>
+											item.itemType === 'video' ? openEditVideoSheet(item) : openEditPdfSheet(item)}
 										aria-label={`Edit ${item.title}`}
 									>
 										<PencilIcon class="size-4" />
@@ -797,7 +820,8 @@
 					{editingVideoId ? 'Edit Video Link' : 'Add Video Link'}
 				</Sheet.Title>
 				<Sheet.Description>
-					Paste an open Google Drive file link. The app will convert it into an embeddable player URL.
+					Paste an open Google Drive file link. The app will convert it into an embeddable player
+					URL.
 				</Sheet.Description>
 			</Sheet.Header>
 
@@ -823,7 +847,8 @@
 							placeholder="https://drive.google.com/file/d/.../view"
 						/>
 						<Field.Description>
-							Only Google Drive file links are supported for videos. Open/public links remain shareable outside the app.
+							Only Google Drive file links are supported for videos. Open/public links remain
+							shareable outside the app.
 						</Field.Description>
 						{#if driveLinkError}
 							<Field.Error>{driveLinkError}</Field.Error>
@@ -869,14 +894,22 @@
 					<Field.Field>
 						<div class="flex items-center justify-between">
 							<Field.Label>Tags</Field.Label>
-							<Button.Root type="button" variant="outline" size="sm" class="gap-2" onclick={addVideoTagField}>
+							<Button.Root
+								type="button"
+								variant="outline"
+								size="sm"
+								class="gap-2"
+								onclick={addVideoTagField}
+							>
 								<PlusIcon class="size-4" />
 								Add tag
 							</Button.Root>
 						</div>
 						<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-							{#each videoTagInputs as _, index (index)}
-								<div class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2">
+							{#each videoTagInputs, index (index)}
+								<div
+									class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2"
+								>
 									<Input
 										bind:value={videoTagInputs[index]}
 										placeholder={`Tag ${index + 1}`}
@@ -915,7 +948,9 @@
 					</Field.Field>
 
 					{#if videoSubmitError}
-						<div class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						<div
+							class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+						>
 							{videoSubmitError}
 						</div>
 					{/if}
@@ -923,7 +958,8 @@
 
 				<Sheet.Footer class="border-t border-border px-6 py-4 sm:justify-between">
 					<p class="text-xs leading-5 text-muted-foreground">
-						The Education Module hides share/download actions in-app, but open Drive links cannot be fully secured.
+						The Education Module hides share/download actions in-app, but open Drive links cannot be
+						fully secured.
 					</p>
 					<div class="flex items-center gap-3">
 						<Button.Root
@@ -954,7 +990,8 @@
 					{editingPdfId ? 'Edit PDF' : 'Add PDF'}
 				</Sheet.Title>
 				<Sheet.Description>
-					Upload a PDF up to 50 MB. The file stays inside the Education Module and opens inline for reading.
+					Upload a PDF up to 50 MB. The file stays inside the Education Module and opens inline for
+					reading.
 				</Sheet.Description>
 			</Sheet.Header>
 
@@ -983,7 +1020,8 @@
 							/>
 						{/key}
 						<Field.Description>
-							PDF only, up to 50 MB. Browser-level share/download controls are hidden where supported.
+							PDF only, up to 50 MB. Browser-level share/download controls are hidden where
+							supported.
 						</Field.Description>
 						{#if currentPdfFileName}
 							<p class="text-xs text-muted-foreground">
@@ -998,14 +1036,22 @@
 					<Field.Field>
 						<div class="flex items-center justify-between">
 							<Field.Label>Tags</Field.Label>
-							<Button.Root type="button" variant="outline" size="sm" class="gap-2" onclick={addPdfTagField}>
+							<Button.Root
+								type="button"
+								variant="outline"
+								size="sm"
+								class="gap-2"
+								onclick={addPdfTagField}
+							>
 								<PlusIcon class="size-4" />
 								Add tag
 							</Button.Root>
 						</div>
 						<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-							{#each pdfTagInputs as _, index (index)}
-								<div class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2">
+							{#each pdfTagInputs, index (index)}
+								<div
+									class="flex items-center gap-2 rounded-xl border border-[#E7ECEA] bg-[#F9FBFA] p-2"
+								>
 									<Input
 										bind:value={pdfTagInputs[index]}
 										placeholder={`Tag ${index + 1}`}
@@ -1044,7 +1090,9 @@
 					</Field.Field>
 
 					{#if pdfSubmitError}
-						<div class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						<div
+							class="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+						>
 							{pdfSubmitError}
 						</div>
 					{/if}
@@ -1052,7 +1100,8 @@
 
 				<Sheet.Footer class="border-t border-border px-6 py-4 sm:justify-between">
 					<p class="text-xs leading-5 text-muted-foreground">
-						PDF reading stays inside the app viewer, but browser support for fully hiding built-in actions can vary.
+						PDF reading stays inside the app viewer, but browser support for fully hiding built-in
+						actions can vary.
 					</p>
 					<div class="flex items-center gap-3">
 						<Button.Root
@@ -1083,7 +1132,9 @@
 		<div class="flex h-full w-full max-w-7xl flex-col gap-4">
 			<div class="flex items-start justify-between gap-4 text-white">
 				<div>
-					<p class="text-xs font-medium tracking-[0.24em] uppercase text-white/70">Education Module</p>
+					<p class="text-xs font-medium tracking-[0.24em] text-white/70 uppercase">
+						Education Module
+					</p>
 					<h2 class="mt-1 text-2xl font-semibold">{activeItem.title}</h2>
 				</div>
 				<div class="flex items-center gap-3">
@@ -1091,7 +1142,7 @@
 						type="button"
 						variant="outline"
 						class="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-						disabled={\!canGoToPreviousItem}
+						disabled={!canGoToPreviousItem}
 						onclick={() => openAdjacentItem(-1)}
 					>
 						<ChevronLeftIcon class="mr-2 size-4" />
@@ -1101,7 +1152,7 @@
 						type="button"
 						variant="outline"
 						class="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-						disabled={\!canGoToNextItem}
+						disabled={!canGoToNextItem}
 						onclick={() => openAdjacentItem(1)}
 					>
 						Next
@@ -1119,7 +1170,9 @@
 				</div>
 			</div>
 
-			<div class="min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
+			<div
+				class="min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl"
+			>
 				{#if activeItem.itemType === 'video'}
 					<iframe
 						src={activeItem.embedUrl}
@@ -1132,7 +1185,7 @@
 					></iframe>
 				{:else}
 					<div class="relative h-full min-h-[70vh] w-full bg-white">
-						{#if \!isPdfFrameError(activeItem.id, 'overlay')}
+						{#if !isPdfFrameError(activeItem.id, 'overlay')}
 							<iframe
 								src={getPdfPreviewUrl(activeItem, 'overlay')}
 								title={activeItem.title}
@@ -1152,12 +1205,16 @@
 						{#if isPdfFrameLoading(activeItem.id, 'overlay')}
 							<div class="absolute inset-0 flex items-center justify-center bg-white">
 								<div class="flex flex-col items-center gap-4 text-[#1F2B49]">
-									<div class="relative flex size-16 items-center justify-center rounded-full border border-[#E4E9F0] bg-[#F8FAFD] shadow-sm">
+									<div
+										class="relative flex size-16 items-center justify-center rounded-full border border-[#E4E9F0] bg-[#F8FAFD] shadow-sm"
+									>
 										<LoaderCircleIcon class="size-7 animate-spin" />
 									</div>
 									<div class="space-y-1 text-center">
 										<p class="text-base font-semibold">Loading PDF</p>
-										<p class="text-sm text-muted-foreground">Please wait while the document opens.</p>
+										<p class="text-sm text-muted-foreground">
+											Please wait while the document opens.
+										</p>
 									</div>
 								</div>
 							</div>
@@ -1167,7 +1224,9 @@
 									<FileTextIcon class="size-14 opacity-30" />
 									<div class="space-y-1 text-center">
 										<p class="text-base font-semibold">Unable to load PDF</p>
-										<p class="text-sm text-muted-foreground">The document could not be displayed. Try again later.</p>
+										<p class="text-sm text-muted-foreground">
+											The document could not be displayed. Try again later.
+										</p>
 									</div>
 								</div>
 							</div>
