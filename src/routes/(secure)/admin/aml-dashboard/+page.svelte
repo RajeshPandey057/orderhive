@@ -14,6 +14,7 @@
 	import Home from '~icons/lucide/house';
 	import Loader from '~icons/svg-spinners/blocks-shuffle-3';
 	import Tag from '~icons/lucide/tag';
+	import X from '~icons/lucide/x';
 
 	type AmlSummaryRow = {
 		key: string;
@@ -54,6 +55,7 @@
 
 	let selectedYear = $state(defaultYear);
 	let selectedMonth = $state(defaultMonth);
+	let showAllDeals = $state(false);
 	let dealSheetOpen = $state(false);
 	let selectedSeniorManager = $state<string | null>(null);
 	let summaryTableScroller: HTMLDivElement | null = $state(null);
@@ -179,6 +181,14 @@
 		dealSheetOpen = true;
 	}
 
+	function showAllDealsFilter(): void {
+		showAllDeals = true;
+	}
+
+	function clearAllDealsFilter(): void {
+		showAllDeals = false;
+	}
+
 	function handleSummaryRowKeydown(event: KeyboardEvent, seniorManager: string): void {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
@@ -231,12 +241,16 @@
 
 	const yearOptions = $derived(buildYearOptions(confirmedSales));
 	const selectedMonthKey = $derived(`${selectedYear}-${selectedMonth}`);
-	const selectedPeriodSales = $derived(
-		confirmedSales.filter((sale) => getSaleMonthKey(sale) === selectedMonthKey)
-	);
+	const selectedPeriodSales = $derived.by(() => {
+		if (showAllDeals) return confirmedSales;
+		return confirmedSales.filter((sale) => getSaleMonthKey(sale) === selectedMonthKey);
+	});
 	const summaryRows = $derived(buildSummaryRows(selectedPeriodSales));
 	const selectedMonthLabel = $derived(
 		monthOptions.find((month) => month.value === selectedMonth)?.label ?? ''
+	);
+	const selectedPeriodLabel = $derived(
+		showAllDeals ? 'All deals' : `${selectedMonthLabel} ${selectedYear}`
 	);
 	const selectedManagerDeals = $derived.by(() => {
 		const seniorManager = selectedSeniorManager;
@@ -324,6 +338,25 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+
+				<Button
+					type="button"
+					variant={showAllDeals ? 'default' : 'outline'}
+					class={[
+						'h-8 gap-2 rounded-md border border-[#D4D9D9] px-3 text-[13px]',
+						showAllDeals
+							? 'bg-[#17213D] text-white hover:bg-[#17213D]/90'
+							: 'bg-white text-[#222626]'
+					]}
+					aria-pressed={showAllDeals}
+					aria-label={showAllDeals ? 'Clear all deals filter' : 'Show all deals'}
+					onclick={showAllDeals ? clearAllDealsFilter : showAllDealsFilter}
+				>
+					All deals
+					{#if showAllDeals}
+						<X class="size-3.5" aria-hidden="true" />
+					{/if}
+				</Button>
 			</div>
 
 			<div class="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -422,7 +455,7 @@
 											</Empty.Media>
 											<Empty.Title>No Confirmed Deals</Empty.Title>
 											<Empty.Description>
-												There are no confirmed deals for the selected period.
+												There are no confirmed deals for {selectedPeriodLabel}.
 											</Empty.Description>
 										</Empty.Header>
 									</Empty.Root>
@@ -449,8 +482,7 @@
 			<Sheet.Header class="border-b border-[#EBEEEE] px-6 py-5">
 				<Sheet.Title class="text-xl font-semibold text-[#17213D]">Deals</Sheet.Title>
 				<Sheet.Description class="text-[13px] text-[#687976]">
-					{selectedSeniorManager ?? 'Senior manager'} · {selectedMonthLabel}
-					{selectedYear} ·
+					{selectedSeniorManager ?? 'Senior manager'} · {selectedPeriodLabel} ·
 					{selectedManagerDeals.length} deal{selectedManagerDeals.length === 1 ? '' : 's'}
 				</Sheet.Description>
 			</Sheet.Header>
