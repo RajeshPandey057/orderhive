@@ -1,8 +1,15 @@
 import { command, form, getRequestEvent } from '$app/server';
+import { LISTING_DEVELOPERS } from '$lib/listing-options';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
+
+const VALID_LISTING_DEVELOPERS = new Set(LISTING_DEVELOPERS);
+const listingDeveloperSchema = z
+	.string()
+	.min(1, 'Developer is required')
+	.refine((value) => VALID_LISTING_DEVELOPERS.has(value), 'Please select a valid developer');
 
 const toUploadedFile = async (file: File | null | undefined, path: string) => {
 	if (!file || file.size <= 0) return null;
@@ -129,7 +136,7 @@ const listingShape = {
 		.default(''),
 
 	// Property details
-	developerName: z.string().min(1, 'Developer is required'),
+	developerName: listingDeveloperSchema,
 	projectName: z.string().min(1, 'Project is required'),
 	unitNo: z.string().min(1, 'Unit number is required'),
 	projectType: z.enum(['Off-Plan Property', 'Ready Property']),

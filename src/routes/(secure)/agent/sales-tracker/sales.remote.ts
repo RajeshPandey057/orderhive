@@ -1,8 +1,15 @@
 import { command, form, getRequestEvent } from '$app/server';
+import { SALE_DEVELOPER_OPTIONS } from '$lib/listing-options';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
+
+const VALID_SALE_DEVELOPERS = new Set(SALE_DEVELOPER_OPTIONS.map((option) => option.value));
+const saleDeveloperSchema = z
+	.string()
+	.min(1, 'Developer is required')
+	.refine((value) => VALID_SALE_DEVELOPERS.has(value), 'Please select a valid developer');
 
 // Ensure a role document exists for the given email; creates a minimal one if absent.
 async function ensureRoleExists(email: string): Promise<void> {
@@ -145,7 +152,7 @@ const saleSchema = z
 			),
 		tentativeEligibilityDate: z.string().optional(),
 		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
-		developer: z.string().min(1, 'Developer is required'),
+		developer: saleDeveloperSchema,
 		project: z.string().min(1, 'Project is required'),
 		community: z.string().optional(),
 		propertyType: z.enum(
@@ -593,7 +600,7 @@ const updateSaleSchema = z
 			),
 		tentativeEligibilityDate: z.string().optional(),
 		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
-		developer: z.string().min(1, 'Developer is required'),
+		developer: saleDeveloperSchema,
 		project: z.string().min(1, 'Project is required'),
 		community: z.string().optional(),
 		propertyType: z.enum(

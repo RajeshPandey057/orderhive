@@ -135,6 +135,7 @@ export const LISTING_DEVELOPERS = [
 	'Emaar Properties',
 	'Empire Developments',
 	'HMB Homes',
+	'LIV developers',
 	'London Gate',
 	'MAG Property Development',
 	'Majid Al Futtaim Properties',
