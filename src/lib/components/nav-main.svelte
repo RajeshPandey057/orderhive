@@ -6,7 +6,8 @@
 
 	let {
 		items,
-		sections = []
+		sections = [],
+		emptyStateMessage
 	}: {
 		items: {
 			title: string;
@@ -29,6 +30,7 @@
 				external?: boolean;
 			}[];
 		}[];
+		emptyStateMessage?: string;
 	} = $props();
 
 	function handleSectionNavigate(event: MouseEvent, url: string, external?: boolean) {
@@ -44,7 +46,7 @@
 {#if sections.length > 0}
 	{#each sections as section, idx (section.title)}
 		<Sidebar.Group>
-			<Sidebar.GroupLabel class="uppercase tracking-wide text-[#8D8D8D]">
+			<Sidebar.GroupLabel class="tracking-wide text-[#8D8D8D] uppercase">
 				{section.title}
 			</Sidebar.GroupLabel>
 			<Sidebar.Menu>
@@ -74,7 +76,7 @@
 			<Sidebar.Separator class="mx-2 my-1" />
 		{/if}
 	{/each}
-{:else}
+{:else if items.length > 0}
 	<Sidebar.Group>
 		<Sidebar.Menu>
 			{#each items as item (item.title)}
@@ -140,5 +142,11 @@
 				{/if}
 			{/each}
 		</Sidebar.Menu>
+	</Sidebar.Group>
+{:else}
+	<Sidebar.Group>
+		<div class="px-2 py-6 text-sm leading-6 text-sidebar-foreground/65">
+			{emptyStateMessage}
+		</div>
 	</Sidebar.Group>
 {/if}
