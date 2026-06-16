@@ -75,14 +75,7 @@
 	let {
 		userRole
 	}: {
-		userRole?:
-			| 'admin'
-			| 'agent'
-			| 'compliance'
-			| 'finance'
-			| 'super-admin'
-			| 'manager'
-			| 'senior-manager';
+		userRole?: Role['accessType'];
 	} = $props();
 
 	const canPunchOrder = $derived(userRole === 'admin' || userRole === 'super-admin');

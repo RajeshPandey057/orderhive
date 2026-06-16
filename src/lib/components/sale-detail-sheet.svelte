@@ -24,14 +24,7 @@
 	interface Props {
 		open?: boolean;
 		sale?: Sale | null;
-		role?:
-			| 'agent'
-			| 'finance'
-			| 'admin'
-			| 'compliance'
-			| 'super-admin'
-			| 'manager'
-			| 'senior-manager';
+		role?: Role['accessType'];
 		onOpenChange?: (open: boolean) => void;
 	}
 

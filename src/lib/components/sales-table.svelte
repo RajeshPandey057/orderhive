@@ -35,14 +35,7 @@
 
 	interface Props {
 		data: Sale[];
-		role?:
-			| 'agent'
-			| 'finance'
-			| 'admin'
-			| 'compliance'
-			| 'super-admin'
-			| 'manager'
-			| 'senior-manager';
+		role?: Role['accessType'];
 	}
 
 	const wholeNumberFormatter = new Intl.NumberFormat('en-US', {

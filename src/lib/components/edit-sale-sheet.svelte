@@ -62,14 +62,7 @@
 		userRole,
 		sale
 	}: {
-		userRole?:
-			| 'admin'
-			| 'agent'
-			| 'compliance'
-			| 'finance'
-			| 'super-admin'
-			| 'manager'
-			| 'senior-manager';
+		userRole?: Role['accessType'];
 		sale: Sale;
 	} = $props();
 
