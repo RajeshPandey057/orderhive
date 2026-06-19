@@ -20,6 +20,20 @@
 	const currentUserUid = $derived(data?.user?.uid ?? '');
 	const currentUserRole = $derived(data?.user?.role ?? '');
 	const isAdmin = $derived(currentUserRole === 'admin' || currentUserRole === 'super-admin');
+	const filters = $derived(
+		data?.filters ?? {
+			developerName: undefined,
+			agentEmail: undefined,
+			unitType: undefined
+		}
+	);
+	const filterOptions = $derived(
+		data?.filterOptions ?? {
+			developers: [],
+			agents: [],
+			unitTypes: []
+		}
+	);
 	const pagination = $derived(
 		data?.pagination ?? {
 			page: 1,
@@ -41,11 +55,33 @@
 		if (searchQuery !== serverSearch) searchQuery = serverSearch;
 	});
 
-	function listingManagementPageUrl(page: number) {
+	function listingManagementPageUrl(
+		page: number,
+		filterOverrides: Partial<{
+			developerName: string;
+			agentEmail: string;
+			unitType: string;
+		}> = {}
+	) {
 		const params = new URLSearchParams();
 		const q = searchQuery.trim();
+		const nextFilters = {
+			developerName: filters.developerName ?? 'all',
+			agentEmail: filters.agentEmail ?? 'all',
+			unitType: filters.unitType ?? 'all',
+			...filterOverrides
+		};
 		if (page > 1) params.set('page', String(page));
 		if (q) params.set('q', q);
+		if (nextFilters.developerName && nextFilters.developerName !== 'all') {
+			params.set('developer', nextFilters.developerName);
+		}
+		if (nextFilters.agentEmail && nextFilters.agentEmail !== 'all') {
+			params.set('agent', nextFilters.agentEmail);
+		}
+		if (nextFilters.unitType && nextFilters.unitType !== 'all') {
+			params.set('unitType', nextFilters.unitType);
+		}
 		const query = params.toString();
 		return query ? `/listing/listing-management?${query}` : '/listing/listing-management';
 	}
@@ -57,6 +93,10 @@
 			await goto(listingManagementPageUrl(1));
 			searchDebounceTimer = undefined;
 		}, 300);
+	}
+
+	function handleFilterChange(filter: 'developerName' | 'agentEmail' | 'unitType', value: string) {
+		goto(listingManagementPageUrl(1, { [filter]: value }));
 	}
 
 	function canManage(listing: Listing): boolean {
@@ -102,7 +142,10 @@
 	<ListingTable
 		listings={data.listings ?? []}
 		searchValue={searchQuery}
+		{filters}
+		{filterOptions}
 		onSearch={handleSearch}
+		onFilterChange={handleFilterChange}
 		onEdit={handleEdit}
 		onDelete={handleDelete}
 	/>

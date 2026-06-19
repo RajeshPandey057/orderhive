@@ -1,4 +1,4 @@
-import { listListingsPage } from '$lib/server/listings';
+import { listListingFilterOptions, listListingsPage } from '$lib/server/listings';
 
 const LISTING_MANAGEMENT_PAGE_SIZE = 20;
 
@@ -14,19 +14,35 @@ export async function load({ locals, url }) {
 				totalCount: 0,
 				totalPages: 1,
 				search: ''
+			},
+			filters: {},
+			filterOptions: {
+				developers: [],
+				agents: [],
+				unitTypes: []
 			}
 		};
 	}
 
 	const pageParam = Number(url.searchParams.get('page') ?? '1');
 	const page = Number.isFinite(pageParam) ? pageParam : 1;
-	const listingPage = await listListingsPage({
-		page,
-		pageSize: LISTING_MANAGEMENT_PAGE_SIZE,
-		createdByUid: isAdmin ? undefined : locals.user?.uid,
-		includeClientDetails: true,
-		search: url.searchParams.get('q') ?? ''
-	});
+	const createdByUid = isAdmin ? undefined : locals.user?.uid;
+	const [listingPage, filterOptions] = await Promise.all([
+		listListingsPage({
+			page,
+			pageSize: LISTING_MANAGEMENT_PAGE_SIZE,
+			createdByUid,
+			includeClientDetails: true,
+			search: url.searchParams.get('q') ?? '',
+			filters: {
+				developerName: url.searchParams.get('developer') ?? '',
+				agentEmail: url.searchParams.get('agent') ?? '',
+				unitType: url.searchParams.get('unitType') ?? ''
+			},
+			returnAllMatches: true
+		}),
+		listListingFilterOptions({ createdByUid })
+	]);
 
 	return {
 		listings: listingPage.listings,
@@ -37,6 +53,8 @@ export async function load({ locals, url }) {
 			totalCount: listingPage.totalCount,
 			totalPages: listingPage.totalPages,
 			search: listingPage.search
-		}
+		},
+		filters: listingPage.filters,
+		filterOptions
 	};
 }

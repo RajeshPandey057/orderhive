@@ -9,42 +9,71 @@
 	let {
 		listings = [],
 		searchValue = '',
+		filters = {},
+		filterOptions,
 		onSearch,
+		onFilterChange,
 		onEdit,
 		onDelete
 	}: {
 		listings: Listing[];
 		searchValue?: string;
+		filters?: {
+			developerName?: string;
+			agentEmail?: string;
+			unitType?: string;
+		};
+		filterOptions?: {
+			developers?: string[];
+			agents?: string[];
+			unitTypes?: string[];
+		};
 		onSearch?: (value: string) => void;
+		onFilterChange?: (filter: 'developerName' | 'agentEmail' | 'unitType', value: string) => void;
 		onEdit?: (listing: Listing) => void;
 		onDelete?: (listing: Listing) => void;
 	} = $props();
 
 	const hasActions = $derived(!!onEdit || !!onDelete);
 
-	let selectedDeveloper = $state('all');
-	let selectedAgent = $state('all');
-	let selectedUnitType = $state('all');
-
+	const selectedDeveloper = $derived(filters.developerName ?? 'all');
+	const selectedAgent = $derived(filters.agentEmail ?? 'all');
+	const selectedUnitType = $derived(filters.unitType ?? 'all');
 	const developerOptions = $derived([
 		'all',
-		...new Set(listings.map((listing) => listing.developerName).filter(Boolean))
+		...new Set(
+			(filterOptions?.developers?.length
+				? filterOptions.developers
+				: listings.map((listing) => listing.developerName)
+			).filter(Boolean)
+		)
 	]);
 	const agentOptions = $derived([
 		'all',
-		...new Set(listings.map((listing) => listing.agentEmail?.trim()).filter(Boolean))
+		...new Set(
+			(filterOptions?.agents?.length
+				? filterOptions.agents
+				: listings.map((listing) => listing.agentEmail?.trim())
+			).filter(Boolean)
+		)
 	]);
 	const unitTypeOptions = $derived([
 		'all',
-		...new Set(listings.map((listing) => listing.unitType).filter(Boolean))
+		...new Set(
+			(filterOptions?.unitTypes?.length
+				? filterOptions.unitTypes
+				: listings.map((listing) => listing.unitType)
+			).filter(Boolean)
+		)
 	]);
 
 	const filteredListings = $derived.by(() => {
 		return listings.filter((listing) => {
 			const matchesDeveloper =
-				selectedDeveloper === 'all' || listing.developerName === selectedDeveloper;
-			const matchesAgent = selectedAgent === 'all' || listing.agentEmail === selectedAgent;
-			const matchesUnitType = selectedUnitType === 'all' || listing.unitType === selectedUnitType;
+				selectedDeveloper === 'all' || listing.developerName?.trim() === selectedDeveloper;
+			const matchesAgent = selectedAgent === 'all' || listing.agentEmail?.trim() === selectedAgent;
+			const matchesUnitType =
+				selectedUnitType === 'all' || listing.unitType?.trim() === selectedUnitType;
 
 			return matchesDeveloper && matchesAgent && matchesUnitType;
 		});
@@ -66,6 +95,10 @@
 	function handleRowOpen(listing: Listing) {
 		onEdit?.(listing);
 	}
+
+	function getSelectValue(event: Event) {
+		return (event.target as HTMLSelectElement).value;
+	}
 </script>
 
 <div class="overflow-x-auto pb-1">
@@ -81,7 +114,8 @@
 		</div>
 		<select
 			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-			bind:value={selectedDeveloper}
+			value={selectedDeveloper}
+			onchange={(event) => onFilterChange?.('developerName', getSelectValue(event))}
 		>
 			{#each developerOptions as option (option)}
 				<option value={option}>
@@ -91,7 +125,8 @@
 		</select>
 		<select
 			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-			bind:value={selectedAgent}
+			value={selectedAgent}
+			onchange={(event) => onFilterChange?.('agentEmail', getSelectValue(event))}
 		>
 			{#each agentOptions as option (option)}
 				<option value={option}>
@@ -101,7 +136,8 @@
 		</select>
 		<select
 			class="h-9 min-w-42.5 rounded-md border border-input bg-background px-3 text-sm"
-			bind:value={selectedUnitType}
+			value={selectedUnitType}
+			onchange={(event) => onFilterChange?.('unitType', getSelectValue(event))}
 		>
 			{#each unitTypeOptions as option (option)}
 				<option value={option}>

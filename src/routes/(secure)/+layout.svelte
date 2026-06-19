@@ -26,19 +26,19 @@
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		height: 2px;
+		height: 6px;
 		width: 100%;
 		overflow: hidden;
-		background: transparent;
+		background: color-mix(in oklab, var(--color-primary) 14%, transparent);
 	}
 
 	.nav-bar {
 		height: 100%;
-		width: 40%;
+		width: 44%;
 		min-width: 120px;
 		background: var(--color-primary);
-		opacity: 0.85;
-		animation: nav-slide 1.1s ease-in-out infinite;
+		box-shadow: 0 0 14px color-mix(in oklab, var(--color-primary) 70%, transparent);
+		animation: nav-slide 0.95s ease-in-out infinite;
 		will-change: transform;
 	}
 

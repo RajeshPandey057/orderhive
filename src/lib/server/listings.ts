@@ -8,6 +8,19 @@ export type ListingPage = {
 	totalCount: number;
 	totalPages: number;
 	search: string;
+	filters: ListingFilters;
+};
+
+export type ListingFilters = {
+	developerName?: string;
+	agentEmail?: string;
+	unitType?: string;
+};
+
+export type ListingFilterOptions = {
+	developers: string[];
+	agents: string[];
+	unitTypes: string[];
 };
 
 type ListListingsPageOptions = {
@@ -16,7 +29,30 @@ type ListListingsPageOptions = {
 	createdByUid?: string;
 	includeClientDetails?: boolean;
 	search?: string;
+	filters?: ListingFilters;
+	returnAllMatches?: boolean;
 };
+
+type ListListingFilterOptionsOptions = {
+	createdByUid?: string;
+};
+
+function normalizeFilterValue(value?: string | null) {
+	const trimmed = value?.trim() ?? '';
+	return trimmed && trimmed !== 'all' ? trimmed : undefined;
+}
+
+function normalizeListingFilters(filters?: ListingFilters): ListingFilters {
+	return {
+		developerName: normalizeFilterValue(filters?.developerName),
+		agentEmail: normalizeFilterValue(filters?.agentEmail),
+		unitType: normalizeFilterValue(filters?.unitType)
+	};
+}
+
+function hasListingFilters(filters: ListingFilters) {
+	return Boolean(filters.developerName || filters.agentEmail || filters.unitType);
+}
 
 function serializeListingDoc(
 	doc: FirebaseFirestore.QueryDocumentSnapshot,
@@ -103,9 +139,20 @@ function listingMatchesSearch(listing: Listing, search: string) {
 	);
 }
 
+function listingMatchesFilters(listing: Listing, filters: ListingFilters) {
+	const matchesDeveloper =
+		!filters.developerName || listing.developerName?.trim() === filters.developerName;
+	const matchesAgent = !filters.agentEmail || listing.agentEmail?.trim() === filters.agentEmail;
+	const matchesUnitType = !filters.unitType || listing.unitType?.trim() === filters.unitType;
+
+	return matchesDeveloper && matchesAgent && matchesUnitType;
+}
+
 export async function listListingsPage(options: ListListingsPageOptions): Promise<ListingPage> {
 	const pageSize = options.pageSize;
 	const search = options.search?.trim().toLowerCase() ?? '';
+	const filters = normalizeListingFilters(options.filters);
+	const hasFilters = hasListingFilters(filters);
 	const requestedPage = Math.max(1, Math.floor(options.page ?? 1));
 	const chunkSize = Math.max(pageSize * 2, 30);
 
@@ -117,7 +164,7 @@ export async function listListingsPage(options: ListListingsPageOptions): Promis
 		query = query.where('createdByUid', '==', options.createdByUid);
 	}
 
-	if (search) {
+	if (search || hasFilters) {
 		const matches: Listing[] = [];
 		let cursor: FirebaseFirestore.QueryDocumentSnapshot | null = null;
 		let hasMoreDocs = true;
@@ -137,22 +184,29 @@ export async function listListingsPage(options: ListListingsPageOptions): Promis
 				const listing = serializeListingDoc(doc, {
 					includeClientDetails: options.includeClientDetails
 				});
-				if (listingMatchesSearch(listing, search)) matches.push(listing);
+				if (listingMatchesSearch(listing, search) && listingMatchesFilters(listing, filters)) {
+					matches.push(listing);
+				}
 			}
 		}
 
 		const totalCount = matches.length;
-		const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-		const page = Math.min(requestedPage, totalPages);
+		const shouldReturnAllMatches = Boolean(options.returnAllMatches);
+		const resultPageSize = shouldReturnAllMatches ? Math.max(totalCount, pageSize) : pageSize;
+		const totalPages = shouldReturnAllMatches ? 1 : Math.max(1, Math.ceil(totalCount / pageSize));
+		const page = shouldReturnAllMatches ? 1 : Math.min(requestedPage, totalPages);
 
 		return {
-			listings: matches.slice((page - 1) * pageSize, page * pageSize),
+			listings: shouldReturnAllMatches
+				? matches
+				: matches.slice((page - 1) * pageSize, page * pageSize),
 			page,
-			pageSize,
-			hasNextPage: page < totalPages,
+			pageSize: resultPageSize,
+			hasNextPage: !shouldReturnAllMatches && page < totalPages,
 			totalCount,
 			totalPages,
-			search
+			search,
+			filters
 		};
 	}
 
@@ -204,6 +258,41 @@ export async function listListingsPage(options: ListListingsPageOptions): Promis
 		hasNextPage: activeListings.length > activeEndIndex,
 		totalCount,
 		totalPages,
-		search
+		search,
+		filters
+	};
+}
+
+export async function listListingFilterOptions(
+	options: ListListingFilterOptionsOptions = {}
+): Promise<ListingFilterOptions> {
+	let query: FirebaseFirestore.Query = firestore.collection('listings');
+
+	if (options.createdByUid) {
+		query = query.where('createdByUid', '==', options.createdByUid);
+	}
+
+	const snap = await query.get();
+	const developers = new Set<string>();
+	const agents = new Set<string>();
+	const unitTypes = new Set<string>();
+
+	for (const doc of snap.docs) {
+		const data = doc.data();
+		if (data.isDeleted) continue;
+
+		const developerName = normalizeFilterValue(data.developerName);
+		const agentEmail = normalizeFilterValue(data.agentEmail);
+		const unitType = normalizeFilterValue(data.unitType);
+
+		if (developerName) developers.add(developerName);
+		if (agentEmail) agents.add(agentEmail);
+		if (unitType) unitTypes.add(unitType);
+	}
+
+	return {
+		developers: [...developers].sort((a, b) => a.localeCompare(b)),
+		agents: [...agents].sort((a, b) => a.localeCompare(b)),
+		unitTypes: [...unitTypes].sort((a, b) => a.localeCompare(b))
 	};
 }
