@@ -53,21 +53,45 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		return Response.redirect(buildStorageMediaUrl(bucket.name, filePath, explicitToken), 302);
 	}
 
-	const [metadata] = await file.getMetadata();
-	const metadataToken = `${metadata.metadata?.firebaseStorageDownloadTokens ?? ''}`
-		.split(',')
-		.map((token) => token.trim())
-		.find(Boolean);
+	// Try to get the download token from GCS custom metadata (set by current uploadFileWithLink)
+	try {
+		const [metadata] = await file.getMetadata();
+		const metadataToken = `${metadata.metadata?.firebaseStorageDownloadTokens ?? ''}`
+			.split(',')
+			.map((t) => t.trim())
+			.find(Boolean);
 
-	if (metadataToken) {
-		return Response.redirect(buildStorageMediaUrl(bucket.name, filePath, metadataToken), 302);
+		if (metadataToken) {
+			return Response.redirect(buildStorageMediaUrl(bucket.name, filePath, metadataToken), 302);
+		}
+	} catch (metaErr) {
+		console.error('[education/assets] getMetadata failed for id:', id, metaErr);
 	}
 
-	const [signedUrl] = await file.getSignedUrl({
-		action: 'read',
-		expires: Date.now() + 60 * 60 * 1000,
-		version: 'v4'
+	// Fallback: stream the file directly via Firebase Admin SDK (no signed-URL IAM permission needed)
+	const rawName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
+	const encodedName = encodeURIComponent(rawName);
+
+	const readStream = file.createReadStream();
+	const body = new ReadableStream<Uint8Array>({
+		start(controller) {
+			readStream.on('data', (chunk: Buffer) => controller.enqueue(chunk));
+			readStream.on('end', () => controller.close());
+			readStream.on('error', (err) => {
+				console.error('[education/assets] stream error for id:', id, err);
+				controller.error(err);
+			});
+		},
+		cancel() {
+			(readStream as import('stream').Readable).destroy();
+		}
 	});
 
-	return Response.redirect(signedUrl, 302);
+	return new Response(body, {
+		headers: {
+			'Content-Type': 'application/pdf',
+			'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
+			'Cache-Control': 'private, no-store, max-age=0'
+		}
+	});
 };
