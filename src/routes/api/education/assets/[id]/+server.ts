@@ -2,12 +2,29 @@ import { canAccessEducationModule } from '$lib/constants';
 import { educationVideosCollection } from '$lib/server/education';
 import { storage } from '$lib/server/firebase';
 import { error, type RequestHandler } from '@sveltejs/kit';
+import { Readable } from 'node:stream';
 
-function buildStorageMediaUrl(bucketName: string, filePath: string, token: string): string {
-	return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+type ResolvedEducationPdf = {
+	file: ReturnType<ReturnType<typeof storage.bucket>['file']>;
+	id: string;
+	filePath: string;
+	headers: Headers;
+};
+
+type AssetRouteParams = {
+	id?: string;
+};
+
+function isStorageNotFound(err: unknown): boolean {
+	if (!err || typeof err !== 'object') return false;
+	const code = 'code' in err ? (err as { code?: unknown }).code : undefined;
+	return code === 404 || code === '404';
 }
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+async function resolveEducationPdf(
+	params: AssetRouteParams,
+	locals: App.Locals
+): Promise<ResolvedEducationPdf> {
 	if (!locals.user) {
 		throw error(401, 'Unauthorized');
 	}
@@ -31,11 +48,6 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		throw error(400, 'Asset is not a PDF');
 	}
 
-	const downloadURL = typeof data.downloadURL === 'string' ? data.downloadURL.trim() : '';
-	if (downloadURL) {
-		return Response.redirect(downloadURL, 302);
-	}
-
 	const filePath = typeof data.filePath === 'string' ? data.filePath : '';
 	if (!filePath) {
 		throw error(404, 'PDF file is missing');
@@ -43,55 +55,47 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
 	const bucket = storage.bucket();
 	const file = bucket.file(filePath);
-	const [exists] = await file.exists();
-	if (!exists) {
-		throw error(404, 'PDF file not found');
-	}
+	const fileName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
+	const encodedName = encodeURIComponent(fileName);
 
-	const explicitToken = typeof data.token === 'string' ? data.token.trim() : '';
-	if (explicitToken) {
-		return Response.redirect(buildStorageMediaUrl(bucket.name, filePath, explicitToken), 302);
-	}
-
-	// Try to get the download token from GCS custom metadata (set by current uploadFileWithLink)
 	try {
 		const [metadata] = await file.getMetadata();
-		const metadataToken = `${metadata.metadata?.firebaseStorageDownloadTokens ?? ''}`
-			.split(',')
-			.map((t) => t.trim())
-			.find(Boolean);
-
-		if (metadataToken) {
-			return Response.redirect(buildStorageMediaUrl(bucket.name, filePath, metadataToken), 302);
-		}
-	} catch (metaErr) {
-		console.error('[education/assets] getMetadata failed for id:', id, metaErr);
-	}
-
-	// Fallback: stream the file directly via Firebase Admin SDK (no signed-URL IAM permission needed)
-	const rawName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
-	const encodedName = encodeURIComponent(rawName);
-
-	const readStream = file.createReadStream();
-	const body = new ReadableStream<Uint8Array>({
-		start(controller) {
-			readStream.on('data', (chunk: Buffer) => controller.enqueue(chunk));
-			readStream.on('end', () => controller.close());
-			readStream.on('error', (err) => {
-				console.error('[education/assets] stream error for id:', id, err);
-				controller.error(err);
-			});
-		},
-		cancel() {
-			(readStream as import('stream').Readable).destroy();
-		}
-	});
-
-	return new Response(body, {
-		headers: {
+		const headers = new Headers({
 			'Content-Type': 'application/pdf',
 			'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
-			'Cache-Control': 'private, no-store, max-age=0'
+			'Cache-Control': 'private, no-store, max-age=0',
+			'X-Content-Type-Options': 'nosniff'
+		});
+
+		if (metadata.size) {
+			headers.set('Content-Length', String(metadata.size));
 		}
+
+		return { file, id, filePath, headers };
+	} catch (err) {
+		const stage = 'metadata';
+		console.error('[education/assets] storage lookup failed', { id, filePath, stage, err });
+
+		if (isStorageNotFound(err)) {
+			throw error(404, 'PDF file not found');
+		}
+
+		throw error(500, 'Unable to access PDF file');
+	}
+}
+
+export const HEAD: RequestHandler = async ({ params, locals }) => {
+	const { headers } = await resolveEducationPdf(params, locals);
+	return new Response(null, { headers });
+};
+
+export const GET: RequestHandler = async ({ params, locals }) => {
+	const { file, id, filePath, headers } = await resolveEducationPdf(params, locals);
+
+	const readStream = file.createReadStream();
+	readStream.on('error', (err) => {
+		console.error('[education/assets] stream failed', { id, filePath, stage: 'stream', err });
 	});
+
+	return new Response(Readable.toWeb(readStream) as ReadableStream<Uint8Array>, { headers });
 };
