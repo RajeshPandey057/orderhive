@@ -75,6 +75,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		embedUrl: '',
 		driveFileId: '',
 		filePath: uploaded.path,
+		downloadURL: uploaded.downloadURL,
+		token: uploaded.token,
 		fileName: pdfFile.name,
 		fileSize: pdfFile.size,
 		contentType: pdfFile.type || 'application/pdf',
@@ -147,6 +149,8 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
 		nextFileData = {
 			filePath: uploaded.path,
+			downloadURL: uploaded.downloadURL,
+			token: uploaded.token,
 			fileName: pdfFile.name,
 			fileSize: pdfFile.size,
 			contentType: pdfFile.type || 'application/pdf',

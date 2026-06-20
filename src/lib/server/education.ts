@@ -15,6 +15,8 @@ type EducationVideoRecord = {
 	embedUrl?: string;
 	driveFileId?: string;
 	filePath?: string;
+	downloadURL?: string;
+	token?: string;
 	fileName?: string;
 	fileSize?: number;
 	contentType?: string;
@@ -54,6 +56,8 @@ export function serializeEducationVideo(id: string, record: EducationVideoRecord
 		embedUrl: record.embedUrl ?? '',
 		driveFileId: record.driveFileId ?? '',
 		filePath: record.filePath ?? '',
+		downloadURL: record.downloadURL ?? '',
+		token: record.token ?? '',
 		fileName: record.fileName ?? '',
 		fileSize: record.fileSize ?? 0,
 		contentType: record.contentType ?? '',

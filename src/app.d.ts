@@ -14,6 +14,8 @@ declare global {
 		embedUrl: string;
 		driveFileId: string;
 		filePath?: string;
+		downloadURL?: string;
+		token?: string;
 		fileName?: string;
 		fileSize?: number;
 		contentType?: string;
