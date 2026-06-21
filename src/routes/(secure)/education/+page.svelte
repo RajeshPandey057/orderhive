@@ -215,6 +215,10 @@
 		return `${itemId}:overlay`;
 	}
 
+	function getPdfAssetUrl(itemId: string): string {
+		return `/api/education/assets/${encodeURIComponent(itemId)}`;
+	}
+
 	function getPdfFrameUrl(itemId: string): string {
 		return pdfFrameUrl[getPdfFrameKey(itemId)] ?? '';
 	}
@@ -265,7 +269,7 @@
 
 	async function validatePdfFrame(itemId: string) {
 		try {
-			const response = await fetch(`/api/education/assets/${itemId}`);
+			const response = await fetch(getPdfAssetUrl(itemId));
 			if (!response.ok) {
 				const message = (await response.text()).trim();
 				throw new Error(
@@ -297,7 +301,7 @@
 		}
 	}
 
-	function formatFileSize(size: number | undefined): string {
+	/* function formatFileSize(size: number | undefined): string {
 		if (!size || size <= 0) return '';
 
 		const units = ['B', 'KB', 'MB', 'GB'];
@@ -314,7 +318,7 @@
 
 	function getPdfMetaLabel(item: EducationVideo): string {
 		return [item.fileName, formatFileSize(item.fileSize)].filter(Boolean).join(' - ');
-	}
+	} */
 
 	function addVideoTagField() {
 		videoTagInputs = [...videoTagInputs, ''];
@@ -770,27 +774,20 @@
 								</div>
 							</button>
 						{:else}
-							<button
-								type="button"
-								class="group relative flex aspect-video w-full flex-col items-center justify-center overflow-hidden bg-[#F4F6F5] px-5 text-center text-[#1F2B49]"
-								onclick={() => openItem(item)}
-								aria-label={`Open ${item.title}`}
+							<div
+								class="group relative aspect-video w-full overflow-hidden bg-[#F4F6F5] text-[#1F2B49]"
 							>
+								<iframe
+									src={`${getPdfAssetUrl(item.id)}#toolbar=0&navpanes=0&view=FitH&page=1`}
+									title={`${item.title} preview`}
+									class="h-full w-full bg-white"
+									loading="lazy"
+								></iframe>
+								<div
+									class="pointer-events-none absolute inset-0 bg-linear-to-t from-black/45 via-black/5 to-black/10"
+								></div>
 								<div class="absolute top-3 left-3">
 									<Badge class="rounded-full bg-white px-2.5 py-1 text-[#1E2A4A]">PDF</Badge>
-								</div>
-								<div
-									class="flex size-16 items-center justify-center rounded-2xl border border-[#E0E6E4] bg-white shadow-sm transition group-hover:scale-105"
-								>
-									<FileTextIcon class="size-8 text-[#F04C06]" />
-								</div>
-								<div class="mt-4 max-w-full space-y-1">
-									<p class="line-clamp-2 text-sm font-semibold text-[#1F2B49]">{item.title}</p>
-									{#if getPdfMetaLabel(item)}
-										<p class="truncate text-xs text-[#687976]">{getPdfMetaLabel(item)}</p>
-									{:else}
-										<p class="text-xs text-[#687976]">PDF document</p>
-									{/if}
 								</div>
 								<div
 									class="absolute right-3 bottom-3 flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm"
@@ -798,7 +795,13 @@
 									<FileTextIcon class="size-4" />
 									Open PDF
 								</div>
-							</button>
+								<button
+									type="button"
+									class="absolute inset-0 cursor-pointer"
+									onclick={() => openItem(item)}
+									aria-label={`Open ${item.title}`}
+								></button>
+							</div>
 						{/if}
 					</div>
 
