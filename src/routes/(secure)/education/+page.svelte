@@ -18,8 +18,9 @@
 		normalizeGoogleDriveVideoSource,
 		type NormalizedGoogleDriveSource
 	} from '$lib/education';
-	import { tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import ArchiveIcon from '~icons/lucide/archive';
 	import ChevronLeftIcon from '~icons/lucide/chevron-left';
 	import ChevronRightIcon from '~icons/lucide/chevron-right';
 	import CirclePlayIcon from '~icons/lucide/circle-play';
@@ -30,7 +31,11 @@
 	import PlusIcon from '~icons/lucide/plus';
 	import SearchIcon from '~icons/lucide/search';
 	import XIcon from '~icons/lucide/x';
-	import { createEducationVideo, updateEducationVideo } from './education.remote';
+	import {
+		archiveEducationItem,
+		createEducationVideo,
+		updateEducationVideo
+	} from './education.remote';
 
 	type EducationFilter = 'all' | 'video' | 'pdf';
 	type SortOrder = 'newest' | 'oldest' | 'title';
@@ -52,6 +57,9 @@
 	let activeItem = $state<EducationVideo | null>(null);
 	let thumbnailFailures = $state<Record<string, boolean>>({});
 	let pdfFrameLoading = $state<Record<string, boolean>>({});
+	let pdfFrameError = $state<Record<string, boolean>>({});
+	let pdfFrameReady = $state<Record<string, boolean>>({});
+	let pdfFrameUrl = $state<Record<string, string>>({});
 
 	let addVideoOpen = $state(false);
 	let videoTitle = $state('');
@@ -76,6 +84,8 @@
 	let pdfSubmitError = $state('');
 	let savingPdf = $state(false);
 	let editingPdfId = $state<string | null>(null);
+
+	let archivingId = $state<string | null>(null);
 
 	const drivePreview = $derived.by(() => {
 		const trimmedLink = driveLink.trim();
@@ -140,6 +150,20 @@
 		activeItemIndex >= 0 && activeItemIndex < filteredItems.length - 1
 	);
 
+	// Fix: close overlay when user exits fullscreen via browser UI (ESC key consumed by browser)
+	onMount(() => {
+		function handleFullscreenChange() {
+			if (!document.fullscreenElement) {
+				if (activeItem?.itemType === 'pdf') {
+					revokePdfFrameUrl(activeItem.id);
+				}
+				activeItem = null;
+			}
+		}
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+	});
+
 	function formatCountLabel(): string {
 		if (mediaFilter === 'video') return 'videos';
 		if (mediaFilter === 'pdf') return 'PDFs';
@@ -187,34 +211,106 @@
 		thumbnailFailures = { ...thumbnailFailures, [itemId]: true };
 	}
 
-	function getPdfPreviewUrl(
-		item: EducationVideo,
-		mode: 'card' | 'hover' | 'overlay' = 'card'
-	): string {
-		const hash =
-			mode === 'card'
-				? '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'
-				: '#toolbar=0&navpanes=0&view=FitH';
-		return `/api/education/assets/${item.id}${hash}`;
+	function getPdfFrameKey(itemId: string): string {
+		return `${itemId}:overlay`;
 	}
 
-	function getPdfFrameKey(itemId: string, mode: 'card' | 'hover' | 'overlay'): string {
-		return `${itemId}:${mode}`;
+	function getPdfFrameUrl(itemId: string): string {
+		return pdfFrameUrl[getPdfFrameKey(itemId)] ?? '';
 	}
 
-	function isPdfFrameLoading(itemId: string, mode: 'card' | 'hover' | 'overlay'): boolean {
-		return pdfFrameLoading[getPdfFrameKey(itemId, mode)] ?? true;
+	function isPdfFrameLoading(itemId: string): boolean {
+		return pdfFrameLoading[getPdfFrameKey(itemId)] === true;
 	}
 
-	function setPdfFrameLoading(
-		itemId: string,
-		mode: 'card' | 'hover' | 'overlay',
-		isLoading: boolean
-	) {
+	function isPdfFrameError(itemId: string): boolean {
+		return pdfFrameError[getPdfFrameKey(itemId)] === true;
+	}
+
+	function isPdfFrameReady(itemId: string): boolean {
+		return pdfFrameReady[getPdfFrameKey(itemId)] === true;
+	}
+
+	function setPdfFrameLoading(itemId: string, isLoading: boolean) {
 		pdfFrameLoading = {
 			...pdfFrameLoading,
-			[getPdfFrameKey(itemId, mode)]: isLoading
+			[getPdfFrameKey(itemId)]: isLoading
 		};
+	}
+
+	function setPdfFrameError(itemId: string) {
+		const key = getPdfFrameKey(itemId);
+		pdfFrameLoading = { ...pdfFrameLoading, [key]: false };
+		pdfFrameError = { ...pdfFrameError, [key]: true };
+		pdfFrameReady = { ...pdfFrameReady, [key]: false };
+	}
+
+	function revokePdfFrameUrl(itemId: string) {
+		const key = getPdfFrameKey(itemId);
+		const objectUrl = pdfFrameUrl[key];
+		if (objectUrl) {
+			URL.revokeObjectURL(objectUrl);
+			pdfFrameUrl = { ...pdfFrameUrl, [key]: '' };
+		}
+	}
+
+	function initPdfFrame(itemId: string) {
+		const key = getPdfFrameKey(itemId);
+		revokePdfFrameUrl(itemId);
+		pdfFrameLoading = { ...pdfFrameLoading, [key]: true };
+		pdfFrameError = { ...pdfFrameError, [key]: false };
+		pdfFrameReady = { ...pdfFrameReady, [key]: false };
+		void validatePdfFrame(itemId);
+	}
+
+	async function validatePdfFrame(itemId: string) {
+		try {
+			const response = await fetch(`/api/education/assets/${itemId}`);
+			if (!response.ok) {
+				throw new Error(`PDF asset request failed with ${response.status}`);
+			}
+
+			const contentType = response.headers.get('content-type') ?? '';
+			if (!contentType.toLowerCase().includes('application/pdf')) {
+				throw new Error(`PDF asset returned ${contentType || 'unknown content type'}`);
+			}
+
+			const blob = await response.blob();
+			const objectUrl = URL.createObjectURL(blob);
+
+			if (activeItem?.id !== itemId) {
+				URL.revokeObjectURL(objectUrl);
+				return;
+			}
+
+			const key = getPdfFrameKey(itemId);
+			pdfFrameUrl = { ...pdfFrameUrl, [key]: `${objectUrl}#toolbar=0&navpanes=0&view=FitH` };
+			pdfFrameReady = { ...pdfFrameReady, [key]: true };
+		} catch (err) {
+			console.error('[education] PDF asset request failed', { itemId, err });
+			if (activeItem?.id === itemId) {
+				setPdfFrameError(itemId);
+			}
+		}
+	}
+
+	function formatFileSize(size: number | undefined): string {
+		if (!size || size <= 0) return '';
+
+		const units = ['B', 'KB', 'MB', 'GB'];
+		let value = size;
+		let unitIndex = 0;
+
+		while (value >= 1024 && unitIndex < units.length - 1) {
+			value /= 1024;
+			unitIndex += 1;
+		}
+
+		return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+	}
+
+	function getPdfMetaLabel(item: EducationVideo): string {
+		return [item.fileName, formatFileSize(item.fileSize)].filter(Boolean).join(' - ');
 	}
 
 	function addVideoTagField() {
@@ -442,10 +538,25 @@
 		}
 	}
 
+	async function handleArchive(item: EducationVideo) {
+		if (archivingId) return;
+		archivingId = item.id;
+
+		try {
+			await archiveEducationItem({ id: item.id });
+			toast.success(`"${item.title}" archived`);
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to archive item right now.');
+		} finally {
+			archivingId = null;
+		}
+	}
+
 	async function openItem(item: EducationVideo) {
 		activeItem = item;
 		if (item.itemType === 'pdf') {
-			setPdfFrameLoading(item.id, 'overlay', true);
+			initPdfFrame(item.id);
 		}
 		await tick();
 
@@ -460,11 +571,16 @@
 		if (document.fullscreenElement === fullscreenContainer) {
 			try {
 				await document.exitFullscreen();
+				// fullscreenchange listener will set activeItem = null
+				return;
 			} catch {
 				// Ignore exit failures and close the overlay anyway.
 			}
 		}
 
+		if (activeItem?.itemType === 'pdf') {
+			revokePdfFrameUrl(activeItem.id);
+		}
 		activeItem = null;
 	}
 
@@ -476,7 +592,7 @@
 
 		activeItem = nextItem;
 		if (nextItem.itemType === 'pdf') {
-			setPdfFrameLoading(nextItem.id, 'overlay', true);
+			initPdfFrame(nextItem.id);
 		}
 	}
 
@@ -573,7 +689,7 @@
 					{#each [{ value: 'all', label: 'All' }, { value: 'video', label: 'Videos' }, { value: 'pdf', label: 'PDF' }] as option (option.value)}
 						<button
 							type="button"
-							class={`inline-flex h-9 min-w-[82px] items-center justify-center rounded-lg px-4 text-sm font-medium transition ${
+							class={`inline-flex h-9 min-w-20.5 items-center justify-center rounded-lg px-4 text-sm font-medium transition ${
 								mediaFilter === option.value
 									? 'bg-white text-foreground shadow-xs'
 									: 'text-muted-foreground hover:text-foreground'
@@ -653,35 +769,25 @@
 						{:else}
 							<button
 								type="button"
-								class="group relative block aspect-video w-full overflow-hidden bg-[#F4F6F5]"
+								class="group relative flex aspect-video w-full flex-col items-center justify-center overflow-hidden bg-[#F4F6F5] px-5 text-center text-[#1F2B49]"
 								onclick={() => openItem(item)}
 								aria-label={`Open ${item.title}`}
 							>
-								<iframe
-									src={getPdfPreviewUrl(item, 'card')}
-									title={`${item.title} preview`}
-									class="pointer-events-none absolute inset-0 h-full w-full bg-white"
-									onload={() => setPdfFrameLoading(item.id, 'card', false)}
-								></iframe>
-								{#if isPdfFrameLoading(item.id, 'card')}
-									<div class="absolute inset-0 flex items-center justify-center bg-[#F6F8F7]">
-										<div class="flex flex-col items-center gap-2 text-[#5D6B68]">
-											<div
-												class="flex size-12 items-center justify-center rounded-full bg-white shadow-sm"
-											>
-												<LoaderCircleIcon class="size-5 animate-spin" />
-											</div>
-											<span class="text-xs font-medium tracking-[0.18em] uppercase">
-												Loading PDF
-											</span>
-										</div>
-									</div>
-								{/if}
-								<div
-									class="absolute inset-0 bg-linear-to-t from-black/28 via-transparent to-black/8"
-								></div>
 								<div class="absolute top-3 left-3">
 									<Badge class="rounded-full bg-white px-2.5 py-1 text-[#1E2A4A]">PDF</Badge>
+								</div>
+								<div
+									class="flex size-16 items-center justify-center rounded-2xl border border-[#E0E6E4] bg-white shadow-sm transition group-hover:scale-105"
+								>
+									<FileTextIcon class="size-8 text-[#F04C06]" />
+								</div>
+								<div class="mt-4 max-w-full space-y-1">
+									<p class="line-clamp-2 text-sm font-semibold text-[#1F2B49]">{item.title}</p>
+									{#if getPdfMetaLabel(item)}
+										<p class="truncate text-xs text-[#687976]">{getPdfMetaLabel(item)}</p>
+									{:else}
+										<p class="text-xs text-[#687976]">PDF document</p>
+									{/if}
 								</div>
 								<div
 									class="absolute right-3 bottom-3 flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm"
@@ -703,17 +809,34 @@
 							</div>
 
 							{#if canManage}
-								<Button.Root
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0 text-[#F04C06] hover:bg-[#FFF1E6] hover:text-[#F04C06]"
-									onclick={() =>
-										item.itemType === 'video' ? openEditVideoSheet(item) : openEditPdfSheet(item)}
-									aria-label={`Edit ${item.title}`}
-								>
-									<PencilIcon class="size-4" />
-								</Button.Root>
+								<div class="flex shrink-0 items-center gap-1">
+									<Button.Root
+										type="button"
+										variant="ghost"
+										size="icon"
+										class="size-8 text-[#F04C06] hover:bg-[#FFF1E6] hover:text-[#F04C06]"
+										onclick={() =>
+											item.itemType === 'video' ? openEditVideoSheet(item) : openEditPdfSheet(item)}
+										aria-label={`Edit ${item.title}`}
+									>
+										<PencilIcon class="size-4" />
+									</Button.Root>
+									<Button.Root
+										type="button"
+										variant="ghost"
+										size="icon"
+										class="size-8 text-muted-foreground hover:bg-muted hover:text-foreground"
+										disabled={archivingId === item.id}
+										onclick={() => handleArchive(item)}
+										aria-label={`Archive ${item.title}`}
+									>
+										{#if archivingId === item.id}
+											<LoaderCircleIcon class="size-4 animate-spin" />
+										{:else}
+											<ArchiveIcon class="size-4" />
+										{/if}
+									</Button.Root>
+								</div>
 							{/if}
 						</div>
 
@@ -1110,17 +1233,24 @@
 					></iframe>
 				{:else}
 					<div class="relative h-full min-h-[70vh] w-full bg-white">
-						<iframe
-							src={getPdfPreviewUrl(activeItem, 'overlay')}
-							title={activeItem.title}
-							class="h-full min-h-[70vh] w-full bg-white"
-							onload={() => {
-								if (activeItem) {
-									setPdfFrameLoading(activeItem.id, 'overlay', false);
-								}
-							}}
-						></iframe>
-						{#if isPdfFrameLoading(activeItem.id, 'overlay')}
+						{#if isPdfFrameReady(activeItem.id) && !isPdfFrameError(activeItem.id)}
+							<iframe
+								src={getPdfFrameUrl(activeItem.id)}
+								title={activeItem.title}
+								class="h-full min-h-[70vh] w-full bg-white"
+								onload={() => {
+									if (activeItem) {
+										setPdfFrameLoading(activeItem.id, false);
+									}
+								}}
+								onerror={() => {
+									if (activeItem) {
+										setPdfFrameError(activeItem.id);
+									}
+								}}
+							></iframe>
+						{/if}
+						{#if isPdfFrameLoading(activeItem.id)}
 							<div class="absolute inset-0 flex items-center justify-center bg-white">
 								<div class="flex flex-col items-center gap-4 text-[#1F2B49]">
 									<div
@@ -1132,6 +1262,18 @@
 										<p class="text-base font-semibold">Loading PDF</p>
 										<p class="text-sm text-muted-foreground">
 											Please wait while the document opens.
+										</p>
+									</div>
+								</div>
+							</div>
+						{:else if isPdfFrameError(activeItem.id)}
+							<div class="absolute inset-0 flex items-center justify-center bg-white">
+								<div class="flex flex-col items-center gap-4 text-[#1F2B49]">
+									<FileTextIcon class="size-14 opacity-30" />
+									<div class="space-y-1 text-center">
+										<p class="text-base font-semibold">Unable to load PDF</p>
+										<p class="text-sm text-muted-foreground">
+											The document could not be displayed. Try again later.
 										</p>
 									</div>
 								</div>
