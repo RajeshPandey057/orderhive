@@ -59,6 +59,7 @@
 	let pdfFrameLoading = $state<Record<string, boolean>>({});
 	let pdfFrameError = $state<Record<string, boolean>>({});
 	let pdfFrameReady = $state<Record<string, boolean>>({});
+	let pdfFrameUrl = $state<Record<string, string>>({});
 
 	let addVideoOpen = $state(false);
 	let videoTitle = $state('');
@@ -153,6 +154,9 @@
 	onMount(() => {
 		function handleFullscreenChange() {
 			if (!document.fullscreenElement) {
+				if (activeItem?.itemType === 'pdf') {
+					revokePdfFrameUrl(activeItem.id);
+				}
 				activeItem = null;
 			}
 		}
@@ -207,12 +211,12 @@
 		thumbnailFailures = { ...thumbnailFailures, [itemId]: true };
 	}
 
-	function getPdfPreviewUrl(item: EducationVideo): string {
-		return `/api/education/assets/${item.id}#toolbar=0&navpanes=0&view=FitH`;
-	}
-
 	function getPdfFrameKey(itemId: string): string {
 		return `${itemId}:overlay`;
+	}
+
+	function getPdfFrameUrl(itemId: string): string {
+		return pdfFrameUrl[getPdfFrameKey(itemId)] ?? '';
 	}
 
 	function isPdfFrameLoading(itemId: string): boolean {
@@ -241,8 +245,18 @@
 		pdfFrameReady = { ...pdfFrameReady, [key]: false };
 	}
 
+	function revokePdfFrameUrl(itemId: string) {
+		const key = getPdfFrameKey(itemId);
+		const objectUrl = pdfFrameUrl[key];
+		if (objectUrl) {
+			URL.revokeObjectURL(objectUrl);
+			pdfFrameUrl = { ...pdfFrameUrl, [key]: '' };
+		}
+	}
+
 	function initPdfFrame(itemId: string) {
 		const key = getPdfFrameKey(itemId);
+		revokePdfFrameUrl(itemId);
 		pdfFrameLoading = { ...pdfFrameLoading, [key]: true };
 		pdfFrameError = { ...pdfFrameError, [key]: false };
 		pdfFrameReady = { ...pdfFrameReady, [key]: false };
@@ -251,17 +265,29 @@
 
 	async function validatePdfFrame(itemId: string) {
 		try {
-			const response = await fetch(`/api/education/assets/${itemId}`, { method: 'HEAD' });
+			const response = await fetch(`/api/education/assets/${itemId}`);
 			if (!response.ok) {
-				throw new Error(`PDF asset check failed with ${response.status}`);
+				throw new Error(`PDF asset request failed with ${response.status}`);
 			}
 
-			if (activeItem?.id !== itemId) return;
+			const contentType = response.headers.get('content-type') ?? '';
+			if (!contentType.toLowerCase().includes('application/pdf')) {
+				throw new Error(`PDF asset returned ${contentType || 'unknown content type'}`);
+			}
+
+			const blob = await response.blob();
+			const objectUrl = URL.createObjectURL(blob);
+
+			if (activeItem?.id !== itemId) {
+				URL.revokeObjectURL(objectUrl);
+				return;
+			}
 
 			const key = getPdfFrameKey(itemId);
+			pdfFrameUrl = { ...pdfFrameUrl, [key]: `${objectUrl}#toolbar=0&navpanes=0&view=FitH` };
 			pdfFrameReady = { ...pdfFrameReady, [key]: true };
 		} catch (err) {
-			console.error('[education] PDF asset check failed', { itemId, err });
+			console.error('[education] PDF asset request failed', { itemId, err });
 			if (activeItem?.id === itemId) {
 				setPdfFrameError(itemId);
 			}
@@ -552,6 +578,9 @@
 			}
 		}
 
+		if (activeItem?.itemType === 'pdf') {
+			revokePdfFrameUrl(activeItem.id);
+		}
 		activeItem = null;
 	}
 
@@ -1204,7 +1233,7 @@
 					<div class="relative h-full min-h-[70vh] w-full bg-white">
 						{#if isPdfFrameReady(activeItem.id) && !isPdfFrameError(activeItem.id)}
 							<iframe
-								src={getPdfPreviewUrl(activeItem)}
+								src={getPdfFrameUrl(activeItem.id)}
 								title={activeItem.title}
 								class="h-full min-h-[70vh] w-full bg-white"
 								onload={() => {
