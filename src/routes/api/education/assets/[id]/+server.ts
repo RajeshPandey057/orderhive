@@ -2,7 +2,6 @@ import { canAccessEducationModule } from '$lib/constants';
 import { educationVideosCollection } from '$lib/server/education';
 import { storage } from '$lib/server/firebase';
 import { error, type RequestHandler } from '@sveltejs/kit';
-import { Readable } from 'node:stream';
 
 type ResolvedEducationPdf = {
 	file: ReturnType<ReturnType<typeof storage.bucket>['file']>;
@@ -57,31 +56,14 @@ async function resolveEducationPdf(
 	const file = bucket.file(filePath);
 	const fileName = typeof data.fileName === 'string' && data.fileName ? data.fileName : `${id}.pdf`;
 	const encodedName = encodeURIComponent(fileName);
+	const headers = new Headers({
+		'Content-Type': 'application/pdf',
+		'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
+		'Cache-Control': 'private, no-store, max-age=0',
+		'X-Content-Type-Options': 'nosniff'
+	});
 
-	try {
-		const [metadata] = await file.getMetadata();
-		const headers = new Headers({
-			'Content-Type': 'application/pdf',
-			'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
-			'Cache-Control': 'private, no-store, max-age=0',
-			'X-Content-Type-Options': 'nosniff'
-		});
-
-		if (metadata.size) {
-			headers.set('Content-Length', String(metadata.size));
-		}
-
-		return { file, id, filePath, headers };
-	} catch (err) {
-		const stage = 'metadata';
-		console.error('[education/assets] storage lookup failed', { id, filePath, stage, err });
-
-		if (isStorageNotFound(err)) {
-			throw error(404, 'PDF file not found');
-		}
-
-		throw error(500, 'Unable to access PDF file');
-	}
+	return { file, id, filePath, headers };
 }
 
 export const HEAD: RequestHandler = async ({ params, locals }) => {
@@ -92,10 +74,19 @@ export const HEAD: RequestHandler = async ({ params, locals }) => {
 export const GET: RequestHandler = async ({ params, locals }) => {
 	const { file, id, filePath, headers } = await resolveEducationPdf(params, locals);
 
-	const readStream = file.createReadStream();
-	readStream.on('error', (err) => {
-		console.error('[education/assets] stream failed', { id, filePath, stage: 'stream', err });
-	});
+	try {
+		const [buffer] = await file.download();
+		headers.set('Content-Length', String(buffer.byteLength));
 
-	return new Response(Readable.toWeb(readStream) as ReadableStream<Uint8Array>, { headers });
+		return new Response(new Uint8Array(buffer), { headers });
+	} catch (err) {
+		const stage = 'download';
+		console.error('[education/assets] storage download failed', { id, filePath, stage, err });
+
+		if (isStorageNotFound(err)) {
+			throw error(404, 'PDF file not found');
+		}
+
+		throw error(500, 'Unable to download PDF file');
+	}
 };
