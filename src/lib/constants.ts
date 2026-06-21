@@ -35,6 +35,10 @@ export type DefaultRoute =
 const EDUCATION_ACCESS_ROLES: AccessType[] = [
 	'admin',
 	'agent',
+	'compliance',
+	'finance',
+	'general',
+	'hr-assignee',
 	'manager',
 	'senior-manager',
 	'super-admin'
@@ -87,15 +91,24 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 	compliance: [
 		'/compliance',
 		'/listing',
+		'/education',
 		'/dashboard',
 		'/profile',
 		'/my-attendance',
 		'/leave',
 		'/holidays'
 	],
-	finance: ['/finance', '/listing', '/dashboard', '/profile', '/my-attendance', '/leave'],
-	'hr-assignee': ['/hr', '/attendance', '/my-attendance', '/leave', '/holidays', '/profile'],
-	general: ['/general', '/profile', '/my-attendance', '/leave', '/holidays'],
+	finance: ['/finance', '/listing', '/education', '/dashboard', '/profile', '/my-attendance', '/leave'],
+	'hr-assignee': [
+		'/hr',
+		'/education',
+		'/attendance',
+		'/my-attendance',
+		'/leave',
+		'/holidays',
+		'/profile'
+	],
+	general: ['/general', '/education', '/profile', '/my-attendance', '/leave', '/holidays'],
 	'super-admin': [
 		'/admin',
 		'/agent',
@@ -171,6 +184,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Approved Sales', url: '/compliance/approved-sales' },
 		{ title: 'Invoices', url: '/compliance/invoices' },
 		{ title: "Next Month's Sales", url: '/compliance/next-months-sales' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' }
@@ -183,11 +197,13 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Approved Sales', url: '/finance/approved-sales' },
 		{ title: 'Invoices', url: '/finance/invoices' },
 		{ title: "Next Month's Sales", url: '/finance/next-months-sales' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' }
 	],
 	'hr-assignee': [
 		{ title: 'Employee Management', url: '/hr/employees' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'Attendance Record', url: '/attendance' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
@@ -195,6 +211,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	],
 	general: [
 		{ title: 'Dashboard', url: '/general/dashboard' },
+		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' }
