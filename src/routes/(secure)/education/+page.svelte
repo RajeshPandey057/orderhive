@@ -267,7 +267,10 @@
 		try {
 			const response = await fetch(`/api/education/assets/${itemId}`);
 			if (!response.ok) {
-				throw new Error(`PDF asset request failed with ${response.status}`);
+				const message = (await response.text()).trim();
+				throw new Error(
+					`PDF asset request failed with ${response.status}${message ? `: ${message}` : ''}`
+				);
 			}
 
 			const contentType = response.headers.get('content-type') ?? '';
