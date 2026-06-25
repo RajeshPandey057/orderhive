@@ -254,21 +254,27 @@
 	function selectAgent(key: number, agent: UserResult) {
 		const email = agent.email ?? '';
 		const name = agent.displayName ?? email;
-		splits = splits.map((s) =>
-			s.key === key
-				? {
-						...s,
-						agentId: agent.id,
-						agentEmail: email,
-						agentName: name,
-						agentPhotoURL: agent.photoURL ?? undefined,
-						managerEmail: (agent.reportingManagerEmail ?? '').trim(),
-						seniorManagerEmail: (agent.seniorManagerEmail ?? '').trim(),
-						managerName: (agent.reportingManagerEmail ?? '').trim(),
-						seniorManagerName: (agent.seniorManagerEmail ?? '').trim()
-					}
-				: s
-		);
+		splits = splits.map((s) => {
+			if (s.key !== key) return s;
+			// Preserve any already-selected manager/SM — only fill from agent profile if currently empty
+			const newManagerEmail = s.managerEmail?.trim()
+				? s.managerEmail
+				: (agent.reportingManagerEmail ?? '').trim();
+			const newSeniorManagerEmail = s.seniorManagerEmail?.trim()
+				? s.seniorManagerEmail
+				: (agent.seniorManagerEmail ?? '').trim();
+			return {
+				...s,
+				agentId: agent.id,
+				agentEmail: email,
+				agentName: name,
+				agentPhotoURL: agent.photoURL ?? undefined,
+				managerEmail: newManagerEmail,
+				seniorManagerEmail: newSeniorManagerEmail,
+				managerName: s.managerName?.trim() ? s.managerName : newManagerEmail,
+				seniorManagerName: s.seniorManagerName?.trim() ? s.seniorManagerName : newSeniorManagerEmail
+			};
+		});
 		agentPopoverOpen[key] = false;
 		onsplitschange?.(splits);
 	}

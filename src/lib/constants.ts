@@ -56,7 +56,8 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/attendance',
 		'/my-attendance',
 		'/leave',
-		'/holidays'
+		'/holidays',
+		'/agent/sales-tracker/edit'
 	],
 	agent: [
 		'/agent',

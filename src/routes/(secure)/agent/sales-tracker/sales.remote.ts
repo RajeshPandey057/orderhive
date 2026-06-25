@@ -46,6 +46,24 @@ function assertCanManageSales() {
 	return locals.user;
 }
 
+function assertCanUpdateSale() {
+	const { locals } = getRequestEvent();
+	if (!locals.user) throw error(401, 'Unauthorized');
+
+	const { role } = locals.user;
+	const canUpdate =
+		role === 'admin' ||
+		role === 'super-admin' ||
+		role === 'agent' ||
+		role === 'manager' ||
+		role === 'senior-manager';
+	if (!canUpdate) {
+		throw error(403, 'You do not have permission to update sales');
+	}
+
+	return locals.user;
+}
+
 // Define the schema for the sale form using Zod
 const buyerSchema = z.object({
 	firstName: z.string().min(1, 'First name is required'),
@@ -749,7 +767,7 @@ const resolveUploadedFile = async (
 };
 
 export const updateSale = form(updateSaleSchema, async (data) => {
-	assertCanManageSales();
+	const user = assertCanUpdateSale();
 
 	const timestamp = FieldValue.serverTimestamp();
 	const saleRef = firestore.collection('sales').doc(data.id);
@@ -945,7 +963,7 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		throw error(500, 'Unable to update sale right now. Please try again.');
 	}
 
-	redirect(303, '/agent/sales-tracker');
+	redirect(303, user.role === 'admin' ? '/admin/all-sales' : '/agent/sales-tracker');
 });
 
 const deleteSaleSchema = z.object({

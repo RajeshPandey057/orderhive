@@ -68,6 +68,10 @@
 
 	const canEditSale = $derived(userRole === 'admin' || userRole === 'super-admin');
 	const isFinanceRole = $derived(userRole === 'finance');
+	const isAgentRole = $derived(
+		userRole === 'agent' || userRole === 'manager' || userRole === 'senior-manager'
+	);
+	const canEditFields = $derived(canEditSale || isAgentRole);
 	let deleteDialogOpen = $state(false);
 	let isDeletingSale = $state(false);
 
@@ -198,7 +202,7 @@
 		}));
 	}
 
-	let dealSplits = $derived(initSplitsFromSale(sale));
+	let dealSplits = $state(initSplitsFromSale(sale));
 
 	const syncSplits = (splits: SplitEntry[]) => {
 		updateSale.fields.splits.set(
@@ -461,6 +465,7 @@
 		if (!sale?.id || prefillingSaleId === sale.id) return;
 
 		prefillingSaleId = sale.id;
+		dealSplits = initSplitsFromSale(sale);
 
 		updateSale.fields.id.set(sale.id);
 		updateSale.fields.firstName.set(sale.clientDetails.firstName);
@@ -552,13 +557,14 @@
 <div class="mx-auto w-full max-w-7xl p-4 sm:p-6">
 	<form
 		enctype="multipart/form-data"
-		{...updateSale.enhance(async ({ submit }) => {
+		{...updateSale.enhance(async (f) => {
 			try {
-				await submit();
-				// Server redirects on success — if we reach here, check for validation issues
+				await f.submit();
 				const issues = updateSale.fields.allIssues();
 				if (issues?.length) {
 					toast.error(issues[0]?.message || 'Please correct the highlighted fields');
+				} else {
+					toast.success('Sale updated successfully!');
 				}
 			} catch (err) {
 				const message = err instanceof Error ? err.message : '';
@@ -627,7 +633,7 @@
 								<Input
 									bind:value={clientFirstName}
 									placeholder="First Name"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								{#each updateSale.fields.firstName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -637,7 +643,7 @@
 								<Input
 									bind:value={clientLastName}
 									placeholder="Last Name"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								{#each updateSale.fields.lastName.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -648,7 +654,7 @@
 									bind:value={clientEmail}
 									type="email"
 									placeholder="Email"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								{#each updateSale.fields.email.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -663,7 +669,7 @@
 								bind:value={clientPhoneValue}
 								bind:country={clientPhoneCountry}
 								showCountrySelect={true}
-								disabled={!canEditSale}
+								disabled={!canEditFields}
 							/>
 						</Field.Field>
 						<input
@@ -682,7 +688,7 @@
 											class="w-full justify-start text-left font-normal"
 											id="sale-date"
 											type="button"
-											disabled={!canEditSale}
+											disabled={!canEditFields}
 										>
 											{#if saleDateValue}
 												{new Date(
@@ -735,7 +741,7 @@
 									id="nationality"
 									{...updateSale.fields.nationality?.as('text')}
 									placeholder="e.g. Indian"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 							</Field.Field>
 							<Field.Field>
@@ -750,7 +756,7 @@
 										updateSale.fields.residentStatus?.set(
 											(v || undefined) as 'resident' | 'non-resident' | undefined
 										)}
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								>
 									<Select.Trigger>
 										{#if updateSale.fields.residentStatus?.value() === 'resident'}
@@ -1040,7 +1046,7 @@
 								type="single"
 								value={updateSale.fields.saleType.value() ?? ''}
 								onValueChange={(v) => updateSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
-								disabled={!canEditSale}
+								disabled={!canEditFields}
 							>
 								<Select.Trigger id="dealype">
 									<div class="flex items-center gap-2">
@@ -1068,7 +1074,7 @@
 										role="combobox"
 										aria-expanded={developerPopoverOpen}
 										class="w-full justify-start gap-2"
-										disabled={!canEditSale}
+										disabled={!canEditFields}
 									>
 										<Hammer class="h-4 w-4" />
 										<span class="truncate">{developerLabel}</span>
@@ -1115,7 +1121,7 @@
 										role="combobox"
 										aria-expanded={communityPopoverOpen}
 										class="w-full justify-start gap-2"
-										disabled={!canEditSale}
+										disabled={!canEditFields}
 									>
 										<Home class="h-4 w-4" />
 										<span class="truncate">{communityLabel}</span>
@@ -1165,7 +1171,7 @@
 									updateSale.fields.propertyType.set(
 										v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
 									)}
-								disabled={!canEditSale}
+								disabled={!canEditFields}
 							>
 								<Select.Trigger id="propertyType">
 									<div class="flex items-center gap-2">
@@ -1200,7 +1206,7 @@
 												Parameters<typeof updateSale.fields.bedroomType.set>[0]
 											>
 										)}
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								>
 									<Select.Trigger id="bedroomType">
 										<div class="flex items-center gap-2">
@@ -1247,7 +1253,7 @@
 												Parameters<typeof updateSale.fields.bedroomType.set>[0]
 											>
 										)}
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								>
 									<Select.Trigger id="bedroomType">
 										<div class="flex items-center gap-2">
@@ -1304,7 +1310,7 @@
 									value={updateSale.fields.commercialSubType.value() ?? ''}
 									onValueChange={(v) =>
 										updateSale.fields.commercialSubType.set(v as 'office' | 'warehouse')}
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								>
 									<Select.Trigger id="commercialSubType">
 										<div class="flex items-center gap-2">
@@ -1379,7 +1385,7 @@
 								<InputGroup.Input
 									{...updateSale.fields.project.as('text')}
 									placeholder="Select Project"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								<InputGroup.Addon>
 									<Building />
@@ -1394,7 +1400,7 @@
 								<InputGroup.Input
 									{...updateSale.fields.unitNo.as('text')}
 									placeholder="Unit No"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								<InputGroup.Addon>
 									<Home />
@@ -1409,7 +1415,7 @@
 								<InputGroup.Input
 									{...updateSale.fields.unitValue.as('text')}
 									placeholder="Unit Value"
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								/>
 								<InputGroup.Addon>
 									<PriceTag />
@@ -1956,7 +1962,7 @@
 				<Field.Legend class="text-lg font-medium">Deal Owners</Field.Legend>
 				<OrderSplit
 					bind:splits={dealSplits}
-					disabled={!canEditSale}
+					disabled={!canEditFields}
 					onsplitschange={(s) => syncSplits(s)}
 				/>
 				{#each dealSplits as split, index (split.key)}
@@ -2007,14 +2013,14 @@
 									<Input
 										name={`jointBuyers[${index}].firstName`}
 										placeholder="First Name"
-										disabled={!canEditSale}
+										disabled={!canEditFields}
 									/>
 								</Field.Field>
 								<Field.Field>
 									<Input
 										name={`jointBuyers[${index}].lastName`}
 										placeholder="Last Name"
-										disabled={!canEditSale}
+										disabled={!canEditFields}
 									/>
 								</Field.Field>
 								<Field.Field>
@@ -2022,7 +2028,7 @@
 										name={`jointBuyers[${index}].email`}
 										placeholder="Email"
 										type="email"
-										disabled={!canEditSale}
+										disabled={!canEditFields}
 									/>
 								</Field.Field>
 							</div>
@@ -2032,7 +2038,7 @@
 									bind:value={jointBuyerPhoneValues[buyer.key]}
 									bind:country={jointBuyerPhoneCountries[buyer.key]}
 									showCountrySelect={true}
-									disabled={!canEditSale}
+									disabled={!canEditFields}
 								></PhoneInput>
 							</Field.Field>
 							<input
