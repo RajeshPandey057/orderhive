@@ -96,7 +96,14 @@
 	};
 
 	const canApproveReject = $derived(role === 'finance' || role === 'compliance');
-	const canEdit = $derived(role === 'admin' || role === 'super-admin');
+	const canEdit = $derived(
+		role === 'admin' ||
+			role === 'super-admin' ||
+			role === 'agent' ||
+			role === 'manager' ||
+			role === 'senior-manager'
+	);
+	const canDelete = $derived(role === 'admin' || role === 'super-admin');
 	let deleteDialogOpen = $state(false);
 	let isDeletingSale = $state(false);
 
@@ -565,6 +572,8 @@
 					<Button variant="outline" size="sm" onclick={openEditSale}>
 						<Pencil class="mr-2 h-4 w-4" /> Edit
 					</Button>
+				{/if}
+				{#if canDelete}
 					<Button
 						variant="outline"
 						size="sm"
