@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
 		createSvelteTable,
 		FlexRender,
-		renderComponent,
 		renderSnippet
 	} from '$lib/components/ui/data-table/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -19,7 +17,6 @@
 		type ColumnDef,
 		type ColumnFiltersState,
 		type PaginationState,
-		type RowSelectionState,
 		type SortingState,
 		type Updater,
 		type VisibilityState,
@@ -75,25 +72,112 @@
 	let detailSheetOpen = $state(false);
 	let selectedSale = $state<Sale | null>(null);
 
-	// Define columns
+	// Scroll sync between table and external scrollbar
+	let tableScrollEl = $state<HTMLDivElement | null>(null);
+	let externalScrollbarEl = $state<HTMLDivElement | null>(null);
+
+	$effect(() => {
+		const tbl = tableScrollEl;
+		const bar = externalScrollbarEl;
+		if (!tbl || !bar) return;
+
+		let syncing = false;
+		const syncFromBar = () => {
+			if (syncing) return;
+			syncing = true;
+			tbl.scrollLeft = bar.scrollLeft;
+			syncing = false;
+		};
+		const syncFromTable = () => {
+			if (syncing) return;
+			syncing = true;
+			bar.scrollLeft = tbl.scrollLeft;
+			syncing = false;
+		};
+
+		bar.addEventListener('scroll', syncFromBar, { passive: true });
+		tbl.addEventListener('scroll', syncFromTable, { passive: true });
+		return () => {
+			bar.removeEventListener('scroll', syncFromBar);
+			tbl.removeEventListener('scroll', syncFromTable);
+		};
+	});
+
+	function formatSaleDate(dateStr: string | undefined): string {
+		if (!dateStr) return '—';
+		const [year, month, day] = dateStr.slice(0, 10).split('-').map(Number);
+		const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+		return `${String(day).padStart(2, '0')}-${months[month - 1]}-${year}`;
+	}
+
+	function emailToName(email: string): string {
+		const local = email.split('@')[0];
+		return local
+			.split(/[._-]/)
+			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+			.join(' ');
+	}
+
+	function normaliseDisplayName(value: string): string {
+		if (!value || value === '—') return value;
+		return value.includes('@') ? emailToName(value) : value;
+	}
+
+	function truncate(str: string, max = 20): string {
+		return str.length > max ? str.slice(0, max) + '…' : str;
+	}
+
+	function getCallerName(sale: Sale): string {
+		const split = sale.splits?.find((s) => s.ownerRole === 'caller');
+		if (split?.agentName) return normaliseDisplayName(split.agentName);
+		const owner = sale.dealOwners?.find((o) => o.ownerRole === 'caller');
+		return owner?.name ? normaliseDisplayName(owner.name) : '—';
+	}
+
+	function getCallerPercentage(sale: Sale): string {
+		const split = sale.splits?.find((s) => s.ownerRole === 'caller');
+		if (split?.percentage != null) return `${split.percentage}%`;
+		const owner = sale.dealOwners?.find((o) => o.ownerRole === 'caller');
+		if (owner?.split != null) return `${owner.split}%`;
+		return '—';
+	}
+
+	function getCallerSeniorManager(sale: Sale): string {
+		const split = sale.splits?.find((s) => s.ownerRole === 'caller');
+		if (split?.seniorManagerEmail) return normaliseDisplayName(split.seniorManagerEmail);
+		return sale.callerSeniorManagerEmail
+			? normaliseDisplayName(sale.callerSeniorManagerEmail)
+			: '—';
+	}
+
+	function getDealStageLabel(stage: Sale['dealStage']): string {
+		if (stage === 'eoi') return 'EOI';
+		if (stage === 'booking') return 'Confirmed';
+		if (stage === 'cancelled') return 'Cancelled';
+		return stage;
+	}
+
+	function getDealStageBadgeColor(stage: Sale['dealStage']): string {
+		if (stage === 'eoi') return 'text-blue-700 bg-blue-100';
+		if (stage === 'booking') return 'text-green-700 bg-green-100';
+		if (stage === 'cancelled') return 'text-red-700 bg-red-100';
+		return DEFAULT_STATUS_BADGE;
+	}
+
+	// Define columns — sequence per spec
 	const columns: ColumnDef<Sale>[] = [
 		{
-			id: 'select',
-			header: ({ table }) =>
-				renderComponent(Checkbox, {
-					checked: table.getIsAllPageRowsSelected(),
-					indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
-					onCheckedChange: (value) => table.toggleAllPageRowsSelected(!!value),
-					'aria-label': 'Select all'
-				}),
-			cell: ({ row }) =>
-				renderComponent(Checkbox, {
-					checked: row.getIsSelected(),
-					onCheckedChange: (value) => row.toggleSelected(!!value),
-					'aria-label': 'Select row'
-				}),
-			enableSorting: false,
-			enableHiding: false
+			id: 'saleDate',
+			accessorKey: 'saleDate',
+			header: 'Sales Date',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ date: string }]>((getData) => {
+					const { date } = getData();
+					return { render: () => `<div class="whitespace-nowrap font-medium">${date}</div>` };
+				});
+				return renderSnippet(cellSnippet, { date: formatSaleDate(row.original.saleDate) });
+			},
+			enableSorting: true
 		},
 		{
 			accessorKey: 'id',
@@ -113,14 +197,53 @@
 					const { saleId } = getSaleId();
 					return {
 						render: () =>
-							`<div class="font-mono text-sm font-semibold text-primary">${saleId}</div>`
+							`<div class="font-mono text-sm font-semibold text-primary whitespace-nowrap">${saleId}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, {
-					saleId: row.original.id
-				});
+				return renderSnippet(cellSnippet, { saleId: row.original.id });
 			},
 			enableSorting: true
+		},
+		{
+			id: 'seniorManagerOfCaller',
+			header: 'Sr. Manager (Caller)',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ full: string; display: string }]>((getData) => {
+					const { full, display } = getData();
+					return {
+						render: () =>
+							`<div class="text-sm whitespace-nowrap" title="${full}">${display}</div>`
+					};
+				});
+				const full = getCallerSeniorManager(row.original);
+				return renderSnippet(cellSnippet, { full, display: truncate(full) });
+			}
+		},
+		{
+			id: 'caller',
+			header: 'Caller',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ full: string; display: string }]>((getData) => {
+					const { full, display } = getData();
+					return {
+						render: () =>
+							`<div class="font-medium whitespace-nowrap" title="${full}">${display}</div>`
+					};
+				});
+				const full = getCallerName(row.original);
+				return renderSnippet(cellSnippet, { full, display: truncate(full) });
+			}
+		},
+		{
+			id: 'callerPercentage',
+			header: 'Caller %',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ value: string }]>((getData) => {
+					const { value } = getData();
+					return { render: () => `<div class="text-center font-medium">${value}</div>` };
+				});
+				return renderSnippet(cellSnippet, { value: getCallerPercentage(row.original) });
+			}
 		},
 		{
 			accessorKey: 'client',
@@ -130,21 +253,21 @@
 						<button class="flex items-center gap-1 font-medium hover:text-foreground">
 							Client
 							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
- </button>
+						</button>
 					`
 				}));
 				return renderSnippet(headerSnippet);
 			},
 			cell: ({ row }) => {
-				const cellSnippet = createRawSnippet<[{ client: string }]>((getClient) => {
-					const { client } = getClient();
+				const cellSnippet = createRawSnippet<[{ full: string; display: string }]>((getData) => {
+					const { full, display } = getData();
 					return {
-						render: () => `<div class="font-medium">${client}</div>`
+						render: () =>
+							`<div class="font-medium whitespace-nowrap" title="${full}">${display}</div>`
 					};
 				});
-				return renderSnippet(cellSnippet, {
-					client: `${row.original.clientDetails.firstName} ${row.original.clientDetails.lastName}`
-				});
+				const full = `${row.original.clientDetails.firstName} ${row.original.clientDetails.lastName}`;
+				return renderSnippet(cellSnippet, { full, display: truncate(full) });
 			}
 		},
 		{
@@ -153,8 +276,8 @@
 				const headerSnippet = createRawSnippet(() => ({
 					render: () => `
 						<div class="flex items-start gap-1">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><!-- Icon from Lucide by Lucide Contributors - https://github.com/lucide-icons/lucide/blob/main/LICENSE --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>							
-							<span>Property</span>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>
+							<span>Developer &amp; Property</span>
 						</div>
 					`
 				}));
@@ -167,8 +290,8 @@
 						return {
 							render: () => `
 							<div>
-								<div class="font-medium">${property}</div>
-								<div class="text-sm text-muted-foreground">${location}</div>
+								<div class="font-medium whitespace-nowrap">${property}</div>
+								<div class="text-sm text-muted-foreground whitespace-nowrap">${location}</div>
 							</div>
 						`
 						};
@@ -186,9 +309,9 @@
 				const headerSnippet = createRawSnippet(() => ({
 					render: () => `
 						<button class="flex items-center gap-1 font-medium hover:text-foreground">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><!-- Icon from Lucide by Lucide Contributors - https://github.com/lucide-icons/lucide/blob/main/LICENSE --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></g></svg>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></g></svg>
 							<span>Unit Value</span>
- 						</button>
+						</button>
 					`
 				}));
 				return renderSnippet(headerSnippet);
@@ -198,9 +321,7 @@
 				const cellSnippet = createRawSnippet<[{ value: number }]>((getValue) => {
 					const { value } = getValue();
 					const formatted = wholeNumberFormatter.format(value);
-					return {
-						render: () => `<div class="font-medium">${formatted}</div>`
-					};
+					return { render: () => `<div class="font-medium text-right">${formatted}</div>` };
 				});
 				return renderSnippet(cellSnippet, {
 					value: Number(String(row.original.unitValue ?? '').replace(/,/g, ''))
@@ -208,63 +329,15 @@
 			}
 		},
 		{
-			accessorKey: 'dealStatus',
-			header: 'Deal Status',
+			id: 'commissionPercentage',
+			header: 'Commission %',
 			cell: ({ row }) => {
-				const status =
-					row.original.dealStage === 'cancelled' ? 'Cancelled Deal' : row.original.dealStage;
-				const payment = row.original.paymentValue;
-
-				const cellSnippet = createRawSnippet<[{ status: string; payment: number }]>((getData) => {
-					const { status, payment } = getData();
-					const badgeColor = getDealStatusBadgeColor(status);
-					const badgeLabel = getDealStatusLabel(status);
-					return {
-						render: () => `
-							<div>
-								<div class="font-medium">${status}</div>
-								<div class="text-sm text-muted-foreground">${payment}% Paid</div>
-								<div class="mt-1.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${badgeColor}">
-									${badgeLabel}
-								</div>
-							</div>
-						`
-					};
+				const cellSnippet = createRawSnippet<[{ value: string }]>((getData) => {
+					const { value } = getData();
+					return { render: () => `<div class="text-center font-medium">${value}</div>` };
 				});
-				return renderSnippet(cellSnippet, { status, payment });
-			}
-		},
-		{
-			accessorKey: 'invoicingStage',
-			header: 'Invoicing Stage',
-			cell: ({ row }) => {
-				const stage = row.original.paymentValue >= 10 ? 'First half' : 'Second half';
-				const payment = `10% + 4% paid`;
-				const status =
-					row.original.paymentValue === 100
-						? 'Approved'
-						: row.original.paymentValue > 50
-							? 'Review'
-							: 'Next Month';
-
-				const cellSnippet = createRawSnippet<[{ stage: string; payment: string; status: string }]>(
-					(getData) => {
-						const { stage, payment, status } = getData();
-						const badgeColor = getInvoiceStatusBadgeColor(status);
-						return {
-							render: () => `
-							<div>
-								<div class="font-medium">${stage}</div>
-								<div class="text-sm text-muted-foreground">${payment}</div>
-								<div class="mt-1.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${badgeColor}">
-									${status}
-								</div>
-							</div>
-						`
-						};
-					}
-				);
-				return renderSnippet(cellSnippet, { stage, payment, status });
+				const pct = row.original.commissionPercentage;
+				return renderSnippet(cellSnippet, { value: pct != null ? `${pct}%` : '—' });
 			}
 		},
 		{
@@ -285,12 +358,84 @@
 				const cellSnippet = createRawSnippet<[{ value: number }]>((getValue) => {
 					const { value } = getValue();
 					const formatted = wholeNumberFormatter.format(value);
+					return { render: () => `<div class="text-right font-medium">${formatted}</div>` };
+				});
+				return renderSnippet(cellSnippet, { value: getEffectiveSaleRevenue(row.original) });
+			}
+		},
+		{
+			id: 'passback',
+			header: 'Passback',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ value: string }]>((getData) => {
+					const { value } = getData();
+					return { render: () => `<div class="text-right font-medium">${value}</div>` };
+				});
+				const amt = row.original.passbackAmount;
+				return renderSnippet(cellSnippet, {
+					value: amt != null ? wholeNumberFormatter.format(amt) : '—'
+				});
+			}
+		},
+		{
+			id: 'revenuePostPassback',
+			header: 'Revenue Post Passback',
+			cell: ({ row }) => {
+				const cellSnippet = createRawSnippet<[{ value: string }]>((getData) => {
+					const { value } = getData();
+					return { render: () => `<div class="text-right font-medium">${value}</div>` };
+				});
+				const amt = row.original.revenueAfterPassback;
+				return renderSnippet(cellSnippet, {
+					value: amt != null ? wholeNumberFormatter.format(amt) : '—'
+				});
+			}
+		},
+		{
+			accessorKey: 'dealStatus',
+			header: 'Deal Status',
+			cell: ({ row }) => {
+				const status =
+					row.original.dealStage === 'cancelled' ? 'Cancelled Deal' : row.original.dealStage;
+				const payment = row.original.paymentValue;
+
+				const cellSnippet = createRawSnippet<[{ status: string; payment: number }]>((getData) => {
+					const { status, payment } = getData();
+					const badgeColor = getDealStatusBadgeColor(status);
+					const badgeLabel = getDealStatusLabel(status);
 					return {
-						render: () => `<div class="text-right font-medium">${formatted}</div>`
+						render: () => `
+							<div>
+								<div class="font-medium whitespace-nowrap">${status}</div>
+								<div class="text-sm text-muted-foreground">${payment}% Paid</div>
+								<div class="mt-1.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${badgeColor}">
+									${badgeLabel}
+								</div>
+							</div>
+						`
+					};
+				});
+				return renderSnippet(cellSnippet, { status, payment });
+			}
+		},
+		{
+			id: 'dealStage',
+			header: 'Deal Stage',
+			cell: ({ row }) => {
+				const stage = row.original.dealStage;
+				const cellSnippet = createRawSnippet<[{ label: string; color: string }]>((getData) => {
+					const { label, color } = getData();
+					return {
+						render: () => `
+							<div class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${color}">
+								${label}
+							</div>
+						`
 					};
 				});
 				return renderSnippet(cellSnippet, {
-					value: getEffectiveSaleRevenue(row.original)
+					label: getDealStageLabel(stage),
+					color: getDealStageBadgeColor(stage)
 				});
 			}
 		}
@@ -301,7 +446,6 @@
 	let sorting = $state<SortingState>([{ id: 'id', desc: true }]);
 	let columnFilters = $state<ColumnFiltersState>([]);
 	let columnVisibility = $state<VisibilityState>({});
-	let rowSelection = $state<RowSelectionState>({});
 	let globalFilter = $state('');
 
 	// Date filter
@@ -491,13 +635,6 @@
 				columnVisibility = updater;
 			}
 		},
-		onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
-			if (typeof updater === 'function') {
-				rowSelection = updater(rowSelection);
-			} else {
-				rowSelection = updater;
-			}
-		},
 		state: {
 			get pagination() {
 				return pagination;
@@ -510,121 +647,101 @@
 			},
 			get columnVisibility() {
 				return columnVisibility;
-			},
-			get rowSelection() {
-				return rowSelection;
 			}
 		}
 	});
 </script>
 
 <div class="w-full space-y-4">
-	<!-- Filters and search bar -->
-	<div class="rounded-lg border bg-card/60 p-3 shadow-sm">
-		<div class="flex flex-col gap-3">
-			<div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-				<div class="relative w-full xl:max-w-xl">
-				<Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+	<!-- Filters — compact single row -->
+	<div class="rounded-lg border bg-card/60 px-3 py-2 shadow-sm">
+		<div class="flex flex-wrap items-center gap-2">
+
+			<!-- Search — left -->
+			<div class="relative shrink-0">
+				<Search class="absolute top-2 left-2 h-3.5 w-3.5 text-muted-foreground" />
 				<Input
-					placeholder="Search sale ID, client, or property..."
+					placeholder="Search sale ID, client, property..."
 					value={globalFilter}
-					oninput={(e) => {
-						globalFilter = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					onchange={(e) => {
-						globalFilter = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					class="pl-8"
+					oninput={(e) => { globalFilter = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					onchange={(e) => { globalFilter = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					class="h-8 w-[220px] pl-7 text-xs"
 				/>
 			</div>
 
-				<div class="flex flex-wrap items-center gap-2 xl:justify-end">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} variant="outline" size="sm" class="h-9 shrink-0 gap-1">
-								Columns
-								<ChevronDown class="h-4 w-4 opacity-50" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-36">
-						{#each table.getAllColumns().filter((col) => col.getCanHide()) as column (column.id)}
-							<DropdownMenu.CheckboxItem
-								class="capitalize"
-								bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
-							>
-								{column.id}
-							</DropdownMenu.CheckboxItem>
-						{/each}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+			<!-- Divider -->
+			<div class="h-5 w-px bg-border shrink-0"></div>
 
-				<Button
-					variant={dateFilter === 'this-month' ? 'default' : 'outline'}
-					size="sm"
-					class="h-9 shrink-0 gap-2"
-					onclick={() => {
-						dateFilter = dateFilter === 'this-month' ? 'all' : 'this-month';
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
+			<!-- Date range -->
+			<div class="flex items-center gap-1 shrink-0">
+				<Calendar class="h-3.5 w-3.5 text-primary shrink-0" />
+				<Input
+					type="date"
+					aria-label="Sale date from"
+					value={saleDateFrom}
+					max={saleDateTo || undefined}
+					oninput={(e) => { saleDateFrom = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					onchange={(e) => { saleDateFrom = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					class="date-input h-8 w-[148px] text-xs"
+				/>
+				<span class="text-xs text-muted-foreground">–</span>
+				<Input
+					type="date"
+					aria-label="Sale date to"
+					value={saleDateTo}
+					min={saleDateFrom || undefined}
+					oninput={(e) => { saleDateTo = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					onchange={(e) => { saleDateTo = e.currentTarget.value; pagination = { ...pagination, pageIndex: 0 }; }}
+					class="date-input h-8 w-[148px] text-xs"
+				/>
+			</div>
+
+			<!-- Divider -->
+			<div class="h-5 w-px bg-border shrink-0"></div>
+
+			<!-- Tab pills: All | This Month | Most Recent -->
+			<div class="flex items-center rounded-md border bg-muted/50 p-0.5 gap-0.5 shrink-0 text-sm">
+				<button
+					class="rounded px-2.5 py-1 transition-colors {dateFilter === 'all' && orderSort === 'default' ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => { dateFilter = 'all'; orderSort = 'default'; sorting = [{ id: 'id', desc: true }]; pagination = { ...pagination, pageIndex: 0 }; }}
 				>
-					<Calendar class="h-4 w-4" />
+					All <span class="ml-1 text-xs font-normal tabular-nums">{table.getFilteredRowModel().rows.length}</span>
+				</button>
+				<button
+					class="rounded px-2.5 py-1 transition-colors {dateFilter === 'this-month' ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => { dateFilter = dateFilter === 'this-month' ? 'all' : 'this-month'; pagination = { ...pagination, pageIndex: 0 }; }}
+				>
 					This Month
-				</Button>
-
-				<Button
-					variant={orderSort === 'most-recent' ? 'default' : 'outline'}
-					size="sm"
-					class="h-9 shrink-0 gap-2"
+				</button>
+				<button
+					class="rounded px-2.5 py-1 transition-colors {orderSort === 'most-recent' ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
 					onclick={setMostRecentSort}
 				>
 					Most Recent
-				</Button>
-
-				{#if hasActiveFilters}
-					<Button variant="ghost" size="sm" class="h-9" onclick={resetFilters}>
-						Clear filters
-					</Button>
-				{/if}
-			</div>
+				</button>
 			</div>
 
-			<!-- Column-specific filters -->
-			<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(170px,0.8fr)_minmax(310px,1.2fr)_minmax(220px,1fr)_minmax(160px,0.75fr)]">
+			<!-- Divider -->
+			<div class="h-5 w-px bg-border shrink-0"></div>
+
+			<!-- Dropdown filters -->
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
-							<span class="truncate">{selectedDeveloperLabel}</span>
-							{#if developerFilter}
-								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-									1
-								</span>
-							{/if}
-							<ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
+						<Button {...props} variant="outline" size="sm" class="h-8 shrink-0 gap-1 text-xs">
+							<span class="truncate max-w-[110px]">{selectedDeveloperLabel}</span>
+							{#if developerFilter}<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>{/if}
+							<ChevronDown class="h-3.5 w-3.5 shrink-0 opacity-50" />
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start" class="max-h-80 w-64 overflow-y-auto">
-					<DropdownMenu.Item
-						onclick={() => {
-							developerFilter = '';
-							pagination = { ...pagination, pageIndex: 0 };
-						}}
-					>
+					<DropdownMenu.Item onclick={() => { developerFilter = ''; pagination = { ...pagination, pageIndex: 0 }; }}>
 						All Developers
 					</DropdownMenu.Item>
 					<DropdownMenu.Separator />
 					{#each developerOptions as developer (developer.value)}
-						<DropdownMenu.Item
-							onclick={() => {
-								developerFilter = developer.value;
-								pagination = { ...pagination, pageIndex: 0 };
-							}}
-						>
+						<DropdownMenu.Item onclick={() => { developerFilter = developer.value; pagination = { ...pagination, pageIndex: 0 }; }}>
 							{developer.label}
 						</DropdownMenu.Item>
 					{:else}
@@ -633,71 +750,23 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 
-			<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-				<Input
-					type="date"
-					aria-label="Sale date from"
-					value={saleDateFrom}
-					max={saleDateTo || undefined}
-					oninput={(e) => {
-						saleDateFrom = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					onchange={(e) => {
-						saleDateFrom = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					class="h-9 w-full min-w-0"
-				/>
-				<span class="text-sm text-muted-foreground">to</span>
-				<Input
-					type="date"
-					aria-label="Sale date to"
-					value={saleDateTo}
-					min={saleDateFrom || undefined}
-					oninput={(e) => {
-						saleDateTo = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					onchange={(e) => {
-						saleDateTo = e.currentTarget.value;
-						pagination = { ...pagination, pageIndex: 0 };
-					}}
-					class="h-9 w-full min-w-0"
-				/>
-			</div>
-
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
-							<span class="truncate">{selectedSeniorManagerLabel}</span>
-							{#if seniorManagerFilter}
-								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-									1
-								</span>
-							{/if}
-							<ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
+						<Button {...props} variant="outline" size="sm" class="h-8 shrink-0 gap-1 text-xs">
+							<span class="truncate max-w-[130px]">{selectedSeniorManagerLabel}</span>
+							{#if seniorManagerFilter}<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>{/if}
+							<ChevronDown class="h-3.5 w-3.5 shrink-0 opacity-50" />
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start" class="max-h-80 w-72 overflow-y-auto">
-					<DropdownMenu.Item
-						onclick={() => {
-							seniorManagerFilter = '';
-							pagination = { ...pagination, pageIndex: 0 };
-						}}
-					>
+					<DropdownMenu.Item onclick={() => { seniorManagerFilter = ''; pagination = { ...pagination, pageIndex: 0 }; }}>
 						All Senior Managers
 					</DropdownMenu.Item>
 					<DropdownMenu.Separator />
 					{#each seniorManagerOptions as seniorManager (seniorManager)}
-						<DropdownMenu.Item
-							onclick={() => {
-								seniorManagerFilter = seniorManager;
-								pagination = { ...pagination, pageIndex: 0 };
-							}}
-						>
+						<DropdownMenu.Item onclick={() => { seniorManagerFilter = seniorManager; pagination = { ...pagination, pageIndex: 0 }; }}>
 							{seniorManager}
 						</DropdownMenu.Item>
 					{:else}
@@ -709,57 +778,60 @@
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="h-9 w-full justify-between gap-1">
+						<Button {...props} variant="outline" size="sm" class="h-8 shrink-0 gap-1 text-xs">
 							Deal Status
-							{#if table.getColumn('dealStatus')?.getFilterValue()}
-								<span class="ml-1 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-									1
-								</span>
-							{/if}
-							<ChevronDown class="h-4 w-4 opacity-50" />
+							{#if table.getColumn('dealStatus')?.getFilterValue()}<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>{/if}
+							<ChevronDown class="h-3.5 w-3.5 opacity-50" />
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start">
-					<DropdownMenu.Item
-						onclick={() => {
-							table.getColumn('dealStatus')?.setFilterValue(undefined);
-							pagination = { ...pagination, pageIndex: 0 };
-						}}
-					>
-						All
-					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => { table.getColumn('dealStatus')?.setFilterValue(undefined); pagination = { ...pagination, pageIndex: 0 }; }}>All</DropdownMenu.Item>
 					<DropdownMenu.Separator />
-					<DropdownMenu.Item
-						onclick={() => {
-							table.getColumn('dealStatus')?.setFilterValue('EOI');
-							pagination = { ...pagination, pageIndex: 0 };
-						}}
-					>
-						EOI
-					</DropdownMenu.Item>
-					<DropdownMenu.Item
-						onclick={() => {
-							table.getColumn('dealStatus')?.setFilterValue('Booking');
-							pagination = { ...pagination, pageIndex: 0 };
-						}}
-					>
-						Booking
-					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => { table.getColumn('dealStatus')?.setFilterValue('EOI'); pagination = { ...pagination, pageIndex: 0 }; }}>EOI</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => { table.getColumn('dealStatus')?.setFilterValue('Booking'); pagination = { ...pagination, pageIndex: 0 }; }}>Booking</DropdownMenu.Item>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
-		</div>
 
-			<div class="flex justify-end text-sm text-muted-foreground">
-				{table.getFilteredSelectedRowModel().rows.length} of
-				{table.getFilteredRowModel().rows.length} row(s) {hasActiveFilters ? 'filtered' : 'total'}
-			</div>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="sm" class="h-8 shrink-0 gap-1 text-xs">
+							Columns
+							<ChevronDown class="h-3.5 w-3.5 opacity-50" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-40">
+					{#each table.getAllColumns().filter((col) => col.getCanHide()) as column (column.id)}
+						<DropdownMenu.CheckboxItem
+							class="capitalize"
+							bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
+						>
+							{column.id}
+						</DropdownMenu.CheckboxItem>
+					{/each}
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+
+			<!-- Spacer -->
+			<div class="flex-1 min-w-0"></div>
+
+			{#if hasActiveFilters}
+				<Button variant="outline" size="sm" class="h-8 text-xs shrink-0" onclick={resetFilters}>
+					Clear Filters
+				</Button>
+			{/if}
+
 		</div>
 	</div>
 
 	<!-- Data Table -->
-	<div class="rounded-md border bg-card">
-		<Table.Root>
+	<div
+		bind:this={tableScrollEl}
+		class="rounded-md border bg-card overflow-x-scroll table-scroll-hidden"
+	>
+		<Table.Root class="min-w-[1900px]">
 			<Table.Header>
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 					<Table.Row class="border-b bg-gray-200/40">
@@ -825,6 +897,14 @@
 		</Table.Root>
 	</div>
 
+	<!-- External horizontal scrollbar -->
+	<div
+		bind:this={externalScrollbarEl}
+		class="overflow-x-scroll external-scrollbar"
+	>
+		<div class="min-w-[1900px]" style="height: 1px;"></div>
+	</div>
+
 	<!-- Pagination -->
 
 	<Pagination.Root
@@ -861,3 +941,39 @@
 
 <!-- Detail Sheet -->
 <SaleDetailSheet bind:open={detailSheetOpen} bind:sale={selectedSale} {role} />
+
+<style>
+	:global(.table-scroll-hidden) {
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	:global(.table-scroll-hidden::-webkit-scrollbar) {
+		display: none;
+	}
+
+	:global(.external-scrollbar) {
+		scrollbar-width: thin;
+		scrollbar-color: #94a3b8 #e2e8f0;
+		height: 12px;
+	}
+	:global(.external-scrollbar::-webkit-scrollbar) {
+		height: 8px;
+	}
+	:global(.external-scrollbar::-webkit-scrollbar-track) {
+		background: #e2e8f0;
+		border-radius: 4px;
+	}
+	:global(.external-scrollbar::-webkit-scrollbar-thumb) {
+		background: #94a3b8;
+		border-radius: 4px;
+	}
+	:global(.external-scrollbar::-webkit-scrollbar-thumb:hover) {
+		background: #64748b;
+	}
+
+	/* Tint the native date picker calendar icon to match --primary (#142336) */
+	:global(.date-input::-webkit-calendar-picker-indicator) {
+		cursor: pointer;
+		filter: brightness(0) saturate(100%) invert(10%) sepia(39%) saturate(858%) hue-rotate(178deg) brightness(97%) contrast(100%);
+	}
+</style>
