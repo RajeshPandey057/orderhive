@@ -565,15 +565,15 @@
 			<form
 				enctype="multipart/form-data"
 				onkeydown={preventEnterSubmit}
-				{...createSale.enhance(async ({ form, submit }) => {
+				{...createSale.enhance(async (f) => {
 					try {
-						await submit();
+						await f.submit();
 
 						// Only reset and close if submission was successful (no validation errors)
 						const issues = createSale.fields.allIssues();
 						if (!issues?.length && createSale.result?.success) {
 							savedSale = createSale.result.sale as SavedSaleSummary;
-							form.reset();
+							f.element.reset();
 							resetDraftState();
 							toast.success(`Sale ${createSale.result.saleId} created successfully!`);
 						}

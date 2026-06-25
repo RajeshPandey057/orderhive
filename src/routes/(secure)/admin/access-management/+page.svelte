@@ -203,13 +203,13 @@
 					<Dialog.Title class="text-2xl font-semibold">Invite User</Dialog.Title>
 				</Dialog.Header>
 				<form
-					{...inviteUser.enhance(async ({ form, submit }) => {
+					{...inviteUser.enhance(async (f) => {
 						try {
-							await submit();
+							await f.submit();
 
 							const issues = inviteUser.fields.allIssues();
 							if (!issues?.length) {
-								form.reset();
+								f.element.reset();
 								dialogOpen = false;
 								toast.success('User invited successfully!');
 							}
@@ -361,7 +361,7 @@
 				<p class="text-sm text-destructive">Error: {rolesCollection.error.message}</p>
 			</div>
 		</div>
-	{:else if rolesCollection.empty}
+	{:else if rolesCollection.isEmpty}
 		<!-- Empty State -->
 		<div class="flex items-center justify-center py-12">
 			<div class="text-center">
@@ -469,13 +469,13 @@
 
 				<!-- Update Form -->
 				<form
-					{...updateUser.enhance(async ({ form, submit }) => {
+					{...updateUser.enhance(async (f) => {
 						try {
-							await submit();
+							await f.submit();
 
 							const issues = updateUser.fields.allIssues();
 							if (!issues?.length) {
-								form.reset();
+								f.element.reset();
 								editSheetOpen = false;
 								selectedRole = null;
 								toast.success('Access updated successfully!');

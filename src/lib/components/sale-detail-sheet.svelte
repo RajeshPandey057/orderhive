@@ -11,7 +11,7 @@
 	import { formatDateDDMmmYYYY } from '$lib/utils';
 	import { Badge } from '@/components/ui/badge';
 	import { Separator } from '@/components/ui/separator';
-	import { firekitDocMutations, firekitUploadTask, firekitUser } from 'svelte-firekit';
+	import { firekitMutations, firekitUploadTask, firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import ArrowLeft from '~icons/lucide/arrow-left';
 	import ChevronDown from '~icons/lucide/chevron-down';
@@ -151,16 +151,12 @@
 			const updateData: Record<string, unknown> = { passbackAmount: parsed };
 			if (revenueAfterPassback != null) updateData.revenueAfterPassback = revenueAfterPassback;
 
-			const result = await firekitDocMutations.update(`sales/${sale.id}`, updateData);
-			if (result.success) {
-				sale.passbackAmount = parsed;
-				if (revenueAfterPassback != null) sale.revenueAfterPassback = revenueAfterPassback;
-				sale = { ...sale };
-				toast.success('Passback amount updated');
-				editPassbackOpen = false;
-			} else {
-				toast.error(result.error?.message ?? 'Failed to update passback amount');
-			}
+			await firekitMutations.update(`sales/${sale.id}`, updateData);
+			sale.passbackAmount = parsed;
+			if (revenueAfterPassback != null) sale.revenueAfterPassback = revenueAfterPassback;
+			sale = { ...sale };
+			toast.success('Passback amount updated');
+			editPassbackOpen = false;
 		} catch {
 			toast.error('Failed to update passback amount');
 		} finally {
@@ -237,7 +233,7 @@
 				createdAt: new Date()
 			};
 
-			// Build updated comments array manually since arrayUnion doesn't work with firekitDocMutations
+			// Build updated comments array manually since arrayUnion doesn't work with firekitMutations
 			const updatedComments = [...(sale.commnets || []), newComment];
 
 			let updateData: Record<string, unknown>;
@@ -268,43 +264,38 @@
 				};
 			}
 
-			const result = await firekitDocMutations.update(`sales/${sale.id}`, updateData);
-
-			if (result.success) {
-				toast.success(
-					rejectFilePath ? 'Document rejected successfully' : 'Sale rejected successfully'
-				);
-				// Update local state
-				if (sale) {
-					if (rejectFilePath) {
-						// Update file status
-						const pathParts = rejectFilePath.split('.');
-						let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
-						for (let i = 0; i < pathParts.length - 1; i++) {
-							target = target[pathParts[i]] as Record<string, unknown>;
-						}
-						const file = target[pathParts[pathParts.length - 1]] as
-							| Record<string, unknown>
-							| undefined;
-						if (file) {
-							file[statusField] = 'rejected';
-						}
-					} else {
-						// Update sale status (invoicing stage)
-						if (statusField === 'financeStatus') {
-							sale.financeStatus = 'rejected';
-						} else {
-							sale.complianceStatus = 'rejected';
-						}
+			await firekitMutations.update(`sales/${sale.id}`, updateData);
+			toast.success(
+				rejectFilePath ? 'Document rejected successfully' : 'Sale rejected successfully'
+			);
+			// Update local state
+			if (sale) {
+				if (rejectFilePath) {
+					// Update file status
+					const pathParts = rejectFilePath.split('.');
+					let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+					for (let i = 0; i < pathParts.length - 1; i++) {
+						target = target[pathParts[i]] as Record<string, unknown>;
 					}
-					// Update comments in local state
-					sale.commnets = updatedComments as Sale['commnets'];
-					sale = { ...sale };
+					const file = target[pathParts[pathParts.length - 1]] as
+						| Record<string, unknown>
+						| undefined;
+					if (file) {
+						file[statusField] = 'rejected';
+					}
+				} else {
+					// Update sale status (invoicing stage)
+					if (statusField === 'financeStatus') {
+						sale.financeStatus = 'rejected';
+					} else {
+						sale.complianceStatus = 'rejected';
+					}
 				}
-				rejectDialogOpen = false;
-			} else {
-				toast.error(result.error?.message ?? 'Failed to reject document');
+				// Update comments in local state
+				sale.commnets = updatedComments as Sale['commnets'];
+				sale = { ...sale };
 			}
+			rejectDialogOpen = false;
 		} catch (error) {
 			toast.error('Failed to reject document');
 			console.error(error);
@@ -332,29 +323,23 @@
 				[statusField]: status
 			};
 
-			const result = await firekitDocMutations.update(`sales/${sale.id}`, {
+			await firekitMutations.update(`sales/${sale.id}`, {
 				[filePath]: updatedFile
 			});
-
-			if (result.success) {
-				toast.success(`Document ${status} successfully`);
-				// Update local state
-				const pathParts = filePath.split('.');
-				if (sale) {
-					let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
-					for (let i = 0; i < pathParts.length - 1; i++) {
-						target = target[pathParts[i]] as Record<string, unknown>;
-					}
-					const file = target[pathParts[pathParts.length - 1]] as
-						| Record<string, unknown>
-						| undefined;
-					if (file) {
-						file[statusField] = status;
-						sale = { ...sale };
-					}
+			toast.success(`Document ${status} successfully`);
+			// Update local state
+			if (sale) {
+				let target: Record<string, unknown> = sale as unknown as Record<string, unknown>;
+				for (let i = 0; i < pathParts.length - 1; i++) {
+					target = target[pathParts[i]] as Record<string, unknown>;
 				}
-			} else {
-				toast.error(result.error?.message ?? 'Failed to update status');
+				const file = target[pathParts[pathParts.length - 1]] as
+					| Record<string, unknown>
+					| undefined;
+				if (file) {
+					file[statusField] = status;
+					sale = { ...sale };
+				}
 			}
 		} catch (error) {
 			toast.error('Failed to update document status');
@@ -377,24 +362,19 @@
 		const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
 
 		try {
-			const result = await firekitDocMutations.update(`sales/${sale.id}`, {
+			await firekitMutations.update(`sales/${sale.id}`, {
 				[statusField]: status
 			});
-
-			if (result.success) {
-				const statusText = status === 'approved' ? 'approved' : 'marked as not eligible';
-				toast.success(`Sale ${statusText} successfully`);
-				// Update local state
-				if (sale) {
-					if (statusField === 'financeStatus') {
-						sale.financeStatus = status;
-					} else {
-						sale.complianceStatus = status;
-					}
-					sale = { ...sale };
+			const statusText = status === 'approved' ? 'approved' : 'marked as not eligible';
+			toast.success(`Sale ${statusText} successfully`);
+			// Update local state
+			if (sale) {
+				if (statusField === 'financeStatus') {
+					sale.financeStatus = status;
+				} else {
+					sale.complianceStatus = status;
 				}
-			} else {
-				toast.error(result.error?.message ?? 'Failed to update status');
+				sale = { ...sale };
 			}
 		} catch (error) {
 			toast.error('Failed to update sale status');
@@ -410,7 +390,7 @@
 			const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
 			try {
 				const currentInvoiceFile = sale.invoiceFile || {};
-				await firekitDocMutations.update(`sales/${sale.id}`, {
+				await firekitMutations.update(`sales/${sale.id}`, {
 					invoiceFile: {
 						...currentInvoiceFile,
 						[statusField]: 'pending'
@@ -433,7 +413,7 @@
 		if (status === 'raised' && sale?.id && sale?.invoiceFile?.downloadURL) {
 			const statusField = role === 'finance' ? 'financeStatus' : 'complianceStatus';
 			try {
-				await firekitDocMutations.update(`sales/${sale.id}`, {
+				await firekitMutations.update(`sales/${sale.id}`, {
 					invoiceFile: {
 						...sale.invoiceFile,
 						[statusField]: 'raised'
@@ -502,7 +482,7 @@
 				}
 			};
 
-			await firekitDocMutations.update(`sales/${sale.id}`, {
+			await firekitMutations.update(`sales/${sale.id}`, {
 				invoiceFile: invoiceFileData
 			});
 

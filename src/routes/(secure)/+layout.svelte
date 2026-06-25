@@ -3,11 +3,12 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { navigating } from '$app/state';
 	import { AuthGuard } from 'svelte-firekit';
+	import { goto } from '$app/navigation';
 
 	let { children, data } = $props();
 </script>
 
-<AuthGuard requireAuth={true} redirectTo="/">
+<AuthGuard requireAuth={true} onUnauthorized={() => goto('/')}>
 	<Sidebar.Provider open={false}>
 		<AppSidebar {data} />
 		<Sidebar.Inset>

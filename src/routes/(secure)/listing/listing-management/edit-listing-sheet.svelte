@@ -556,14 +556,14 @@
 	<Sheet.Content side="right" class="w-200 max-w-200 overflow-y-auto sm:w-200 sm:max-w-200">
 		<form
 			enctype="multipart/form-data"
-			{...updateListing.enhance(async ({ form, submit }) => {
+			{...updateListing.enhance(async (f) => {
 				if (!validate()) return;
 				saving = true;
 				try {
-					await submit();
+					await f.submit();
 					const issues = updateListing.fields.allIssues();
 					if (!issues?.length) {
-						form.reset();
+						f.element.reset();
 						open = false;
 						toast.success('Listing updated successfully');
 						await invalidateAll();

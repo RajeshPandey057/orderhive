@@ -523,16 +523,16 @@
 	<Sheet.Content side="right" class="w-200 max-w-200 overflow-y-auto sm:w-200 sm:max-w-200">
 		<form
 			enctype="multipart/form-data"
-			{...createListing.enhance(async ({ form, submit }) => {
+			{...createListing.enhance(async (f) => {
 				// Client-side pre-validation for instant UX feedback
 				if (!validate()) return;
 
 				saving = true;
 				try {
-					await submit();
+					await f.submit();
 					const issues = createListing.fields.allIssues();
 					if (!issues?.length) {
-						form.reset();
+						f.element.reset();
 						open = false;
 						toast.success('Property listing added');
 						resetForm();
