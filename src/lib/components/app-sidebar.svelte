@@ -30,7 +30,7 @@
 		'Team Management': LucideUsers,
 		'Employee Management': LucideUsers,
 		'Education Module': LucideGraduationCap,
-		'Pending Sales': LucideClipboardCheck,
+		'Pending Sales': LucideClock,
 		'Approved Sales': LucideClipboardCheck,
 		"Next Month's Sales": LucideCalendarClock,
 		'Holiday Calendar': LucideCalendarDays,

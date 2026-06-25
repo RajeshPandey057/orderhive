@@ -27,7 +27,7 @@ export type DefaultRoute =
 	| '/admin/finance-dashboard'
 	| '/agent/dashboard'
 	| '/compliance/dashboard'
-	| '/finance/dashboard'
+	| '/finance/pending-sales'
 	| '/hr/employees'
 	| '/general/dashboard'
 	| '/dashboard';
@@ -191,8 +191,6 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Holiday Calendar', url: '/holidays' }
 	],
 	finance: [
-		{ title: 'Finance Dashboard', url: '/finance/dashboard' },
-		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Pending Sales', url: '/finance/pending-sales' },
 		{ title: 'Approved Sales', url: '/finance/approved-sales' },
@@ -264,7 +262,7 @@ export function getDefaultRoute(role: AccessType): DefaultRoute {
 		case 'compliance':
 			return '/compliance/dashboard';
 		case 'finance':
-			return '/finance/dashboard';
+			return '/finance/pending-sales';
 		case 'hr-assignee':
 			return '/hr/employees';
 		case 'general':

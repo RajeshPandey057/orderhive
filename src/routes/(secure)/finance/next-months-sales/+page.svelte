@@ -23,7 +23,7 @@
 		<div class="flex items-center gap-2 px-4">
 			<Sidebar.Trigger class="-ms-1" />
 			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
-			<h1 class="text-2xl font-medium">Sales Tracker</h1>
+			<h1 class="text-2xl font-medium">Next Month's Sales</h1>
 		</div>
 		<AddSaleSheet />
 	</div>
