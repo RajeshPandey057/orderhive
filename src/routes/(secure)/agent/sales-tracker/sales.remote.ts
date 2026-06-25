@@ -547,12 +547,15 @@ export const createSale = form(saleSchema, async (data) => {
 
 const buyerUpdateSchema = z.object({
 	firstName: z.string().min(1, 'First name is required'),
-	lastName: z.string().min(1, 'Last name is required'),
-	email: z.email('Valid email is required'),
-	phone: z.string().min(10, 'Valid phone number is required'),
+	lastName: z.string().optional(),
+	email: z.string().optional(),
+	phone: z.string().optional(),
 	passportFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 	nationalIdFile: z.custom<File>((file) => !file || file instanceof File).optional(),
-	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional()
+	amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+	removePassportFile: z.string().optional(),
+	removeNationalIdFile: z.string().optional(),
+	removeAmlFormFile: z.string().optional()
 });
 
 const updateSaleSchema = z
@@ -660,7 +663,13 @@ const updateSaleSchema = z
 			.min(0, 'Commission % must be at least 0')
 			.max(100, 'Commission % cannot exceed 100')
 			.optional(),
-		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional()
+		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional(),
+		removePassportFile: z.string().optional(),
+		removeNationalIdFile: z.string().optional(),
+		removeAmlFormFile: z.string().optional(),
+		removeBookingFormFile: z.string().optional(),
+		removePaymentReceiptFile: z.string().optional(),
+		removeRefferalAgreementFile: z.string().optional()
 	})
 	.superRefine((data, ctx) => {
 		if (data.propertyType === 'apartment') {
@@ -760,8 +769,10 @@ type UploadedDoc = Awaited<ReturnType<typeof toUploadedFile>>;
 const resolveUploadedFile = async (
 	file: File | null | undefined,
 	path: string,
-	existing: UploadedDoc | null | undefined
+	existing: UploadedDoc | null | undefined,
+	remove = false
 ) => {
+	if (remove) return null;
 	const uploaded = await toUploadedFile(file, path);
 	return uploaded ?? existing ?? null;
 };
@@ -807,17 +818,20 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		resolveUploadedFile(
 			data.passportFile,
 			`${basePath}/primary/passport`,
-			existingClient.passportFile as UploadedDoc
+			existingClient.passportFile as UploadedDoc,
+			!!data.removePassportFile
 		),
 		resolveUploadedFile(
 			data.nationalIdFile,
 			`${basePath}/primary/national-id`,
-			existingClient.nationalIdFile as UploadedDoc
+			existingClient.nationalIdFile as UploadedDoc,
+			!!data.removeNationalIdFile
 		),
 		resolveUploadedFile(
 			data.amlFormFile,
 			`${basePath}/primary/aml-form`,
-			existingClient.amlFormFile as UploadedDoc
+			existingClient.amlFormFile as UploadedDoc,
+			!!data.removeAmlFormFile
 		)
 	]);
 
@@ -828,17 +842,20 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 				resolveUploadedFile(
 					buyer.passportFile,
 					`${basePath}/joint/${index}/passport`,
-					existingBuyer.passportFile as UploadedDoc
+					existingBuyer.passportFile as UploadedDoc,
+					!!buyer.removePassportFile
 				),
 				resolveUploadedFile(
 					buyer.nationalIdFile,
 					`${basePath}/joint/${index}/national-id`,
-					existingBuyer.nationalIdFile as UploadedDoc
+					existingBuyer.nationalIdFile as UploadedDoc,
+					!!buyer.removeNationalIdFile
 				),
 				resolveUploadedFile(
 					buyer.amlFormFile,
 					`${basePath}/joint/${index}/aml-form`,
-					existingBuyer.amlFormFile as UploadedDoc
+					existingBuyer.amlFormFile as UploadedDoc,
+					!!buyer.removeAmlFormFile
 				)
 			]);
 
@@ -858,17 +875,20 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		resolveUploadedFile(
 			data.bookingFormFile,
 			`${basePath}/booking-form`,
-			existingSale.bookingFormFile as UploadedDoc
+			existingSale.bookingFormFile as UploadedDoc,
+			!!data.removeBookingFormFile
 		),
 		resolveUploadedFile(
 			data.paymentReceiptFile,
 			`${basePath}/payment-receipt`,
-			existingSale.paymentReceiptFile as UploadedDoc
+			existingSale.paymentReceiptFile as UploadedDoc,
+			!!data.removePaymentReceiptFile
 		),
 		resolveUploadedFile(
 			data.refferalAgreementFile,
 			`${basePath}/referral-agreement`,
-			existingSale.refferalAgreementFile as UploadedDoc
+			existingSale.refferalAgreementFile as UploadedDoc,
+			!!data.removeRefferalAgreementFile
 		)
 	]);
 
@@ -906,9 +926,9 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		tentativeEligibilityDate: data.tentativeEligibilityDate || null,
 		clientDetails: {
 			firstName: data.firstName,
-			lastName: data.lastName,
-			email: data.email,
-			phone: data.phone,
+			lastName: data.lastName ?? '',
+			email: data.email ?? '',
+			phone: data.phone ?? '',
 			passportFile: primaryPassportFile,
 			nationalIdFile: primaryNationalIdFile,
 			amlFormFile: primaryAmlFormFile

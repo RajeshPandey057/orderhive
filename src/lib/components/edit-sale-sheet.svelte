@@ -301,8 +301,11 @@
 		}
 	};
 
+	let removedFiles = $state<Record<string, boolean>>({});
+
 	const removeFile = (fieldName: string) => {
 		uploadedFiles[fieldName] = null;
+		removedFiles[fieldName] = true;
 		const input = document.getElementById(fieldName) as HTMLInputElement;
 		if (input) input.value = '';
 	};
@@ -466,6 +469,7 @@
 
 		prefillingSaleId = sale.id;
 		dealSplits = initSplitsFromSale(sale);
+		removedFiles = {};
 
 		updateSale.fields.id.set(sale.id);
 		updateSale.fields.firstName.set(sale.clientDetails.firstName);
@@ -583,6 +587,12 @@
 		})}
 	>
 		<input type="hidden" {...updateSale.fields.id.as('text')} />
+		{#if removedFiles.passportFile}<input type="hidden" name="removePassportFile" value="true" />{/if}
+		{#if removedFiles.nationalIdFile}<input type="hidden" name="removeNationalIdFile" value="true" />{/if}
+		{#if removedFiles.amlFormFile}<input type="hidden" name="removeAmlFormFile" value="true" />{/if}
+		{#if removedFiles.bookingFormFile}<input type="hidden" name="removeBookingFormFile" value="true" />{/if}
+		{#if removedFiles.paymentReceiptFile}<input type="hidden" name="removePaymentReceiptFile" value="true" />{/if}
+		{#if removedFiles.refferalAgreementFile}<input type="hidden" name="removeRefferalAgreementFile" value="true" />{/if}
 		<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 			<h1 class="text-2xl font-medium">Edit Sale</h1>
 			<div class="flex flex-row gap-2">
