@@ -106,11 +106,11 @@
 	];
 
 	const adminSidebarModeDefaultRoutes: Record<AdminSidebarMode, string> = {
-		'control-panel': '/admin/dashboard',
-		'dashboard-panel': '/admin/aml-dashboard'
+		'control-panel': '/admin/all-sales',
+		'dashboard-panel': '/admin/finance-dashboard'
 	};
 
-	const adminDashboardPanelRoutes = new Set(['/admin/aml-dashboard']);
+	const adminDashboardPanelRoutes = new Set(['/admin/finance-dashboard', '/admin/aml-dashboard']);
 
 	let adminSidebarMode = $state<AdminSidebarMode>('control-panel');
 
@@ -195,13 +195,6 @@
 				title: 'Deals',
 				items: compact([
 					{
-						title: 'Sales Dashboard',
-						url: navMap.get('/admin/dashboard')?.url || '/admin/dashboard',
-						isActive: navMap.get('/admin/dashboard')?.isActive,
-						icon: navMap.get('/admin/dashboard')?.icon,
-						external: navMap.get('/admin/dashboard')?.external
-					},
-					{
 						title: 'All Sales/Deals',
 						url: navMap.get('/admin/all-sales')?.url || '/admin/all-sales',
 						isActive: navMap.get('/admin/all-sales')?.isActive,
@@ -265,7 +258,16 @@
 		return [
 			{
 				title: 'Dashboards',
-				items: compact([navMap.get('/admin/aml-dashboard')])
+				items: compact([
+					{
+						title: 'Finance Dashboard',
+						url: navMap.get('/admin/finance-dashboard')?.url || '/admin/finance-dashboard',
+						isActive: navMap.get('/admin/finance-dashboard')?.isActive,
+						icon: navMap.get('/admin/finance-dashboard')?.icon,
+						external: navMap.get('/admin/finance-dashboard')?.external
+					},
+					navMap.get('/admin/aml-dashboard')
+				])
 			}
 		];
 	});

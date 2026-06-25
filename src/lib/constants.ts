@@ -24,7 +24,7 @@ interface MenuItem {
 }
 
 export type DefaultRoute =
-	| '/admin/dashboard'
+	| '/admin/finance-dashboard'
 	| '/agent/dashboard'
 	| '/compliance/dashboard'
 	| '/finance/dashboard'
@@ -130,7 +130,7 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 // Menu items for each role
 const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	admin: [
-		{ title: 'Sales Dashboard', url: '/admin/dashboard' },
+		{ title: 'Finance Dashboard', url: '/admin/finance-dashboard' },
 		{ title: 'AML Dashboard', url: '/admin/aml-dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
@@ -145,7 +145,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Bulk Import', url: '/admin/bulk-import' }
 	],
 	agent: [
-		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Finance Dashboard', url: '/agent/dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Sales Tracker', url: '/agent/sales-tracker' },
@@ -156,7 +156,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	manager: [
-		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Finance Dashboard', url: '/agent/dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
@@ -167,7 +167,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Notifications', url: '/agent/notifications' }
 	],
 	'senior-manager': [
-		{ title: 'Dashboard', url: '/agent/dashboard' },
+		{ title: 'Finance Dashboard', url: '/agent/dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Team Sales', url: '/agent/sales-tracker' },
@@ -218,7 +218,7 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 		{ title: 'Holiday Calendar', url: '/holidays' }
 	],
 	'super-admin': [
-		{ title: 'Sales Dashboard', url: '/admin/dashboard' },
+		{ title: 'Sales Dashboard', url: '/admin/finance-dashboard' },
 		{ title: 'AML Dashboard', url: '/admin/aml-dashboard' },
 		{ title: 'Listing Management', url: '/listing/listing-management' },
 		{ title: 'View Listings', url: '/listing/view-listings' },
@@ -256,7 +256,7 @@ export function getDefaultRoute(role: AccessType): DefaultRoute {
 	switch (role) {
 		case 'admin':
 		case 'super-admin':
-			return '/admin/dashboard';
+			return '/admin/finance-dashboard';
 		case 'agent':
 		case 'manager':
 		case 'senior-manager':
