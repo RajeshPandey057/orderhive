@@ -158,7 +158,16 @@ export const UNIT_TYPES = [
 	'Others'
 ];
 
-export const BEDROOM_OPTIONS = ['Studio', '1 Bed', '2 Bed', '3 Bed', '4 Bed', '5 Bed', '6 Bed', '7 Bed'];
+export const BEDROOM_OPTIONS = [
+	'Studio',
+	'1 Bed',
+	'2 Bed',
+	'3 Bed',
+	'4 Bed',
+	'5 Bed',
+	'6 Bed',
+	'7 Bed'
+];
 
 export const PAYMENT_PLANS = [
 	'100%',
@@ -187,6 +196,24 @@ const slugifyOptionValue = (value: string) =>
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 
+export const normalizeOptionValue = (value: unknown, options: SelectOption[]) => {
+	if (typeof value !== 'string') return '';
+
+	const trimmed = value.trim();
+	if (!trimmed) return '';
+
+	const lowered = trimmed.toLowerCase();
+	const slugged = slugifyOptionValue(trimmed);
+	const match = options.find(
+		(option) =>
+			option.value.toLowerCase() === lowered ||
+			option.label.toLowerCase() === lowered ||
+			option.value === slugged
+	);
+
+	return match?.value ?? trimmed;
+};
+
 const uniqueOptions = (options: SelectOption[]) => {
 	const seen = new Set<string>();
 	return options.filter((option) => {
@@ -203,6 +230,11 @@ export const SALE_TYPE_OPTIONS: SelectOption[] = [
 	{ value: 'off-plan', label: 'Off Plan' },
 	{ value: 'secondary', label: 'Secondary' }
 ];
+
+export const normalizeSaleTypeValue = (value: unknown) => {
+	const normalized = normalizeOptionValue(value, SALE_TYPE_OPTIONS);
+	return SALE_TYPE_OPTIONS.some((option) => option.value === normalized) ? normalized : '';
+};
 
 const BASE_SALE_DEVELOPER_OPTIONS: SelectOption[] = [
 	{ value: 'al-wasl', label: 'Al Wasl' },
@@ -222,6 +254,7 @@ const BASE_SALE_DEVELOPER_OPTIONS: SelectOption[] = [
 	{ value: 'ellington', label: 'Ellington' },
 	{ value: 'emaar', label: 'Emaar' },
 	{ value: 'expo', label: 'Expo' },
+	{ value: 'imtiaz', label: 'Imtiaz' },
 	{ value: 'london-gate', label: 'London Gate' },
 	{ value: 'majid-al-futtaim', label: 'Majid Al Futtaim' },
 	{ value: 'meraas', label: 'Meraas' },
@@ -277,6 +310,32 @@ export const PROPERTY_TYPE_OPTIONS: SelectOption[] = [
 	{ value: 'commercial', label: 'Commercial' },
 	{ value: 'plot', label: 'Plot' }
 ];
+
+export const normalizeSaleDeveloperValue = (value: unknown) =>
+	normalizeOptionValue(value, SALE_DEVELOPER_OPTIONS);
+
+export const normalizePropertyTypeValue = (value: unknown) => {
+	const normalized = normalizeOptionValue(value, PROPERTY_TYPE_OPTIONS);
+	return PROPERTY_TYPE_OPTIONS.some((option) => option.value === normalized) ? normalized : '';
+};
+
+export const normalizeDealStageValue = (value: unknown) => {
+	if (typeof value !== 'string') return '';
+
+	const key = slugifyOptionValue(value);
+	const aliases: Record<string, 'eoi' | 'booking' | 'cancelled'> = {
+		eoi: 'eoi',
+		'expression-of-interest': 'eoi',
+		booking: 'booking',
+		'booking-stage': 'booking',
+		cancelled: 'cancelled',
+		'cancelled-deal': 'cancelled',
+		canceled: 'cancelled',
+		'canceled-deal': 'cancelled'
+	};
+
+	return aliases[key] ?? '';
+};
 
 export const APARTMENT_BEDROOM_OPTIONS: SelectOption[] = [
 	{ value: 'studio', label: 'Studio' },

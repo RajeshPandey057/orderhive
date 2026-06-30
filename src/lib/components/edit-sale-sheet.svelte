@@ -25,7 +25,11 @@
 		SALE_COMMUNITY_OPTIONS,
 		SALE_DEVELOPER_OPTIONS,
 		SALE_TYPE_OPTIONS,
-		TOWNHOUSE_VILLA_BEDROOM_OPTIONS
+		TOWNHOUSE_VILLA_BEDROOM_OPTIONS,
+		normalizeDealStageValue,
+		normalizePropertyTypeValue,
+		normalizeSaleDeveloperValue,
+		normalizeSaleTypeValue
 	} from '$lib/listing-options';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { parseDate, type DateValue } from '@internationalized/date';
@@ -46,6 +50,7 @@
 	import Traffic from '~icons/lucide/traffic-cone';
 	import Trash2 from '~icons/lucide/trash-2';
 	import X from '~icons/lucide/x';
+	import { untrack } from 'svelte';
 	import { deleteSale, updateSale } from '../../routes/(secure)/agent/sales-tracker/sales.remote';
 
 	type AMLTarget =
@@ -103,12 +108,32 @@
 	let popoverOpen = $state(false);
 	let developerPopoverOpen = $state(false);
 	let developerSearchValue = $state('');
+	let selectedSaleType = $state<string>(normalizeSaleTypeValue(sale?.saleType));
+	let selectedDeveloper = $state<string>(normalizeSaleDeveloperValue(sale?.developer));
+	let selectedCommunity = $state<string | undefined>(sale?.community ?? undefined);
+	let selectedDealStage = $state<string>(normalizeDealStageValue(sale?.dealStage));
+	let selectedPropertyType = $state<string>(normalizePropertyTypeValue(sale?.propertyType));
+
+	// Effective values: user selection takes precedence, prop value is always the fallback
+	const effectiveSaleType = $derived(selectedSaleType || normalizeSaleTypeValue(sale?.saleType));
+	const effectiveDeveloper = $derived(
+		selectedDeveloper || normalizeSaleDeveloperValue(sale?.developer)
+	);
+	const effectiveCommunity = $derived(selectedCommunity ?? sale?.community ?? undefined);
+	const effectiveDealStage = $derived(
+		selectedDealStage || normalizeDealStageValue(sale?.dealStage)
+	);
+	const effectivePropertyType = $derived(
+		selectedPropertyType || normalizePropertyTypeValue(sale?.propertyType)
+	);
+	const submittedDealStage = $derived(effectiveDealStage || sale?.dealStage || '');
+	const submittedPropertyType = $derived(effectivePropertyType || sale?.propertyType || '');
 
 	// Invoice stage checkbox states
-	let firstHalfChecked = $state(false);
-	let secondHalfChecked = $state(false);
-	let fullChecked = $state(false);
-	let notEligibleChecked = $state(false);
+	let firstHalfChecked = $state((sale?.invoiceStage ?? []).includes('first-half'));
+	let secondHalfChecked = $state((sale?.invoiceStage ?? []).includes('second-half'));
+	let fullChecked = $state((sale?.invoiceStage ?? []).includes('full'));
+	let notEligibleChecked = $state((sale?.invoiceStage ?? []).includes('not-yet-eligible'));
 
 	// Sync checkbox states with form field
 	$effect(() => {
@@ -252,12 +277,12 @@
 	let jointBuyerPhoneCountries = $state<Record<number, string>>({});
 	let jointBuyerPhoneValues = $state<Record<number, string>>({});
 	let clientPhoneCountry = $state<string>('AE');
-	let clientPhoneValue = $state<string>('');
+	let clientPhoneValue = $state<string>(sale?.clientDetails?.phone ?? '');
 
 	// Track client details for display
-	let clientFirstName = $state<string>('');
-	let clientLastName = $state<string>('');
-	let clientEmail = $state<string>('');
+	let clientFirstName = $state<string>(sale?.clientDetails?.firstName ?? '');
+	let clientLastName = $state<string>(sale?.clientDetails?.lastName ?? '');
+	let clientEmail = $state<string>(sale?.clientDetails?.email ?? '');
 
 	// Sync local client details to form fields
 	$effect(() => {
@@ -376,10 +401,10 @@
 	const commercialSubTypes = COMMERCIAL_SUB_TYPE_OPTIONS;
 
 	const saleTypeLabel = $derived(
-		saleTypes.find((d) => d.value === updateSale.fields.saleType.value())?.label ?? 'Sale Type'
+		saleTypes.find((d) => d.value === effectiveSaleType)?.label ?? 'Sale Type'
 	);
 	const developerLabel = $derived(
-		developers.find((d) => d.value === updateSale.fields.developer.value())?.label ?? 'Developer'
+		developers.find((d) => d.value === effectiveDeveloper)?.label ?? sale?.developer ?? 'Developer'
 	);
 	const filteredDevelopers = $derived(
 		developerSearchValue
@@ -396,11 +421,11 @@
 			: communities
 	);
 	const communityLabel = $derived(
-		communities.find((c) => c.value === updateSale.fields.community?.value())?.label ??
-			'Community (Optional)'
+		communities.find((c) => c.value === effectiveCommunity)?.label ?? 'Community (Optional)'
 	);
 	const propertyTypeLabel = $derived(
-		propertyTypes.find((p) => p.value === updateSale.fields.propertyType.value())?.label ??
+		propertyTypes.find((p) => p.value === effectivePropertyType)?.label ??
+			sale?.propertyType ??
 			'Property Type'
 	);
 	const bedroomTypeLabel = $derived(
@@ -465,96 +490,121 @@
 	let prefillingSaleId = $state<string | null>(null);
 
 	$effect(() => {
-		if (!sale?.id || prefillingSaleId === sale.id) return;
+		const saleId = sale?.id;
+		if (!saleId) return;
 
-		prefillingSaleId = sale.id;
-		dealSplits = initSplitsFromSale(sale);
-		removedFiles = {};
+		untrack(() => {
+			if (prefillingSaleId === saleId) return;
+			prefillingSaleId = saleId;
 
-		updateSale.fields.id.set(sale.id);
-		updateSale.fields.firstName.set(sale.clientDetails.firstName);
-		updateSale.fields.lastName.set(sale.clientDetails.lastName ?? '');
-		updateSale.fields.email.set(sale.clientDetails.email ?? '');
-		updateSale.fields.phone.set(sale.clientDetails.phone);
+			dealSplits = initSplitsFromSale(sale);
+			removedFiles = {};
 
-		// Set local variables for display
-		clientFirstName = sale.clientDetails.firstName;
-		clientLastName = sale.clientDetails.lastName ?? '';
-		clientEmail = sale.clientDetails.email ?? '';
-		clientPhoneValue = sale.clientDetails.phone;
+			updateSale.fields.id.set(sale.id);
+			updateSale.fields.firstName.set(sale.clientDetails.firstName);
+			updateSale.fields.lastName.set(sale.clientDetails.lastName ?? '');
+			updateSale.fields.email.set(sale.clientDetails.email ?? '');
+			updateSale.fields.phone.set(sale.clientDetails.phone);
 
-		updateSale.fields.dealStage.set(sale.dealStage);
-		updateSale.fields.paymentValue.set(sale.paymentValue);
-		updateSale.fields.invoiceStage.set(sale.invoiceStage ?? []);
-		firstHalfChecked = (sale.invoiceStage ?? []).includes('first-half');
-		secondHalfChecked = (sale.invoiceStage ?? []).includes('second-half');
-		fullChecked = (sale.invoiceStage ?? []).includes('full');
-		notEligibleChecked = (sale.invoiceStage ?? []).includes('not-yet-eligible');
+			// Set local variables for display
+			clientFirstName = sale.clientDetails.firstName;
+			clientLastName = sale.clientDetails.lastName ?? '';
+			clientEmail = sale.clientDetails.email ?? '';
+			clientPhoneValue = sale.clientDetails.phone;
 
-		updateSale.fields.saleType.set(sale.saleType);
-		updateSale.fields.developer.set(sale.developer);
-		updateSale.fields.project.set(sale.project);
-		updateSale.fields.community?.set(sale.community ?? undefined);
-		updateSale.fields.propertyType.set(sale.propertyType);
-		updateSale.fields.bedroomType.set(sale.bedroomType ?? undefined);
-		updateSale.fields.commercialSubType.set(sale.commercialSubType ?? undefined);
-		updateSale.fields.propertySize.set(sale.propertySize ?? undefined);
-		updateSale.fields.plotArea.set(sale.plotArea ?? undefined);
-		updateSale.fields.builtUpArea.set(sale.builtUpArea ?? undefined);
-		updateSale.fields.grossFloorArea.set(sale.grossFloorArea ?? undefined);
-		updateSale.fields.unitNo.set(sale.unitNo);
-		updateSale.fields.unitValue.set(sale.unitValue);
-		updateSale.fields.saleDate.set(sale.saleDate);
-		updateSale.fields.nationality?.set(sale.nationality ?? undefined);
-		updateSale.fields.residentStatus?.set(sale.residentStatus ?? undefined);
-		updateSale.fields.commissionPercentage.set(sale.commissionPercentage ?? undefined);
-		updateSale.fields.passbackAmount.set(sale.passbackAmount ?? undefined);
+			const normalizedDealStage = normalizeDealStageValue(sale.dealStage);
+			const normalizedSaleType = normalizeSaleTypeValue(sale.saleType);
+			const normalizedDeveloper = normalizeSaleDeveloperValue(sale.developer);
+			const normalizedPropertyType = normalizePropertyTypeValue(sale.propertyType);
 
-		if (sale.saleDate) {
-			saleDateValue = parseDate(sale.saleDate.slice(0, 10));
-		}
-		if (sale.tentativeEligibilityDate) {
-			tentativeEligibilityDate = parseDate(sale.tentativeEligibilityDate.slice(0, 10));
-		}
+			selectedDealStage = normalizedDealStage;
+			updateSale.fields.dealStage.set(
+				normalizedDealStage as 'eoi' | 'booking' | 'cancelled' | undefined
+			);
+			updateSale.fields.paymentValue.set(sale.paymentValue);
+			updateSale.fields.invoiceStage.set(sale.invoiceStage ?? []);
+			firstHalfChecked = (sale.invoiceStage ?? []).includes('first-half');
+			secondHalfChecked = (sale.invoiceStage ?? []).includes('second-half');
+			fullChecked = (sale.invoiceStage ?? []).includes('full');
+			notEligibleChecked = (sale.invoiceStage ?? []).includes('not-yet-eligible');
 
-		dealSplits = initSplitsFromSale(sale);
-		syncSplits(dealSplits);
+			selectedSaleType = normalizedSaleType;
+			updateSale.fields.saleType.set(normalizedSaleType as 'off-plan' | 'secondary' | undefined);
+			updateSale.fields.developer.set(normalizedDeveloper);
+			selectedDeveloper = normalizedDeveloper;
+			updateSale.fields.project.set(sale.project);
+			updateSale.fields.community?.set(sale.community ?? undefined);
+			selectedCommunity = sale.community ?? undefined;
+			selectedPropertyType = normalizedPropertyType;
+			updateSale.fields.propertyType.set(
+				normalizedPropertyType as
+					| 'apartment'
+					| 'townhouse'
+					| 'villa'
+					| 'commercial'
+					| 'plot'
+					| undefined
+			);
+			updateSale.fields.bedroomType.set(sale.bedroomType ?? undefined);
+			updateSale.fields.commercialSubType.set(sale.commercialSubType ?? undefined);
+			updateSale.fields.propertySize.set(sale.propertySize ?? undefined);
+			updateSale.fields.plotArea.set(sale.plotArea ?? undefined);
+			updateSale.fields.builtUpArea.set(sale.builtUpArea ?? undefined);
+			updateSale.fields.grossFloorArea.set(sale.grossFloorArea ?? undefined);
+			updateSale.fields.unitNo.set(sale.unitNo);
+			updateSale.fields.unitValue.set(sale.unitValue);
+			updateSale.fields.saleDate.set(sale.saleDate);
+			updateSale.fields.nationality?.set(sale.nationality ?? undefined);
+			updateSale.fields.residentStatus?.set(sale.residentStatus ?? undefined);
+			updateSale.fields.commissionPercentage.set(sale.commissionPercentage ?? undefined);
+			updateSale.fields.passbackAmount.set(sale.passbackAmount ?? undefined);
 
-		jointBuyers = sale.jointBuyers.map((_, index) => ({ key: index }));
-		nextJointKey = jointBuyers.length;
-		jointBuyerFiles = Object.fromEntries(
-			sale.jointBuyers.map((buyer, index) => [
-				index,
-				{
-					passportFile: toDisplayFile(buyer.passportFile),
-					nationalIdFile: toDisplayFile(buyer.nationalIdFile),
-					amlFormFile: toDisplayFile(buyer.amlFormFile)
-				}
-			])
-		);
-		jointBuyerPhoneCountries = Object.fromEntries(
-			sale.jointBuyers.map((_, index) => [index, 'AE'])
-		);
-		jointBuyerPhoneValues = Object.fromEntries(
-			sale.jointBuyers.map((buyer, index) => [index, buyer.phone ?? ''])
-		);
-		updateSale.fields.jointBuyers.set(
-			sale.jointBuyers.map((buyer) => ({
-				firstName: buyer.firstName,
-				lastName: buyer.lastName,
-				email: buyer.email,
-				phone: buyer.phone
-			}))
-		);
+			if (sale.saleDate) {
+				saleDateValue = parseDate(sale.saleDate.slice(0, 10));
+			}
+			if (sale.tentativeEligibilityDate) {
+				tentativeEligibilityDate = parseDate(sale.tentativeEligibilityDate.slice(0, 10));
+			}
 
-		uploadedFiles = {
-			passportFile: toDisplayFile(sale.clientDetails.passportFile),
-			nationalIdFile: toDisplayFile(sale.clientDetails.nationalIdFile),
-			amlFormFile: toDisplayFile(sale.clientDetails.amlFormFile),
-			bookingFormFile: toDisplayFile(sale.bookingFormFile),
-			paymentReceiptFile: toDisplayFile(sale.paymentReceiptFile),
-			refferalAgreementFile: toDisplayFile(sale.refferalAgreementFile)
-		};
+			dealSplits = initSplitsFromSale(sale);
+			syncSplits(dealSplits);
+
+			jointBuyers = sale.jointBuyers.map((_, index) => ({ key: index }));
+			nextJointKey = jointBuyers.length;
+			jointBuyerFiles = Object.fromEntries(
+				sale.jointBuyers.map((buyer, index) => [
+					index,
+					{
+						passportFile: toDisplayFile(buyer.passportFile),
+						nationalIdFile: toDisplayFile(buyer.nationalIdFile),
+						amlFormFile: toDisplayFile(buyer.amlFormFile)
+					}
+				])
+			);
+			jointBuyerPhoneCountries = Object.fromEntries(
+				sale.jointBuyers.map((_, index) => [index, 'AE'])
+			);
+			jointBuyerPhoneValues = Object.fromEntries(
+				sale.jointBuyers.map((buyer, index) => [index, buyer.phone ?? ''])
+			);
+			updateSale.fields.jointBuyers.set(
+				sale.jointBuyers.map((buyer) => ({
+					firstName: buyer.firstName,
+					lastName: buyer.lastName,
+					email: buyer.email,
+					phone: buyer.phone
+				}))
+			);
+
+			uploadedFiles = {
+				passportFile: toDisplayFile(sale.clientDetails.passportFile),
+				nationalIdFile: toDisplayFile(sale.clientDetails.nationalIdFile),
+				amlFormFile: toDisplayFile(sale.clientDetails.amlFormFile),
+				bookingFormFile: toDisplayFile(sale.bookingFormFile),
+				paymentReceiptFile: toDisplayFile(sale.paymentReceiptFile),
+				refferalAgreementFile: toDisplayFile(sale.refferalAgreementFile)
+			};
+		}); // end untrack
 	});
 </script>
 
@@ -587,12 +637,32 @@
 		})}
 	>
 		<input type="hidden" {...updateSale.fields.id.as('text')} />
-		{#if removedFiles.passportFile}<input type="hidden" name="removePassportFile" value="true" />{/if}
-		{#if removedFiles.nationalIdFile}<input type="hidden" name="removeNationalIdFile" value="true" />{/if}
+		{#if removedFiles.passportFile}<input
+				type="hidden"
+				name="removePassportFile"
+				value="true"
+			/>{/if}
+		{#if removedFiles.nationalIdFile}<input
+				type="hidden"
+				name="removeNationalIdFile"
+				value="true"
+			/>{/if}
 		{#if removedFiles.amlFormFile}<input type="hidden" name="removeAmlFormFile" value="true" />{/if}
-		{#if removedFiles.bookingFormFile}<input type="hidden" name="removeBookingFormFile" value="true" />{/if}
-		{#if removedFiles.paymentReceiptFile}<input type="hidden" name="removePaymentReceiptFile" value="true" />{/if}
-		{#if removedFiles.refferalAgreementFile}<input type="hidden" name="removeRefferalAgreementFile" value="true" />{/if}
+		{#if removedFiles.bookingFormFile}<input
+				type="hidden"
+				name="removeBookingFormFile"
+				value="true"
+			/>{/if}
+		{#if removedFiles.paymentReceiptFile}<input
+				type="hidden"
+				name="removePaymentReceiptFile"
+				value="true"
+			/>{/if}
+		{#if removedFiles.refferalAgreementFile}<input
+				type="hidden"
+				name="removeRefferalAgreementFile"
+				value="true"
+			/>{/if}
 		<div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
 			<h1 class="text-2xl font-medium">Edit Sale</h1>
 			<div class="flex flex-row gap-2">
@@ -1054,8 +1124,11 @@
 						<Field.Field id="saleType">
 							<Select.Root
 								type="single"
-								value={updateSale.fields.saleType.value() ?? ''}
-								onValueChange={(v) => updateSale.fields.saleType.set(v as 'off-plan' | 'secondary')}
+								value={effectiveSaleType}
+								onValueChange={(v) => {
+									updateSale.fields.saleType.set(v as 'off-plan' | 'secondary');
+									selectedSaleType = v;
+								}}
 								disabled={!canEditFields}
 							>
 								<Select.Trigger id="dealype">
@@ -1070,7 +1143,7 @@
 									{/each}
 								</Select.Content>
 							</Select.Root>
-							<input type="hidden" {...updateSale.fields.saleType.as('text')} />
+							<input type="hidden" name="saleType" value={effectiveSaleType} />
 							{#each updateSale.fields.saleType.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1104,6 +1177,7 @@
 														value={developer.value}
 														onSelect={() => {
 															updateSale.fields.developer.set(developer.value);
+															selectedDeveloper = developer.value;
 															developerPopoverOpen = false;
 															developerSearchValue = '';
 														}}
@@ -1116,7 +1190,7 @@
 									</Command.Root>
 								</Popover.Content>
 							</Popover.Root>
-							<input type="hidden" {...updateSale.fields.developer.as('text')} />
+							<input type="hidden" name="developer" value={effectiveDeveloper} />
 							{#each updateSale.fields.developer.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1151,6 +1225,7 @@
 														value={community.value}
 														onSelect={() => {
 															updateSale.fields.community?.set(community.value);
+															selectedCommunity = community.value;
 															communityPopoverOpen = false;
 															communitySearchValue = '';
 														}}
@@ -1163,7 +1238,9 @@
 									</Command.Root>
 								</Popover.Content>
 							</Popover.Root>
-							<input type="hidden" {...updateSale.fields.community?.as('text')} />
+							{#if effectiveCommunity}
+								<input type="hidden" name="community" value={effectiveCommunity} />
+							{/if}
 							{#each updateSale.fields.community?.issues() ?? [] as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1176,11 +1253,13 @@
 						<Field.Field id="propertyType">
 							<Select.Root
 								type="single"
-								value={updateSale.fields.propertyType.value() ?? ''}
-								onValueChange={(v) =>
+								value={effectivePropertyType}
+								onValueChange={(v) => {
 									updateSale.fields.propertyType.set(
 										v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
-									)}
+									);
+									selectedPropertyType = v;
+								}}
 								disabled={!canEditFields}
 							>
 								<Select.Trigger id="propertyType">
@@ -1195,7 +1274,7 @@
 									{/each}
 								</Select.Content>
 							</Select.Root>
-							<input type="hidden" {...updateSale.fields.propertyType.as('text')} />
+							<input type="hidden" name="propertyType" value={submittedPropertyType} />
 							{#each updateSale.fields.propertyType.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1205,7 +1284,7 @@
 					<!-- Conditional Fields Based on Property Type -->
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						<!-- Apartment Fields -->
-						{#if updateSale.fields.propertyType.value() === 'apartment'}
+						{#if effectivePropertyType === 'apartment'}
 							<Field.Field id="bedroomType">
 								<Select.Root
 									type="single"
@@ -1252,7 +1331,7 @@
 						{/if}
 
 						<!-- Townhouse/Villa Fields -->
-						{#if updateSale.fields.propertyType.value() === 'townhouse' || updateSale.fields.propertyType.value() === 'villa'}
+						{#if effectivePropertyType === 'townhouse' || effectivePropertyType === 'villa'}
 							<Field.Field id="bedroomType">
 								<Select.Root
 									type="single"
@@ -1313,7 +1392,7 @@
 						{/if}
 
 						<!-- Commercial Fields -->
-						{#if updateSale.fields.propertyType.value() === 'commercial'}
+						{#if effectivePropertyType === 'commercial'}
 							<Field.Field id="commercialSubType">
 								<Select.Root
 									type="single"
@@ -1372,7 +1451,7 @@
 						{/if}
 
 						<!-- Plot Fields -->
-						{#if updateSale.fields.propertyType.value() === 'plot'}
+						{#if effectivePropertyType === 'plot'}
 							<Field.Field>
 								<InputGroup.Root id="propertySize">
 									<InputGroup.Input
@@ -1524,8 +1603,9 @@
 				<Field.Group class="space-y-4">
 					<RadioGroup.Root
 						bind:value={
-							() => updateSale.fields.dealStage.value() ?? '',
+							() => effectiveDealStage,
 							(v) => {
+								selectedDealStage = v;
 								updateSale.fields.dealStage.set(v || undefined);
 								if (v === 'cancelled') updateSale.fields.paymentValue.set(0);
 							}
@@ -1543,7 +1623,7 @@
 										() => updateSale.fields.paymentValue.value() ?? 0,
 										(v) => updateSale.fields.paymentValue.set(Number(v) || 0)
 									}
-									disabled={updateSale.fields.dealStage.value() !== 'eoi'}
+									disabled={effectiveDealStage !== 'eoi'}
 								/>
 								<input class="sr-only" {...updateSale.fields.paymentValue.as('number')} />
 								{#each updateSale.fields.paymentValue.issues() as issue, i (i)}
@@ -1562,7 +1642,7 @@
 										() => updateSale.fields.paymentValue.value() ?? 0,
 										(v) => updateSale.fields.paymentValue.set(Number(v) || 0)
 									}
-									disabled={updateSale.fields.dealStage.value() !== 'booking'}
+									disabled={effectiveDealStage !== 'booking'}
 								/>
 								{#each updateSale.fields.paymentValue.issues() as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -1576,15 +1656,15 @@
 							</Field.Field>
 						</div>
 					</RadioGroup.Root>
-					<input class="sr-only" {...updateSale.fields.dealStage.as('text')} />
+					<input type="hidden" name="dealStage" value={submittedDealStage} />
 
 					<!-- File Uploads - Only show when a stage is selected -->
-					{#if updateSale.fields.dealStage.value() && updateSale.fields.dealStage.value() !== 'cancelled'}
+					{#if effectiveDealStage && effectiveDealStage !== 'cancelled'}
 						<div class="space-y-4 pt-2">
 							<Field.Field class="w-full">
 								{#if uploadedFiles.bookingFormFile}
 									<h3 class="text-sm font-medium">
-										{updateSale.fields.dealStage.value() === 'eoi' ? 'EOI Form' : 'Booking Form'}
+										{effectiveDealStage === 'eoi' ? 'EOI Form' : 'Booking Form'}
 									</h3>
 
 									<div
@@ -1615,9 +1695,7 @@
 									>
 										<Upload class="h-5 w-5 text-gray-600" />
 										<span class="text-sm font-medium">
-											{updateSale.fields.dealStage.value() === 'eoi'
-												? 'Upload EOI form'
-												: 'Upload booking form'}
+											{effectiveDealStage === 'eoi' ? 'Upload EOI form' : 'Upload booking form'}
 										</span>
 									</label>
 								{/if}

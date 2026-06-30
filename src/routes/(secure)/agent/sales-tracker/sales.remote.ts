@@ -1,5 +1,11 @@
 import { command, form, getRequestEvent } from '$app/server';
-import { SALE_DEVELOPER_OPTIONS } from '$lib/listing-options';
+import {
+	SALE_DEVELOPER_OPTIONS,
+	normalizeDealStageValue,
+	normalizePropertyTypeValue,
+	normalizeSaleDeveloperValue,
+	normalizeSaleTypeValue
+} from '$lib/listing-options';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -9,7 +15,20 @@ const VALID_SALE_DEVELOPERS = new Set(SALE_DEVELOPER_OPTIONS.map((option) => opt
 const saleDeveloperSchema = z
 	.string()
 	.min(1, 'Developer is required')
-	.refine((value) => VALID_SALE_DEVELOPERS.has(value), 'Please select a valid developer');
+	.refine(
+		(value) => VALID_SALE_DEVELOPERS.has(normalizeSaleDeveloperValue(value)),
+		'Please select a valid developer'
+	);
+const dealStageSchema = z
+	.string()
+	.refine((value) => Boolean(normalizeDealStageValue(value)), 'Deal stage is required');
+const saleTypeSchema = z
+	.string()
+	.refine((value) => Boolean(normalizeSaleTypeValue(value)), 'Deal type is required');
+const propertyTypeSchema = z
+	.string()
+	.refine((value) => Boolean(normalizePropertyTypeValue(value)), 'Property type is required');
+const optionalUpdateValueSchema = z.string().optional();
 
 // Ensure a role document exists for the given email; creates a minimal one if absent.
 async function ensureRoleExists(email: string): Promise<void> {
@@ -136,7 +155,7 @@ const saleSchema = z
 		// Joint Buyers (unlimited)
 		jointBuyers: z.array(buyerSchema).default([]),
 		// Deal Status
-		dealStage: z.enum(['eoi', 'booking', 'cancelled'], 'Deal stage is required'),
+		dealStage: dealStageSchema,
 		paymentValue: z
 			.number()
 			.min(0, 'Payment value must be at least 0')
@@ -169,14 +188,11 @@ const saleSchema = z
 				}
 			),
 		tentativeEligibilityDate: z.string().optional(),
-		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
+		saleType: saleTypeSchema,
 		developer: saleDeveloperSchema,
 		project: z.string().min(1, 'Project is required'),
 		community: z.string().optional(),
-		propertyType: z.enum(
-			['apartment', 'townhouse', 'villa', 'commercial', 'plot'],
-			'Property type is required'
-		),
+		propertyType: propertyTypeSchema,
 		bedroomType: z
 			.enum([
 				'studio',
@@ -215,8 +231,11 @@ const saleSchema = z
 		passbackAmount: z.number().min(0, 'Passback amount must be at least 0').optional()
 	})
 	.superRefine((data, ctx) => {
+		const propertyType = normalizePropertyTypeValue(data.propertyType);
+		const dealStage = normalizeDealStageValue(data.dealStage);
+
 		// Apartment validation
-		if (data.propertyType === 'apartment') {
+		if (propertyType === 'apartment') {
 			if (!data.bedroomType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -234,7 +253,7 @@ const saleSchema = z
 		}
 
 		// Townhouse/Villa validation
-		if (data.propertyType === 'townhouse' || data.propertyType === 'villa') {
+		if (propertyType === 'townhouse' || propertyType === 'villa') {
 			if (!data.bedroomType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -259,7 +278,7 @@ const saleSchema = z
 		}
 
 		// Commercial validation
-		if (data.propertyType === 'commercial') {
+		if (propertyType === 'commercial') {
 			if (!data.commercialSubType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -284,7 +303,7 @@ const saleSchema = z
 		}
 
 		// Plot validation
-		if (data.propertyType === 'plot') {
+		if (propertyType === 'plot') {
 			if (!data.propertySize) {
 				ctx.addIssue({
 					code: 'custom',
@@ -313,7 +332,7 @@ const saleSchema = z
 			}
 		}
 
-		if (data.dealStage !== 'cancelled') {
+		if (dealStage !== 'cancelled') {
 			if (!data.bookingFormFile || data.bookingFormFile.size <= 0) {
 				ctx.addIssue({
 					code: 'custom',
@@ -386,6 +405,10 @@ async function generateSaleId(): Promise<string> {
 
 export const createSale = form(saleSchema, async (data) => {
 	const timestamp = FieldValue.serverTimestamp();
+	const dealStage = normalizeDealStageValue(data.dealStage);
+	const saleType = normalizeSaleTypeValue(data.saleType);
+	const developer = normalizeSaleDeveloperValue(data.developer);
+	const propertyType = normalizePropertyTypeValue(data.propertyType);
 	const createdByUid = data.splits[0]?.agentId ?? 'unknown';
 	const createdByEmail = data.splits[0]?.agentEmail ?? null;
 
@@ -438,7 +461,7 @@ export const createSale = form(saleSchema, async (data) => {
 			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
 		}
 	}
-	if (data.dealStage === 'cancelled') {
+	if (dealStage === 'cancelled') {
 		revenueAchieved = 0;
 		revenueAfterPassback = 0;
 	}
@@ -490,16 +513,16 @@ export const createSale = form(saleSchema, async (data) => {
 		splitAgentIds,
 		dealOwners,
 		dealOwnerIds: splitAgentIds,
-		dealStage: data.dealStage,
+		dealStage,
 		paymentValue: data.paymentValue,
 		bookingFormFile,
 		paymentReceiptFile,
 		refferalAgreementFile,
-		saleType: data.saleType,
-		developer: data.developer,
+		saleType,
+		developer,
 		project: data.project,
 		...(data.community && { community: data.community }),
-		propertyType: data.propertyType,
+		propertyType,
 		...(data.bedroomType && { bedroomType: data.bedroomType }),
 		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
 		...(data.propertySize && { propertySize: data.propertySize }),
@@ -596,7 +619,7 @@ const updateSaleSchema = z
 				});
 			}),
 		jointBuyers: z.array(buyerUpdateSchema).default([]),
-		dealStage: z.enum(['eoi', 'booking', 'cancelled'], 'Deal stage is required'),
+		dealStage: optionalUpdateValueSchema,
 		paymentValue: z
 			.number()
 			.min(0, 'Payment value must be at least 0')
@@ -620,14 +643,11 @@ const updateSaleSchema = z
 				}
 			),
 		tentativeEligibilityDate: z.string().optional(),
-		saleType: z.enum(['off-plan', 'secondary'], 'Deal type is required'),
-		developer: saleDeveloperSchema,
+		saleType: optionalUpdateValueSchema,
+		developer: optionalUpdateValueSchema,
 		project: z.string().min(1, 'Project is required'),
 		community: z.string().optional(),
-		propertyType: z.enum(
-			['apartment', 'townhouse', 'villa', 'commercial', 'plot'],
-			'Property type is required'
-		),
+		propertyType: optionalUpdateValueSchema,
 		bedroomType: z
 			.enum([
 				'studio',
@@ -672,7 +692,9 @@ const updateSaleSchema = z
 		removeRefferalAgreementFile: z.string().optional()
 	})
 	.superRefine((data, ctx) => {
-		if (data.propertyType === 'apartment') {
+		const propertyType = normalizePropertyTypeValue(data.propertyType);
+
+		if (propertyType === 'apartment') {
 			if (!data.bedroomType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -689,7 +711,7 @@ const updateSaleSchema = z
 			}
 		}
 
-		if (data.propertyType === 'townhouse' || data.propertyType === 'villa') {
+		if (propertyType === 'townhouse' || propertyType === 'villa') {
 			if (!data.bedroomType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -713,7 +735,7 @@ const updateSaleSchema = z
 			}
 		}
 
-		if (data.propertyType === 'commercial') {
+		if (propertyType === 'commercial') {
 			if (!data.commercialSubType) {
 				ctx.addIssue({
 					code: 'custom',
@@ -737,7 +759,7 @@ const updateSaleSchema = z
 			}
 		}
 
-		if (data.propertyType === 'plot' && !data.propertySize) {
+		if (propertyType === 'plot' && !data.propertySize) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['propertySize'],
@@ -792,6 +814,30 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	if (existingSale.isDeleted) {
 		throw error(404, 'Sale not found');
 	}
+
+	const existingDealStage =
+		typeof existingSale.dealStage === 'string' ? existingSale.dealStage : '';
+	const existingSaleType = typeof existingSale.saleType === 'string' ? existingSale.saleType : '';
+	const existingDeveloper =
+		typeof existingSale.developer === 'string' ? existingSale.developer : '';
+	const existingPropertyType =
+		typeof existingSale.propertyType === 'string' ? existingSale.propertyType : '';
+	const dealStage =
+		normalizeDealStageValue(data.dealStage) ||
+		normalizeDealStageValue(existingDealStage) ||
+		existingDealStage;
+	const saleType =
+		normalizeSaleTypeValue(data.saleType) ||
+		normalizeSaleTypeValue(existingSaleType) ||
+		existingSaleType;
+	const developer =
+		normalizeSaleDeveloperValue(data.developer) ||
+		normalizeSaleDeveloperValue(existingDeveloper) ||
+		existingDeveloper;
+	const propertyType =
+		normalizePropertyTypeValue(data.propertyType) ||
+		normalizePropertyTypeValue(existingPropertyType) ||
+		existingPropertyType;
 
 	const createdByUid =
 		(existingSale?.createdByUid as string | undefined) ?? data.splits[0]?.agentId ?? 'unknown';
@@ -901,7 +947,7 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 			revenueAfterPassback = Math.round(revenueAchieved - (data.passbackAmount ?? 0));
 		}
 	}
-	if (data.dealStage === 'cancelled') {
+	if (dealStage === 'cancelled') {
 		revenueAchieved = 0;
 		revenueAfterPassback = 0;
 	}
@@ -938,16 +984,16 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		splitAgentIds,
 		dealOwners,
 		dealOwnerIds: splitAgentIds,
-		dealStage: data.dealStage,
+		dealStage,
 		paymentValue: data.paymentValue,
 		bookingFormFile,
 		paymentReceiptFile,
 		refferalAgreementFile,
-		saleType: data.saleType,
-		developer: data.developer,
+		saleType,
+		developer,
 		project: data.project,
 		...(data.community && { community: data.community }),
-		propertyType: data.propertyType,
+		propertyType,
 		...(data.bedroomType && { bedroomType: data.bedroomType }),
 		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
 		...(data.propertySize && { propertySize: data.propertySize }),
