@@ -7,6 +7,7 @@
 	import OrderSplit from '$lib/components/order-split.svelte';
 	import PhoneInput from '$lib/components/phone-input.svelte';
 	import ReferralFormInline from '$lib/components/referral-form-inline.svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import CalendarComponent from '$lib/components/ui/calendar/calendar.svelte';
@@ -29,7 +30,8 @@
 		normalizeDealStageValue,
 		normalizePropertyTypeValue,
 		normalizeSaleDeveloperValue,
-		normalizeSaleTypeValue
+		normalizeSaleTypeValue,
+		type SelectOption
 	} from '$lib/listing-options';
 	import HorizontalSeparator from '@/components/ui/separator/horizontal-separator.svelte';
 	import { parseDate, type DateValue } from '@internationalized/date';
@@ -79,6 +81,7 @@
 	const canEditFields = $derived(canEditSale || isAgentRole);
 	let deleteDialogOpen = $state(false);
 	let isDeletingSale = $state(false);
+	let saveError = $state<string | null>(null);
 
 	const handleDeleteSale = async () => {
 		if (!sale?.id) return;
@@ -108,11 +111,11 @@
 	let popoverOpen = $state(false);
 	let developerPopoverOpen = $state(false);
 	let developerSearchValue = $state('');
-	let selectedSaleType = $state<string>(normalizeSaleTypeValue(sale?.saleType));
-	let selectedDeveloper = $state<string>(normalizeSaleDeveloperValue(sale?.developer));
-	let selectedCommunity = $state<string | undefined>(sale?.community ?? undefined);
-	let selectedDealStage = $state<string>(normalizeDealStageValue(sale?.dealStage));
-	let selectedPropertyType = $state<string>(normalizePropertyTypeValue(sale?.propertyType));
+	let selectedSaleType = $state<string>('');
+	let selectedDeveloper = $state<string>('');
+	let selectedCommunity = $state<string | undefined>(undefined);
+	let selectedDealStage = $state<string>('');
+	let selectedPropertyType = $state<string>('');
 
 	// Effective values: user selection takes precedence, prop value is always the fallback
 	const effectiveSaleType = $derived(selectedSaleType || normalizeSaleTypeValue(sale?.saleType));
@@ -126,14 +129,16 @@
 	const effectivePropertyType = $derived(
 		selectedPropertyType || normalizePropertyTypeValue(sale?.propertyType)
 	);
+	const submittedSaleType = $derived(effectiveSaleType || sale?.saleType || '');
+	const submittedDeveloper = $derived(effectiveDeveloper || sale?.developer || '');
 	const submittedDealStage = $derived(effectiveDealStage || sale?.dealStage || '');
 	const submittedPropertyType = $derived(effectivePropertyType || sale?.propertyType || '');
 
 	// Invoice stage checkbox states
-	let firstHalfChecked = $state((sale?.invoiceStage ?? []).includes('first-half'));
-	let secondHalfChecked = $state((sale?.invoiceStage ?? []).includes('second-half'));
-	let fullChecked = $state((sale?.invoiceStage ?? []).includes('full'));
-	let notEligibleChecked = $state((sale?.invoiceStage ?? []).includes('not-yet-eligible'));
+	let firstHalfChecked = $state(false);
+	let secondHalfChecked = $state(false);
+	let fullChecked = $state(false);
+	let notEligibleChecked = $state(false);
 
 	// Sync checkbox states with form field
 	$effect(() => {
@@ -204,7 +209,7 @@
 			}));
 		}
 		// Fall back to legacy dealOwners
-		return s.dealOwners.map((owner, idx) => ({
+		return (s.dealOwners ?? []).map((owner, idx) => ({
 			key: idx,
 			agentId: owner.userId,
 			agentName: owner.name,
@@ -227,7 +232,7 @@
 		}));
 	}
 
-	let dealSplits = $state(initSplitsFromSale(sale));
+	let dealSplits = $state<SplitEntry[]>([]);
 
 	const syncSplits = (splits: SplitEntry[]) => {
 		updateSale.fields.splits.set(
@@ -248,6 +253,27 @@
 		syncSplits(dealSplits);
 	});
 
+	let initialSplitIdentities = $state<Set<string>>(new Set());
+	let initialSplitHierarchyByIdentity = $state<Record<string, boolean>>({});
+	const splitIdentityForEdit = (split: SplitEntry) =>
+		[
+			split.ownerRole,
+			(split.agentId ?? '').trim().toLowerCase(),
+			(split.agentEmail ?? '').trim().toLowerCase(),
+			(split.agentName ?? '').trim().toLowerCase(),
+			String(Number(split.percentage) || 0)
+		].join('|');
+	const splitHasHierarchy = (split: SplitEntry) =>
+		Boolean((split.managerEmail ?? '').trim() && (split.seniorManagerEmail ?? '').trim());
+	const splitMissingHierarchy = $derived(
+		dealSplits.find((split) => {
+			const identity = splitIdentityForEdit(split);
+			const isExistingSplit = initialSplitIdentities.has(identity);
+			const hadHierarchy = initialSplitHierarchyByIdentity[identity] === true;
+			if (!isExistingSplit) return !splitHasHierarchy(split);
+			return hadHierarchy && !splitHasHierarchy(split);
+		})
+	);
 	const splitTotal = $derived(dealSplits.reduce((t, s) => t + (Number(s.percentage) || 0), 0));
 	const splitRemaining = $derived(100 - splitTotal);
 
@@ -276,13 +302,16 @@
 	// Track phone countries and values for joint buyers
 	let jointBuyerPhoneCountries = $state<Record<number, string>>({});
 	let jointBuyerPhoneValues = $state<Record<number, string>>({});
+	let jointBuyerDetails = $state<
+		Record<number, { firstName: string; lastName: string; email: string }>
+	>({});
 	let clientPhoneCountry = $state<string>('AE');
-	let clientPhoneValue = $state<string>(sale?.clientDetails?.phone ?? '');
+	let clientPhoneValue = $state<string>('');
 
 	// Track client details for display
-	let clientFirstName = $state<string>(sale?.clientDetails?.firstName ?? '');
-	let clientLastName = $state<string>(sale?.clientDetails?.lastName ?? '');
-	let clientEmail = $state<string>(sale?.clientDetails?.email ?? '');
+	let clientFirstName = $state<string>('');
+	let clientLastName = $state<string>('');
+	let clientEmail = $state<string>('');
 
 	// Sync local client details to form fields
 	$effect(() => {
@@ -323,10 +352,14 @@
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
 			uploadedFiles[fieldName] = input.files[0];
+			removedFiles[fieldName] = false;
 		}
 	};
 
 	let removedFiles = $state<Record<string, boolean>>({});
+	let removedJointBuyerFiles = $state<
+		Record<number, Partial<Record<'passportFile' | 'nationalIdFile' | 'amlFormFile', boolean>>>
+	>({});
 
 	const removeFile = (fieldName: string) => {
 		uploadedFiles[fieldName] = null;
@@ -347,6 +380,7 @@
 		jointBuyerFiles[newKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 		jointBuyerPhoneCountries[newKey] = 'AE';
 		jointBuyerPhoneValues[newKey] = '';
+		jointBuyerDetails[newKey] = { firstName: '', lastName: '', email: '' };
 		amlGenerating[`joint-${newKey}`] = false;
 	};
 
@@ -355,6 +389,8 @@
 		delete jointBuyerFiles[key];
 		delete jointBuyerPhoneCountries[key];
 		delete jointBuyerPhoneValues[key];
+		delete jointBuyerDetails[key];
+		delete removedJointBuyerFiles[key];
 	};
 
 	function getE164number(phoneValue: string, phoneCountry: string): string {
@@ -378,6 +414,10 @@
 				jointBuyerFiles[buyerKey] = { passportFile: null, nationalIdFile: null, amlFormFile: null };
 			}
 			jointBuyerFiles[buyerKey][fieldName] = input.files[0];
+			removedJointBuyerFiles[buyerKey] = {
+				...(removedJointBuyerFiles[buyerKey] ?? {}),
+				[fieldName]: false
+			};
 		}
 	};
 
@@ -388,6 +428,10 @@
 		if (jointBuyerFiles[buyerKey]) {
 			jointBuyerFiles[buyerKey][fieldName] = null;
 		}
+		removedJointBuyerFiles[buyerKey] = {
+			...(removedJointBuyerFiles[buyerKey] ?? {}),
+			[fieldName]: true
+		};
 		const input = document.getElementById(`joint-${fieldName}-${buyerKey}`) as HTMLInputElement;
 		if (input) input.value = '';
 	};
@@ -399,19 +443,73 @@
 	const apartmentBedrooms = APARTMENT_BEDROOM_OPTIONS;
 	const townhouseVillaBedrooms = TOWNHOUSE_VILLA_BEDROOM_OPTIONS;
 	const commercialSubTypes = COMMERCIAL_SUB_TYPE_OPTIONS;
+	const optionContainsValue = (options: SelectOption[], value: string) =>
+		options.some((option) => option.value === value);
+	const createLegacyOption = (
+		value: unknown,
+		normalizedValue: string,
+		options: SelectOption[]
+	): SelectOption | null => {
+		const raw = typeof value === 'string' ? value.trim() : '';
+		if (!raw || optionContainsValue(options, normalizedValue)) return null;
+		if (
+			options.some(
+				(option) =>
+					option.value.toLowerCase() === raw.toLowerCase() ||
+					option.label.toLowerCase() === raw.toLowerCase()
+			)
+		) {
+			return null;
+		}
+
+		return { value: raw, label: `${raw} (legacy)` };
+	};
+
+	const legacySaleTypeOption = $derived(
+		createLegacyOption(sale?.saleType, normalizeSaleTypeValue(sale?.saleType), saleTypes)
+	);
+	const legacyDeveloperOption = $derived(
+		createLegacyOption(sale?.developer, normalizeSaleDeveloperValue(sale?.developer), developers)
+	);
+	const legacyPropertyTypeOption = $derived(
+		createLegacyOption(
+			sale?.propertyType,
+			normalizePropertyTypeValue(sale?.propertyType),
+			propertyTypes
+		)
+	);
+	const saleTypeOptions = $derived(
+		legacySaleTypeOption ? [legacySaleTypeOption, ...saleTypes] : saleTypes
+	);
+	const developerOptions = $derived(
+		legacyDeveloperOption ? [legacyDeveloperOption, ...developers] : developers
+	);
+	const propertyTypeOptions = $derived(
+		legacyPropertyTypeOption ? [legacyPropertyTypeOption, ...propertyTypes] : propertyTypes
+	);
+	const legacyFieldLabels = $derived(
+		[
+			legacySaleTypeOption ? 'sale type' : null,
+			legacyDeveloperOption ? 'developer' : null,
+			sale?.dealStage && !normalizeDealStageValue(sale.dealStage) ? 'deal stage' : null,
+			legacyPropertyTypeOption ? 'property type' : null
+		].filter((field): field is string => Boolean(field))
+	);
 
 	const saleTypeLabel = $derived(
-		saleTypes.find((d) => d.value === effectiveSaleType)?.label ?? 'Sale Type'
+		saleTypeOptions.find((d) => d.value === submittedSaleType)?.label ?? 'Sale Type'
 	);
 	const developerLabel = $derived(
-		developers.find((d) => d.value === effectiveDeveloper)?.label ?? sale?.developer ?? 'Developer'
+		developerOptions.find((d) => d.value === submittedDeveloper)?.label ??
+			sale?.developer ??
+			'Developer'
 	);
 	const filteredDevelopers = $derived(
 		developerSearchValue
-			? developers.filter((dev) =>
+			? developerOptions.filter((dev) =>
 					dev.label.toLowerCase().includes(developerSearchValue.toLowerCase())
 				)
-			: developers
+			: developerOptions
 	);
 	const filteredCommunities = $derived(
 		communitySearchValue
@@ -424,7 +522,7 @@
 		communities.find((c) => c.value === effectiveCommunity)?.label ?? 'Community (Optional)'
 	);
 	const propertyTypeLabel = $derived(
-		propertyTypes.find((p) => p.value === effectivePropertyType)?.label ??
+		propertyTypeOptions.find((p) => p.value === submittedPropertyType)?.label ??
 			sale?.propertyType ??
 			'Property Type'
 	);
@@ -476,15 +574,21 @@
 					};
 				}
 				jointBuyerFiles[buyerKey].amlFormFile = displayFile;
+				removedJointBuyerFiles[buyerKey] = {
+					...(removedJointBuyerFiles[buyerKey] ?? {}),
+					amlFormFile: false
+				};
 			}
 			return;
 		}
 
 		uploadedFiles.amlFormFile = displayFile;
+		removedFiles.amlFormFile = false;
 	};
 
 	const handleReferralGenerated = (document: SaleDocumentFile) => {
 		uploadedFiles.refferalAgreementFile = toDisplayFile(document);
+		removedFiles.refferalAgreementFile = false;
 	};
 
 	let prefillingSaleId = $state<string | null>(null);
@@ -498,7 +602,12 @@
 			prefillingSaleId = saleId;
 
 			dealSplits = initSplitsFromSale(sale);
+			initialSplitIdentities = new Set(dealSplits.map(splitIdentityForEdit));
+			initialSplitHierarchyByIdentity = Object.fromEntries(
+				dealSplits.map((split) => [splitIdentityForEdit(split), splitHasHierarchy(split)])
+			);
 			removedFiles = {};
+			removedJointBuyerFiles = {};
 
 			updateSale.fields.id.set(sale.id);
 			updateSale.fields.firstName.set(sale.clientDetails.firstName);
@@ -567,6 +676,10 @@
 			}
 
 			dealSplits = initSplitsFromSale(sale);
+			initialSplitIdentities = new Set(dealSplits.map(splitIdentityForEdit));
+			initialSplitHierarchyByIdentity = Object.fromEntries(
+				dealSplits.map((split) => [splitIdentityForEdit(split), splitHasHierarchy(split)])
+			);
 			syncSplits(dealSplits);
 
 			jointBuyers = sale.jointBuyers.map((_, index) => ({ key: index }));
@@ -586,6 +699,16 @@
 			);
 			jointBuyerPhoneValues = Object.fromEntries(
 				sale.jointBuyers.map((buyer, index) => [index, buyer.phone ?? ''])
+			);
+			jointBuyerDetails = Object.fromEntries(
+				sale.jointBuyers.map((buyer, index) => [
+					index,
+					{
+						firstName: buyer.firstName ?? '',
+						lastName: buyer.lastName ?? '',
+						email: buyer.email ?? ''
+					}
+				])
 			);
 			updateSale.fields.jointBuyers.set(
 				sale.jointBuyers.map((buyer) => ({
@@ -613,6 +736,12 @@
 		enctype="multipart/form-data"
 		{...updateSale.enhance(async (f) => {
 			try {
+				saveError = null;
+				if (splitMissingHierarchy) {
+					saveError = `Manager and senior manager are required when changing the ${splitMissingHierarchy.ownerRole} split`;
+					toast.error(saveError);
+					return;
+				}
 				await f.submit();
 				const issues = updateSale.fields.allIssues();
 				if (issues?.length) {
@@ -633,6 +762,7 @@
 				} else {
 					toast.error('Failed to update sale. Please try again.');
 				}
+				saveError = message || 'Failed to update sale. Please try again.';
 			}
 		})}
 	>
@@ -689,8 +819,12 @@
 				<Button
 					type="submit"
 					size="sm"
-					disabled={!!updateSale.pending || splitRemaining !== 0}
-					title={splitRemaining !== 0 ? 'Owner split must total 100%' : undefined}
+					disabled={!!updateSale.pending || splitRemaining !== 0 || !!splitMissingHierarchy}
+					title={splitMissingHierarchy
+						? `Manager and senior manager are required for the ${splitMissingHierarchy.ownerRole} split`
+						: splitRemaining !== 0
+							? 'Owner split must total 100%'
+							: undefined}
 				>
 					<Save class="mr-2 h-4 w-4" />
 					{updateSale.pending ? 'Updating...' : 'Update'}
@@ -702,6 +836,25 @@
 				{issue.message}
 			</Field.Error>
 		{/each}
+		{#if saveError}
+			<div class="px-6 pt-4">
+				<Alert.Root variant="destructive">
+					<Alert.Title>Unable to save sale</Alert.Title>
+					<Alert.Description>{saveError}</Alert.Description>
+				</Alert.Root>
+			</div>
+		{/if}
+		{#if legacyFieldLabels.length}
+			<div class="px-6 pt-4">
+				<Alert.Root class="border-amber-200 bg-amber-50 text-amber-900">
+					<Alert.Title>Legacy sale data</Alert.Title>
+					<Alert.Description>
+						This sale has migrated {legacyFieldLabels.join(', ')} values. They are preserved unless you
+						choose a replacement.
+					</Alert.Description>
+				</Alert.Root>
+			</div>
+		{/if}
 		<div class="flex flex-col gap-8 p-6">
 			<!-- Client Details Section -->
 			<Field.Set>
@@ -1124,7 +1277,7 @@
 						<Field.Field id="saleType">
 							<Select.Root
 								type="single"
-								value={effectiveSaleType}
+								value={submittedSaleType}
 								onValueChange={(v) => {
 									updateSale.fields.saleType.set(v as 'off-plan' | 'secondary');
 									selectedSaleType = v;
@@ -1138,12 +1291,12 @@
 									</div>
 								</Select.Trigger>
 								<Select.Content>
-									{#each saleTypes as saleType (saleType.value)}
+									{#each saleTypeOptions as saleType (saleType.value)}
 										<Select.Item {...saleType} />
 									{/each}
 								</Select.Content>
 							</Select.Root>
-							<input type="hidden" name="saleType" value={effectiveSaleType} />
+							<input type="hidden" name="saleType" value={submittedSaleType} />
 							{#each updateSale.fields.saleType.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1190,7 +1343,7 @@
 									</Command.Root>
 								</Popover.Content>
 							</Popover.Root>
-							<input type="hidden" name="developer" value={effectiveDeveloper} />
+							<input type="hidden" name="developer" value={submittedDeveloper} />
 							{#each updateSale.fields.developer.issues() as issue, i (i)}
 								<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
 							{/each}
@@ -1253,7 +1406,7 @@
 						<Field.Field id="propertyType">
 							<Select.Root
 								type="single"
-								value={effectivePropertyType}
+								value={submittedPropertyType}
 								onValueChange={(v) => {
 									updateSale.fields.propertyType.set(
 										v as 'apartment' | 'townhouse' | 'villa' | 'commercial' | 'plot'
@@ -1269,7 +1422,7 @@
 									</div>
 								</Select.Trigger>
 								<Select.Content>
-									{#each propertyTypes as propertyType (propertyType.value)}
+									{#each propertyTypeOptions as propertyType (propertyType.value)}
 										<Select.Item {...propertyType} />
 									{/each}
 								</Select.Content>
@@ -2053,6 +2206,11 @@
 					disabled={!canEditFields}
 					onsplitschange={(s) => syncSplits(s)}
 				/>
+				{#if splitMissingHierarchy}
+					<Field.Error class="text-sm text-destructive">
+						Manager and senior manager are required for the {splitMissingHierarchy.ownerRole} split.
+					</Field.Error>
+				{/if}
 				{#each dealSplits as split, index (split.key)}
 					<input type="hidden" name="splits[{index}].agentId" value={split.agentId} />
 					<input type="hidden" name="splits[{index}].agentEmail" value={split.agentEmail} />
@@ -2099,21 +2257,24 @@
 							<div class="grid grid-cols-3 gap-4">
 								<Field.Field>
 									<Input
-										name={`jointBuyers[${index}].firstName`}
+										id={`joint-firstName-${buyer.key}`}
+										bind:value={jointBuyerDetails[buyer.key].firstName}
 										placeholder="First Name"
 										disabled={!canEditFields}
 									/>
 								</Field.Field>
 								<Field.Field>
 									<Input
-										name={`jointBuyers[${index}].lastName`}
+										id={`joint-lastName-${buyer.key}`}
+										bind:value={jointBuyerDetails[buyer.key].lastName}
 										placeholder="Last Name"
 										disabled={!canEditFields}
 									/>
 								</Field.Field>
 								<Field.Field>
 									<Input
-										name={`jointBuyers[${index}].email`}
+										id={`joint-email-${buyer.key}`}
+										bind:value={jointBuyerDetails[buyer.key].email}
 										placeholder="Email"
 										type="email"
 										disabled={!canEditFields}
@@ -2137,6 +2298,42 @@
 									jointBuyerPhoneCountries[buyer.key] || ''
 								)}
 							/>
+							<input
+								type="hidden"
+								name={`jointBuyers[${index}].firstName`}
+								value={jointBuyerDetails[buyer.key]?.firstName ?? ''}
+							/>
+							<input
+								type="hidden"
+								name={`jointBuyers[${index}].lastName`}
+								value={jointBuyerDetails[buyer.key]?.lastName ?? ''}
+							/>
+							<input
+								type="hidden"
+								name={`jointBuyers[${index}].email`}
+								value={jointBuyerDetails[buyer.key]?.email ?? ''}
+							/>
+							{#if removedJointBuyerFiles[buyer.key]?.passportFile}
+								<input
+									type="hidden"
+									name={`jointBuyers[${index}].removePassportFile`}
+									value="true"
+								/>
+							{/if}
+							{#if removedJointBuyerFiles[buyer.key]?.nationalIdFile}
+								<input
+									type="hidden"
+									name={`jointBuyers[${index}].removeNationalIdFile`}
+									value="true"
+								/>
+							{/if}
+							{#if removedJointBuyerFiles[buyer.key]?.amlFormFile}
+								<input
+									type="hidden"
+									name={`jointBuyers[${index}].removeAmlFormFile`}
+									value="true"
+								/>
+							{/if}
 						</Field.Group>
 
 						<Field.Set>

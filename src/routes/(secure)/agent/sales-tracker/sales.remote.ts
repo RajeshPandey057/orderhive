@@ -601,22 +601,6 @@ const updateSaleSchema = z
 						message: 'Deal split percentages must total 100%'
 					});
 				}
-				splits.forEach((s, i) => {
-					if (!s.managerEmail || s.managerEmail.trim() === '') {
-						ctx.addIssue({
-							code: 'custom',
-							path: [i, 'managerEmail'],
-							message: `Manager email is required for the ${s.ownerRole}`
-						});
-					}
-					if (!s.seniorManagerEmail || s.seniorManagerEmail.trim() === '') {
-						ctx.addIssue({
-							code: 'custom',
-							path: [i, 'seniorManagerEmail'],
-							message: `Senior manager email is required for the ${s.ownerRole}`
-						});
-					}
-				});
 			}),
 		jointBuyers: z.array(buyerUpdateSchema).default([]),
 		dealStage: optionalUpdateValueSchema,
@@ -787,6 +771,132 @@ const updateSaleSchema = z
 	});
 
 type UploadedDoc = Awaited<ReturnType<typeof toUploadedFile>>;
+type SaleSplitInput = z.infer<typeof splitSchema>;
+
+const normalizeText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+const getExistingSplits = (sale: Record<string, unknown>): SaleSplitInput[] => {
+	const rawSplits = Array.isArray(sale.splits) ? sale.splits : [];
+	if (rawSplits.length > 0) {
+		return rawSplits.map((raw, index) => {
+			const split = raw as Record<string, unknown>;
+			return {
+				agentId: normalizeText(split.agentId),
+				agentName: normalizeText(split.agentName),
+				agentEmail: normalizeText(split.agentEmail),
+				agentPhotoURL: normalizeText(split.agentPhotoURL),
+				ownerRole: ['caller', 'closer', 'closer2', 'closer3'].includes(
+					normalizeText(split.ownerRole)
+				)
+					? (normalizeText(split.ownerRole) as SaleSplitInput['ownerRole'])
+					: index === 0
+						? 'caller'
+						: index === 1
+							? 'closer'
+							: index === 2
+								? 'closer2'
+								: 'closer3',
+				percentage: Number(split.percentage) || 0,
+				managerEmail: normalizeText(split.managerEmail),
+				seniorManagerEmail: normalizeText(split.seniorManagerEmail)
+			};
+		});
+	}
+
+	const rawOwners = Array.isArray(sale.dealOwners) ? sale.dealOwners : [];
+	return rawOwners.map((raw, index) => {
+		const owner = raw as Record<string, unknown>;
+		const ownerRole = ['caller', 'closer', 'closer2', 'closer3'].includes(
+			normalizeText(owner.ownerRole)
+		)
+			? (normalizeText(owner.ownerRole) as SaleSplitInput['ownerRole'])
+			: index === 0
+				? 'caller'
+				: index === 1
+					? 'closer'
+					: index === 2
+						? 'closer2'
+						: 'closer3';
+
+		return {
+			agentId: normalizeText(owner.userId),
+			agentName: normalizeText(owner.name),
+			agentEmail: normalizeText(owner.email),
+			agentPhotoURL: normalizeText(owner.photoURL),
+			ownerRole,
+			percentage: Number(owner.split) || 0,
+			managerEmail:
+				normalizeText(owner.managerEmail) ||
+				(ownerRole === 'caller'
+					? normalizeText(sale.callerManagerEmail)
+					: ownerRole === 'closer'
+						? normalizeText(sale.closerManagerEmail)
+						: ''),
+			seniorManagerEmail:
+				normalizeText(owner.seniorManagerEmail) ||
+				(ownerRole === 'caller'
+					? normalizeText(sale.callerSeniorManagerEmail)
+					: ownerRole === 'closer'
+						? normalizeText(sale.closerSeniorManagerEmail)
+						: '')
+		};
+	});
+};
+
+const splitIdentity = (split: SaleSplitInput) =>
+	[
+		split.ownerRole,
+		normalizeText(split.agentId).toLowerCase(),
+		normalizeText(split.agentEmail).toLowerCase(),
+		normalizeText(split.agentName).toLowerCase(),
+		String(Number(split.percentage) || 0)
+	].join('|');
+
+const hasHierarchy = (split: SaleSplitInput) =>
+	Boolean(normalizeText(split.managerEmail) && normalizeText(split.seniorManagerEmail));
+
+const comparableValue = (value: unknown) => {
+	try {
+		return JSON.stringify(value ?? null);
+	} catch {
+		return String(value);
+	}
+};
+
+const removeUndefinedValues = (value: unknown): unknown => {
+	if (Array.isArray(value)) {
+		return value.map((entry) => removeUndefinedValues(entry));
+	}
+
+	if (!value || typeof value !== 'object') return value;
+
+	return Object.fromEntries(
+		Object.entries(value)
+			.filter(([, entry]) => entry !== undefined)
+			.map(([key, entry]) => [key, removeUndefinedValues(entry)])
+	);
+};
+
+function assertChangedSplitsHaveHierarchy(
+	submittedSplits: SaleSplitInput[],
+	existingSale: Record<string, unknown>
+) {
+	const existingSplitsByIdentity = new Map(
+		getExistingSplits(existingSale).map((split) => [splitIdentity(split), split])
+	);
+	const changedMissingHierarchy = submittedSplits.find((split) => {
+		const existingSplit = existingSplitsByIdentity.get(splitIdentity(split));
+		if (!existingSplit) return !hasHierarchy(split);
+		return hasHierarchy(existingSplit) && !hasHierarchy(split);
+	});
+
+	if (changedMissingHierarchy) {
+		throw error(
+			400,
+			`Manager and senior manager are required when changing the ${changedMissingHierarchy.ownerRole} split`
+		);
+	}
+}
 
 const resolveUploadedFile = async (
 	file: File | null | undefined,
@@ -814,6 +924,8 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	if (existingSale.isDeleted) {
 		throw error(404, 'Sale not found');
 	}
+
+	assertChangedSplitsHaveHierarchy(data.splits, existingSale);
 
 	const existingDealStage =
 		typeof existingSale.dealStage === 'string' ? existingSale.dealStage : '';
@@ -852,7 +964,9 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 			name: s.agentName,
 			photoURL: s.agentPhotoURL ?? '',
 			ownerRole: s.ownerRole as 'caller' | 'closer',
-			split: s.percentage
+			split: s.percentage,
+			managerEmail: s.managerEmail ?? '',
+			seniorManagerEmail: s.seniorManagerEmail ?? ''
 		}));
 	const splitAgentIds = data.splits.map((s) => s.agentId);
 
@@ -962,68 +1076,88 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		].map((email) => ensureRoleExists(email))
 	);
 
-	const updatedRecord = {
-		status: existingSale.status ?? 'pending',
-		financeStatus: existingSale.financeStatus ?? 'pending',
-		complianceStatus: existingSale.complianceStatus ?? 'pending',
-		commissionStatus: existingSale.commissionStatus ?? 'pending',
-		invoiceFile: existingSale.invoiceFile ?? { status: 'pending' },
-		invoiceStage: data.invoiceStage,
-		tentativeEligibilityDate: data.tentativeEligibilityDate || null,
-		clientDetails: {
-			firstName: data.firstName,
-			lastName: data.lastName ?? '',
-			email: data.email ?? '',
-			phone: data.phone ?? '',
-			passportFile: primaryPassportFile,
-			nationalIdFile: primaryNationalIdFile,
-			amlFormFile: primaryAmlFormFile
-		},
-		jointBuyers,
-		splits: data.splits,
-		splitAgentIds,
-		dealOwners,
-		dealOwnerIds: splitAgentIds,
-		dealStage,
-		paymentValue: data.paymentValue,
-		bookingFormFile,
-		paymentReceiptFile,
-		refferalAgreementFile,
-		saleType,
-		developer,
-		project: data.project,
-		...(data.community && { community: data.community }),
-		propertyType,
-		...(data.bedroomType && { bedroomType: data.bedroomType }),
-		...(data.commercialSubType && { commercialSubType: data.commercialSubType }),
-		...(data.propertySize && { propertySize: data.propertySize }),
-		...(data.plotArea && { plotArea: data.plotArea }),
-		...(data.builtUpArea && { builtUpArea: data.builtUpArea }),
-		...(data.grossFloorArea && { grossFloorArea: data.grossFloorArea }),
-		unitNo: data.unitNo,
-		unitValue: data.unitValue,
-		saleDate: data.saleDate,
-		...(data.nationality && { nationality: data.nationality }),
-		...(data.residentStatus && { residentStatus: data.residentStatus }),
-		...(data.commissionPercentage !== undefined && {
-			commissionPercentage: data.commissionPercentage
-		}),
-		...(revenueAchieved !== undefined && { revenueAchieved }),
-		...(data.passbackAmount !== undefined && { passbackAmount: data.passbackAmount }),
-		...(revenueAfterPassback !== undefined && { revenueAfterPassback }),
-		commnets: existingSale.commnets ?? [],
-		createdByUid: existingSale.createdByUid ?? createdByUid,
-		createdByEmail: existingSale.createdByEmail ?? data.splits[0]?.agentEmail ?? null,
-		createdAt: existingSale.createdAt ?? timestamp,
-		isDeleted: existingSale.isDeleted ?? false,
-		deletedAt: existingSale.deletedAt ?? null,
-		deletedByUid: existingSale.deletedByUid ?? null,
-		deletedByEmail: existingSale.deletedByEmail ?? null,
-		updatedAt: timestamp
+	const updatePayload: Record<string, unknown> = { updatedAt: timestamp };
+	const addIfChanged = (path: string, nextValue: unknown, existingValue: unknown) => {
+		if (nextValue === undefined) return;
+		const cleanNextValue = removeUndefinedValues(nextValue);
+		if (comparableValue(cleanNextValue) !== comparableValue(existingValue)) {
+			updatePayload[path] = cleanNextValue;
+		}
+	};
+	const addIfMissing = (path: string, nextValue: unknown, existingValue: unknown) => {
+		if (existingValue === undefined || existingValue === null) {
+			updatePayload[path] = removeUndefinedValues(nextValue);
+		}
 	};
 
+	addIfMissing('status', 'pending', existingSale.status);
+	addIfMissing('financeStatus', 'pending', existingSale.financeStatus);
+	addIfMissing('complianceStatus', 'pending', existingSale.complianceStatus);
+	addIfMissing('commissionStatus', 'pending', existingSale.commissionStatus);
+	addIfMissing('invoiceFile', { status: 'pending' }, existingSale.invoiceFile);
+	addIfMissing('commnets', [], existingSale.commnets);
+	addIfMissing('createdByUid', createdByUid, existingSale.createdByUid);
+	addIfMissing('createdByEmail', data.splits[0]?.agentEmail ?? null, existingSale.createdByEmail);
+	addIfMissing('createdAt', timestamp, existingSale.createdAt);
+	addIfMissing('isDeleted', false, existingSale.isDeleted);
+	addIfMissing('deletedAt', null, existingSale.deletedAt);
+	addIfMissing('deletedByUid', null, existingSale.deletedByUid);
+	addIfMissing('deletedByEmail', null, existingSale.deletedByEmail);
+
+	addIfChanged('invoiceStage', data.invoiceStage, existingSale.invoiceStage);
+	addIfChanged(
+		'tentativeEligibilityDate',
+		data.tentativeEligibilityDate || null,
+		existingSale.tentativeEligibilityDate
+	);
+	addIfChanged('clientDetails.firstName', data.firstName, existingClient.firstName);
+	addIfChanged('clientDetails.lastName', data.lastName ?? '', existingClient.lastName);
+	addIfChanged('clientDetails.email', data.email ?? '', existingClient.email);
+	addIfChanged('clientDetails.phone', data.phone ?? '', existingClient.phone);
+	addIfChanged('clientDetails.passportFile', primaryPassportFile, existingClient.passportFile);
+	addIfChanged(
+		'clientDetails.nationalIdFile',
+		primaryNationalIdFile,
+		existingClient.nationalIdFile
+	);
+	addIfChanged('clientDetails.amlFormFile', primaryAmlFormFile, existingClient.amlFormFile);
+	addIfChanged('jointBuyers', jointBuyers, existingSale.jointBuyers);
+	addIfChanged('splits', data.splits, existingSale.splits);
+	addIfChanged('splitAgentIds', splitAgentIds, existingSale.splitAgentIds);
+	addIfChanged('dealOwners', dealOwners, existingSale.dealOwners);
+	addIfChanged('dealOwnerIds', splitAgentIds, existingSale.dealOwnerIds);
+	addIfChanged('dealStage', dealStage, existingSale.dealStage);
+	addIfChanged('paymentValue', data.paymentValue, existingSale.paymentValue);
+	addIfChanged('bookingFormFile', bookingFormFile, existingSale.bookingFormFile);
+	addIfChanged('paymentReceiptFile', paymentReceiptFile, existingSale.paymentReceiptFile);
+	addIfChanged('refferalAgreementFile', refferalAgreementFile, existingSale.refferalAgreementFile);
+	addIfChanged('saleType', saleType, existingSale.saleType);
+	addIfChanged('developer', developer, existingSale.developer);
+	addIfChanged('project', data.project, existingSale.project);
+	addIfChanged('community', data.community, existingSale.community);
+	addIfChanged('propertyType', propertyType, existingSale.propertyType);
+	addIfChanged('bedroomType', data.bedroomType, existingSale.bedroomType);
+	addIfChanged('commercialSubType', data.commercialSubType, existingSale.commercialSubType);
+	addIfChanged('propertySize', data.propertySize, existingSale.propertySize);
+	addIfChanged('plotArea', data.plotArea, existingSale.plotArea);
+	addIfChanged('builtUpArea', data.builtUpArea, existingSale.builtUpArea);
+	addIfChanged('grossFloorArea', data.grossFloorArea, existingSale.grossFloorArea);
+	addIfChanged('unitNo', data.unitNo, existingSale.unitNo);
+	addIfChanged('unitValue', data.unitValue, existingSale.unitValue);
+	addIfChanged('saleDate', data.saleDate, existingSale.saleDate);
+	addIfChanged('nationality', data.nationality, existingSale.nationality);
+	addIfChanged('residentStatus', data.residentStatus, existingSale.residentStatus);
+	addIfChanged(
+		'commissionPercentage',
+		data.commissionPercentage,
+		existingSale.commissionPercentage
+	);
+	addIfChanged('revenueAchieved', revenueAchieved, existingSale.revenueAchieved);
+	addIfChanged('passbackAmount', data.passbackAmount, existingSale.passbackAmount);
+	addIfChanged('revenueAfterPassback', revenueAfterPassback, existingSale.revenueAfterPassback);
+
 	try {
-		await saleRef.set(updatedRecord);
+		await saleRef.update(updatePayload);
 	} catch (err) {
 		console.error('Failed to update sale in Firestore', err);
 		throw error(500, 'Unable to update sale right now. Please try again.');
