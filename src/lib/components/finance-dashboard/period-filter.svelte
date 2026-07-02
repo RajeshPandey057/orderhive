@@ -2,209 +2,150 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import {
-		formatDateInput,
-		getAvailableYears,
-		getWeeksForYear,
-		type FinancePeriodParams,
-		type FinancePeriodType
-	} from '$lib/date-period.js';
+	import { getAvailableYears, type FinancePeriodParams } from '$lib/date-period.js';
 	import { cn } from '$lib/utils.js';
+	import { parseDate, type DateValue } from '@internationalized/date';
+	import CalendarIcon from '~icons/lucide/calendar';
+	import X from '~icons/lucide/x';
 
 	let { params }: { params: FinancePeriodParams } = $props();
 
-	const MONTHS = [
-		'January', 'February', 'March', 'April', 'May', 'June',
-		'July', 'August', 'September', 'October', 'November', 'December'
-	];
-
-	const currentYear = new Date().getFullYear();
 	const years = getAvailableYears();
-	let weekYear = $state<number>(currentYear);
-	let weeks = $derived(getWeeksForYear(weekYear));
 
-	let customFrom = $state('');
-	let customTo = $state('');
+	let customPopoverOpen = $state(false);
+	let rangeValue = $state<{ start: DateValue | undefined; end: DateValue | undefined }>({
+		start: undefined,
+		end: undefined
+	});
+
+	$effect(() => {
+		if (params.period === 'custom' && params.from) {
+			rangeValue = {
+				start: parseDate(params.from),
+				end: parseDate(params.to ?? params.from)
+			};
+		} else {
+			rangeValue = { start: undefined, end: undefined };
+		}
+	});
 
 	function navigate(newParams: Partial<FinancePeriodParams>) {
 		const url = new URL(page.url);
-		['period', 'year', 'month', 'from', 'to'].forEach((k) => url.searchParams.delete(k));
+		['period', 'year', 'from', 'to'].forEach((k) => url.searchParams.delete(k));
 
 		const merged: FinancePeriodParams = { ...params, ...newParams };
 		url.searchParams.set('period', merged.period);
 		if (merged.year) url.searchParams.set('year', String(merged.year));
-		if (merged.month) url.searchParams.set('month', String(merged.month));
 		if (merged.from) url.searchParams.set('from', merged.from);
 		if (merged.to) url.searchParams.set('to', merged.to);
 
 		goto(url.toString(), { replaceState: true });
 	}
 
-	function setSimple(period: FinancePeriodType) {
-		navigate({ period, year: undefined, month: undefined, from: undefined, to: undefined });
-	}
-
 	function setYear(year: string | undefined) {
 		if (!year) return;
-		navigate({ period: 'year', year: parseInt(year), month: undefined, from: undefined, to: undefined });
+		if (year === 'all') {
+			navigate({ period: 'all-time', year: undefined, from: undefined, to: undefined });
+		} else {
+			navigate({ period: 'year', year: parseInt(year), from: undefined, to: undefined });
+		}
 	}
 
-	function setMonth(month: string | undefined) {
-		if (!month) return;
-		const y = params.period === 'month' ? (params.year ?? currentYear) : currentYear;
-		navigate({ period: 'month', year: y, month: parseInt(month), from: undefined, to: undefined });
+	function onRangeChange(value: { start: DateValue | undefined; end: DateValue | undefined }) {
+		rangeValue = value;
+		if (value.start && value.end) {
+			navigate({ period: 'custom', from: value.start.toString(), to: value.end.toString(), year: undefined });
+			customPopoverOpen = false;
+		}
 	}
 
-	function setMonthYear(year: string | undefined) {
-		if (!year) return;
-		const m = params.period === 'month' ? params.month : undefined;
-		navigate({ period: 'month', year: parseInt(year), month: m, from: undefined, to: undefined });
+	function clearCustom() {
+		rangeValue = { start: undefined, end: undefined };
+		navigate({ period: 'all-time', year: undefined, from: undefined, to: undefined });
 	}
 
-	function setWeek(fromTo: string | undefined) {
-		if (!fromTo) return;
-		const [from, to] = fromTo.split('|');
-		navigate({ period: 'week', year: weekYear, from, to, month: undefined });
+	function formatDisplay(value: string) {
+		const [y, m, d] = value.split('-').map(Number);
+		return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 
-	function applyCustom() {
-		if (!customFrom) return;
-		navigate({ period: 'custom', from: customFrom, to: customTo || customFrom, year: undefined, month: undefined });
-	}
-
-	const isActive = (p: FinancePeriodType) => params.period === p;
-
-	const pillClass = (p: FinancePeriodType) =>
-		cn(
-			'h-9 rounded-lg border px-4 text-sm font-medium transition-colors',
-			isActive(p)
-				? 'bg-primary text-primary-foreground border-primary'
-				: 'bg-background text-foreground border-border hover:bg-muted'
-		);
+	const isCustomActive = $derived(params.period === 'custom');
+	const yearSelectValue = $derived(params.period === 'year' && params.year ? String(params.year) : 'all');
+	const yearLabel = $derived(params.period === 'year' && params.year ? String(params.year) : 'All Years');
+	const customLabel = $derived(
+		isCustomActive && params.from
+			? `${formatDisplay(params.from)} – ${formatDisplay(params.to ?? params.from)}`
+			: 'Custom range'
+	);
 </script>
 
-<div class="flex flex-wrap items-center gap-2 rounded-xl border bg-card px-4 py-3 shadow-sm">
+<div class="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
 	<span class="text-muted-foreground text-sm font-medium shrink-0">Period:</span>
 
-	<!-- Simple pills -->
-	<button class={pillClass('today')} onclick={() => setSimple('today')}>Today</button>
-	<button class={pillClass('all-time')} onclick={() => setSimple('all-time')}>All Time</button>
-
-	<!-- Year dropdown -->
-	<Select.Root
-		type="single"
-		value={isActive('year') ? String(params.year) : undefined}
-		onValueChange={setYear}
-	>
+	<Select.Root type="single" value={yearSelectValue} onValueChange={setYear}>
 		<Select.Trigger
 			class={cn(
-				'h-9 min-w-24 rounded-lg border px-3 text-sm font-medium',
-				isActive('year')
+				'h-9 min-w-32 rounded-lg border px-3 text-sm font-medium',
+				!isCustomActive
 					? 'bg-primary text-primary-foreground border-primary'
 					: 'bg-background text-foreground border-border hover:bg-muted'
 			)}
 		>
-			{isActive('year') && params.year ? String(params.year) : 'Year'}
+			{yearLabel}
 		</Select.Trigger>
 		<Select.Content>
+			<Select.Item value="all">All Years</Select.Item>
 			{#each years as y}
 				<Select.Item value={String(y)}>{y}</Select.Item>
 			{/each}
 		</Select.Content>
 	</Select.Root>
 
-	<!-- Month dropdown (year selector + month selector) -->
-	<div class="flex items-center gap-1">
-		<Select.Root
-			type="single"
-			value={isActive('month') ? String(params.year ?? currentYear) : undefined}
-			onValueChange={setMonthYear}
-		>
-			<Select.Trigger
-				class={cn(
-					'h-9 min-w-16 rounded-lg border px-3 text-sm font-medium',
-					isActive('month')
-						? 'bg-primary/10 text-primary border-primary/40'
-						: 'bg-background text-foreground border-border hover:bg-muted'
-				)}
-			>
-				{isActive('month') && params.year ? String(params.year) : 'Year'}
-			</Select.Trigger>
-			<Select.Content>
-				{#each years as y}
-					<Select.Item value={String(y)}>{y}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+	<span class="text-muted-foreground text-sm">or</span>
 
-		<Select.Root
-			type="single"
-			value={isActive('month') && params.month ? String(params.month) : undefined}
-			onValueChange={setMonth}
-		>
-			<Select.Trigger
-				class={cn(
-					'h-9 min-w-28 rounded-lg border px-3 text-sm font-medium',
-					isActive('month')
-						? 'bg-primary text-primary-foreground border-primary'
-						: 'bg-background text-foreground border-border hover:bg-muted'
-				)}
+	<div class="flex items-center gap-2">
+		<Popover.Root bind:open={customPopoverOpen}>
+			<Popover.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="outline"
+						type="button"
+						class={cn(
+							'h-9 gap-2 rounded-lg border px-3 text-sm font-medium',
+							isCustomActive
+								? 'bg-primary text-primary-foreground border-primary'
+								: 'bg-background text-foreground border-border hover:bg-muted'
+						)}
+					>
+						<CalendarIcon
+							class={cn('h-4 w-4', isCustomActive ? 'text-primary-foreground' : 'text-blue-500')}
+						/>
+						{customLabel}
+					</Button>
+				{/snippet}
+			</Popover.Trigger>
+			<Popover.Content class="w-auto p-0" align="start">
+				<RangeCalendar bind:value={rangeValue} onValueChange={onRangeChange} numberOfMonths={2} />
+			</Popover.Content>
+		</Popover.Root>
+
+		{#if isCustomActive}
+			<button
+				type="button"
+				class="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				onclick={clearCustom}
+				aria-label="Clear custom range"
 			>
-				{isActive('month') && params.month ? MONTHS[params.month - 1] : 'Month'}
-			</Select.Trigger>
-			<Select.Content>
-				{#each MONTHS as m, i}
-					<Select.Item value={String(i + 1)}>{m}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+				<X class="h-4 w-4" />
+			</button>
+		{/if}
 	</div>
-
-	<!-- Week dropdown -->
-	<Select.Root
-		type="single"
-		value={isActive('week') && params.from ? `${params.from}|${params.to}` : undefined}
-		onValueChange={setWeek}
-	>
-		<Select.Trigger
-			class={cn(
-				'h-9 min-w-28 rounded-lg border px-3 text-sm font-medium',
-				isActive('week')
-					? 'bg-primary text-primary-foreground border-primary'
-					: 'bg-background text-foreground border-border hover:bg-muted'
-			)}
-		>
-			{isActive('week') && params.from
-				? `${params.from} – ${params.to}`
-				: 'Week'}
-		</Select.Trigger>
-		<Select.Content class="max-h-60 overflow-y-auto">
-			{#each weeks as w}
-				<Select.Item value={`${w.from}|${w.to}`}>{w.label} ({w.from})</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
-
-	<!-- Custom -->
-	<button class={pillClass('custom')} onclick={() => setSimple('custom')}>Custom</button>
-
-	{#if isActive('custom')}
-		<div class="flex items-center gap-2">
-			<input
-				type="date"
-				class="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-				bind:value={customFrom}
-				onchange={applyCustom}
-			/>
-			<span class="text-muted-foreground text-sm">to</span>
-			<input
-				type="date"
-				class="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-				bind:value={customTo}
-				min={customFrom}
-				onchange={applyCustom}
-			/>
-		</div>
-	{/if}
 </div>

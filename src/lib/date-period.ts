@@ -1,12 +1,11 @@
 export type DateFilterPeriod = 'today' | 'this-month' | 'custom';
 export type AttendancePeriod = 'this-week' | 'last-week' | 'this-month';
 
-export type FinancePeriodType = 'today' | 'all-time' | 'year' | 'month' | 'week' | 'custom';
+export type FinancePeriodType = 'all-time' | 'year' | 'custom';
 
 export type FinancePeriodParams = {
 	period: FinancePeriodType;
 	year?: number;
-	month?: number;
 	from?: string;
 	to?: string;
 };
@@ -15,29 +14,14 @@ export function getFinancePeriodRange(
 	params: FinancePeriodParams,
 	referenceDate: Date
 ): { start: string | null; end: string | null } {
-	const { period, year, month, from, to } = params;
+	const { period, year, from, to } = params;
 
 	if (period === 'all-time') return { start: null, end: null };
-
-	if (period === 'today') {
-		const day = formatDateInput(referenceDate);
-		return { start: day, end: day };
-	}
 
 	if (period === 'year' && year) {
 		const start = `${year}-01-01`;
 		const end = `${year}-12-31`;
 		return { start, end };
-	}
-
-	if (period === 'month' && year && month) {
-		const startDate = new Date(year, month - 1, 1);
-		const endDate = new Date(year, month, 0);
-		return { start: formatDateInput(startDate), end: formatDateInput(endDate) };
-	}
-
-	if (period === 'week' && from && to) {
-		return { start: from, end: to };
 	}
 
 	if (period === 'custom') {
@@ -53,10 +37,9 @@ export function getFinancePeriodRange(
 export function parseFinancePeriodParams(searchParams: URLSearchParams): FinancePeriodParams {
 	const period = (searchParams.get('period') as FinancePeriodType) || 'all-time';
 	const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : undefined;
-	const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : undefined;
 	const from = searchParams.get('from') || undefined;
 	const to = searchParams.get('to') || undefined;
-	return { period, year, month, from, to };
+	return { period, year, from, to };
 }
 
 export function getAvailableYears(fromYear = 2022): number[] {
@@ -64,33 +47,6 @@ export function getAvailableYears(fromYear = 2022): number[] {
 	const years: number[] = [];
 	for (let y = current; y >= fromYear; y--) years.push(y);
 	return years;
-}
-
-export function getWeeksForYear(year: number): { label: string; from: string; to: string }[] {
-	const weeks: { label: string; from: string; to: string }[] = [];
-	const jan1 = new Date(year, 0, 1);
-	const dayOfWeek = jan1.getDay();
-	const firstMonday = new Date(jan1);
-	firstMonday.setDate(jan1.getDate() + ((1 - dayOfWeek + 7) % 7));
-
-	let weekStart = new Date(firstMonday);
-	let weekNum = 1;
-
-	while (weekStart.getFullYear() <= year) {
-		const weekEnd = new Date(weekStart);
-		weekEnd.setDate(weekStart.getDate() + 6);
-		if (weekEnd.getFullYear() < year || weekStart.getFullYear() === year) {
-			weeks.push({
-				label: `Week ${weekNum}`,
-				from: formatDateInput(weekStart),
-				to: formatDateInput(weekEnd)
-			});
-		}
-		weekStart.setDate(weekStart.getDate() + 7);
-		weekNum++;
-		if (weekNum > 53) break;
-	}
-	return weeks;
 }
 
 export function formatDateInput(date: Date): string {
