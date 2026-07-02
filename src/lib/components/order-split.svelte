@@ -49,7 +49,7 @@
 		// If third > 0 and no closer2 row exists, add one
 		const hasCloser2 = updated.some((s) => s.ownerRole === 'closer2');
 		if (preset.third > 0 && !hasCloser2) {
-			const newKey = nextKey++;
+			const newKey = getNextKey();
 			updated = [
 				...updated,
 				{
@@ -81,7 +81,13 @@
 		onsplitschange?.(splits);
 	}
 
-	let nextKey = $state(splits.length > 0 ? Math.max(...splits.map((s) => s.key)) + 1 : 0);
+	// Computed fresh on each call rather than cached in $state — `splits` can be
+	// reassigned wholesale after this component mounts (e.g. prefilled from an
+	// existing sale inside a deferred $effect), which would leave a cached
+	// counter stuck at 0 and cause new rows to collide with row key 0.
+	function getNextKey() {
+		return splits.length > 0 ? Math.max(...splits.map((s) => s.key)) + 1 : 0;
+	}
 
 	type UserResult = {
 		id: string;
@@ -316,7 +322,7 @@
 	}
 
 	function addAgent() {
-		const newKey = nextKey++;
+		const newKey = getNextKey();
 		// Assign roles in order: closer, closer2, closer3
 		const hasCloser = splits.some((s) => s.ownerRole === 'closer');
 		const hasCloser2 = splits.some((s) => s.ownerRole === 'closer2');

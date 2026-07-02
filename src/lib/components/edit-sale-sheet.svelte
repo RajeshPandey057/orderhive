@@ -945,8 +945,7 @@
 											onValueChange={(value) => {
 												saleDateValue = value;
 												if (value) {
-													const d = new Date(value.year, value.month - 1, value.day);
-													updateSale.fields.saleDate?.set(d.toISOString().split('T')[0]);
+													updateSale.fields.saleDate?.set(value.toString());
 												}
 												saleDatePickerOpen = false;
 											}}
@@ -956,11 +955,7 @@
 								<input
 									type="hidden"
 									{...updateSale.fields.saleDate?.as('text')}
-									value={saleDateValue
-										? new Date(saleDateValue.year, saleDateValue.month - 1, saleDateValue.day)
-												.toISOString()
-												.split('T')[0]
-										: ''}
+									value={saleDateValue ? saleDateValue.toString() : ''}
 								/>
 								{#each updateSale.fields.saleDate?.issues() ?? [] as issue, i (i)}
 									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
@@ -2167,8 +2162,7 @@
 												'input[name="tentativeEligibilityDate"]'
 											) as HTMLInputElement;
 											if (hiddenInput && value) {
-												const date = new Date(value.year, value.month - 1, value.day);
-												hiddenInput.value = date.toISOString().split('T')[0];
+												hiddenInput.value = value.toString();
 											}
 											popoverOpen = false;
 										}}
@@ -2178,15 +2172,7 @@
 							<input
 								type="hidden"
 								name="tentativeEligibilityDate"
-								value={tentativeEligibilityDate
-									? new Date(
-											tentativeEligibilityDate.year,
-											tentativeEligibilityDate.month - 1,
-											tentativeEligibilityDate.day
-										)
-											.toISOString()
-											.split('T')[0]
-									: ''}
+								value={tentativeEligibilityDate ? tentativeEligibilityDate.toString() : ''}
 							/>
 						</Field.Field>
 					</div>
