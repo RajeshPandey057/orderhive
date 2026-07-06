@@ -6,6 +6,7 @@ import {
 	normalizeSaleDeveloperValue,
 	normalizeSaleTypeValue
 } from '$lib/listing-options';
+import { getSaleHierarchyEmails } from '$lib/sale-hierarchy';
 import { firestore, uploadFileWithLink } from '$lib/server/firebase';
 import { error, redirect } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -490,6 +491,7 @@ export const createSale = form(saleSchema, async (data) => {
 		}));
 
 	const splitAgentIds = data.splits.map((s) => s.agentId);
+	const hierarchyEmails = getSaleHierarchyEmails(data.splits);
 
 	const saleRecord = {
 		status: 'pending',
@@ -511,6 +513,7 @@ export const createSale = form(saleSchema, async (data) => {
 		jointBuyers,
 		splits: data.splits,
 		splitAgentIds,
+		...hierarchyEmails,
 		dealOwners,
 		dealOwnerIds: splitAgentIds,
 		dealStage,
@@ -969,6 +972,7 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 			seniorManagerEmail: s.seniorManagerEmail ?? ''
 		}));
 	const splitAgentIds = data.splits.map((s) => s.agentId);
+	const hierarchyEmails = getSaleHierarchyEmails(data.splits);
 
 	const existingClient = (existingSale.clientDetails as Record<string, unknown>) ?? {};
 	const existingJoint =
@@ -1124,6 +1128,12 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	addIfChanged('jointBuyers', jointBuyers, existingSale.jointBuyers);
 	addIfChanged('splits', data.splits, existingSale.splits);
 	addIfChanged('splitAgentIds', splitAgentIds, existingSale.splitAgentIds);
+	addIfChanged('managerEmails', hierarchyEmails.managerEmails, existingSale.managerEmails);
+	addIfChanged(
+		'seniorManagerEmails',
+		hierarchyEmails.seniorManagerEmails,
+		existingSale.seniorManagerEmails
+	);
 	addIfChanged('dealOwners', dealOwners, existingSale.dealOwners);
 	addIfChanged('dealOwnerIds', splitAgentIds, existingSale.dealOwnerIds);
 	addIfChanged('dealStage', dealStage, existingSale.dealStage);

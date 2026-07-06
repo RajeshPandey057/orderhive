@@ -1,5 +1,5 @@
 import { firestore } from '$lib/server/firebase';
-import { applySalesScope, getSalesScope } from '$lib/server/rbac';
+import { getSalesDocsForScope, getSalesScope } from '$lib/server/rbac';
 import {
 	buildDashboardData,
 	isInPeriod,
@@ -27,11 +27,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const scope = await getSalesScope(user);
 	const salesRef = firestore.collection('sales');
-	const scopedRef = applySalesScope(salesRef, scope);
 
-	const snap = await scopedRef.where('dealStage', '==', 'booking').get();
+	const docs = await getSalesDocsForScope(salesRef, scope, (query) =>
+		query.where('dealStage', '==', 'booking')
+	);
 
-	const confirmedDeals: Sale[] = snap.docs
+	const confirmedDeals: Sale[] = docs
 		.map((doc) => ({ id: doc.id, ...doc.data() } as Sale))
 		.filter(
 			(sale) =>

@@ -1,5 +1,6 @@
 import { firestore } from '$lib/server/firebase';
 import { getSalesScope } from '$lib/server/rbac';
+import { saleMatchesHierarchyEmail } from '$lib/sale-hierarchy';
 import { error } from '@sveltejs/kit';
 
 const serializeFirestoreValue = (value: unknown): unknown => {
@@ -26,9 +27,21 @@ async function canViewSale(user: NonNullable<App.Locals['user']>, sale: Record<s
 	const scope = await getSalesScope(user);
 	if (scope.type === 'all') return true;
 
+	if (user.role === 'manager' || user.role === 'senior-manager') {
+		if (saleMatchesHierarchyEmail(sale as Sale, user.role, user.email)) return true;
+	}
+
 	if (scope.type === 'array-contains') {
 		return (
 			includesAny(sale[scope.field], [scope.value]) || includesAny(sale.dealOwnerIds, [scope.value])
+		);
+	}
+
+	if (scope.type === 'any') {
+		return scope.scopes.some((candidate) =>
+			candidate.type === 'array-contains'
+				? includesAny(sale[candidate.field], [candidate.value])
+				: includesAny(sale[candidate.field], candidate.values)
 		);
 	}
 

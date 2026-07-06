@@ -1,8 +1,16 @@
 import { firestore } from '$lib/server/firebase';
+import { getSaleHierarchyEmails, normalizeHierarchyEmail } from '$lib/sale-hierarchy';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 const BATCH_SIZE = 500;
+
+function sameNormalizedArray(left: unknown, right: string[]) {
+	if (!Array.isArray(left)) return false;
+	const normalizedLeft = left.map(normalizeHierarchyEmail).filter(Boolean).sort();
+	const normalizedRight = [...right].sort();
+	return JSON.stringify(normalizedLeft) === JSON.stringify(normalizedRight);
+}
 
 /**
  * POST /api/migrate-splits
@@ -35,16 +43,6 @@ export const POST: RequestHandler = async ({ locals }) => {
 				try {
 					const data = doc.data() as Record<string, unknown>;
 
-					// Skip if splits already migrated and up to date
-					if (
-						Array.isArray(data.splits) &&
-						data.splits.length > 0 &&
-						Array.isArray(data.splitAgentIds)
-					) {
-						skippedCount++;
-						continue;
-					}
-
 					const dealOwners = data.dealOwners as
 						| {
 								userId: string;
@@ -53,29 +51,77 @@ export const POST: RequestHandler = async ({ locals }) => {
 								photoURL?: string;
 								ownerRole: 'caller' | 'closer';
 								split: number;
+								managerEmail?: string;
+								seniorManagerEmail?: string;
 						  }[]
 						| undefined;
 
-					if (!Array.isArray(dealOwners) || dealOwners.length === 0) {
+					const existingSplits = Array.isArray(data.splits) ? data.splits : [];
+					const splits =
+						existingSplits.length > 0
+							? existingSplits
+							: Array.isArray(dealOwners) && dealOwners.length > 0
+								? dealOwners.map((owner, idx) => {
+										const ownerRole = idx >= 2 ? 'closer2' : owner.ownerRole;
+										return {
+											agentId: owner.userId ?? '',
+											agentName: owner.name ?? owner.email ?? '',
+											agentEmail: owner.email ?? '',
+											agentPhotoURL: owner.photoURL ?? '',
+											ownerRole,
+											percentage: owner.split ?? 0,
+											managerEmail:
+												owner.managerEmail ??
+												(ownerRole === 'caller'
+													? data.callerManagerEmail
+													: ownerRole === 'closer'
+														? data.closerManagerEmail
+														: ''),
+											seniorManagerEmail:
+												owner.seniorManagerEmail ??
+												(ownerRole === 'caller'
+													? data.callerSeniorManagerEmail
+													: ownerRole === 'closer'
+														? data.closerSeniorManagerEmail
+														: '')
+										};
+									})
+								: [];
+
+					if (splits.length === 0) {
 						skippedCount++;
 						continue;
 					}
 
-					const splits = dealOwners.map((owner, idx) => ({
-						agentId: owner.userId ?? '',
-						agentName: owner.name ?? owner.email ?? '',
-						agentEmail: owner.email ?? '',
-						agentPhotoURL: owner.photoURL ?? '',
-						// Third+ agents get role 'extra'
-						ownerRole: (idx >= 2 ? 'extra' : owner.ownerRole) as 'caller' | 'closer' | 'extra',
-						percentage: owner.split ?? 0
-					}));
+					const splitAgentIds = splits
+						.map((s) => (typeof s.agentId === 'string' ? s.agentId : ''))
+						.filter(Boolean);
+					const hierarchyEmails = getSaleHierarchyEmails(splits);
+					const updatePayload: Record<string, unknown> = {};
 
-					const splitAgentIds = splits.map((s) => s.agentId).filter(Boolean);
+					if (existingSplits.length === 0) updatePayload.splits = splits;
+					if (!sameNormalizedArray(data.splitAgentIds, splitAgentIds)) {
+						updatePayload.splitAgentIds = splitAgentIds;
+					}
+					if (!sameNormalizedArray(data.managerEmails, hierarchyEmails.managerEmails)) {
+						updatePayload.managerEmails = hierarchyEmails.managerEmails;
+					}
+					if (
+						!sameNormalizedArray(
+							data.seniorManagerEmails,
+							hierarchyEmails.seniorManagerEmails
+						)
+					) {
+						updatePayload.seniorManagerEmails = hierarchyEmails.seniorManagerEmails;
+					}
+
+					if (Object.keys(updatePayload).length === 0) {
+						skippedCount++;
+						continue;
+					}
 
 					batch.update(doc.ref, {
-						splits,
-						splitAgentIds,
+						...updatePayload,
 						_migratedAt: new Date().toISOString()
 					});
 

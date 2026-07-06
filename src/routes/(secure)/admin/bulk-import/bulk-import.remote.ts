@@ -1,4 +1,5 @@
 import { form, getRequestEvent } from '$app/server';
+import { getSaleHierarchyEmails } from '$lib/sale-hierarchy';
 import { firestore } from '$lib/server/firebase';
 import { error } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -632,6 +633,17 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 		const isUpdate = existing.exists;
 
 		const parsedSaleDate = parseDDMmmYYYY(primary.sale_date) ?? primary.sale_date ?? null;
+		const saleSplits = dealOwners.map((o) => ({
+			agentId: o.userId,
+			agentName: o.name,
+			agentEmail: o.email,
+			agentPhotoURL: o.photoURL,
+			ownerRole: o.ownerRole as 'caller' | 'closer' | 'closer2' | 'closer3',
+			percentage: o.split,
+			...(o.managerEmail && { managerEmail: o.managerEmail }),
+			...(o.seniorManagerEmail && { seniorManagerEmail: o.seniorManagerEmail })
+		}));
+		const hierarchyEmails = getSaleHierarchyEmails(saleSplits);
 
 		// Ensure role documents exist for any manager emails provided
 		await Promise.all(
@@ -675,17 +687,9 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 			})),
 			dealOwners,
 			dealOwnerIds: dealOwners.map((o) => o.userId),
-			splits: dealOwners.map((o) => ({
-				agentId: o.userId,
-				agentName: o.name,
-				agentEmail: o.email,
-				agentPhotoURL: o.photoURL,
-				ownerRole: o.ownerRole as 'caller' | 'closer' | 'closer2' | 'closer3',
-				percentage: o.split,
-				...(o.managerEmail && { managerEmail: o.managerEmail }),
-				...(o.seniorManagerEmail && { seniorManagerEmail: o.seniorManagerEmail })
-			})),
+			splits: saleSplits,
 			splitAgentIds: dealOwners.map((o) => o.userId),
+			...hierarchyEmails,
 			dealStage: primary.deal_stage ?? '',
 			paymentValue: primary.payment_value ?? 0,
 			bookingFormFile: makeFileRecord(primary.booking_form_url),

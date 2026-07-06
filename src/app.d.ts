@@ -287,6 +287,8 @@ declare global {
 			photoURL: string;
 			ownerRole: 'caller' | 'closer' | 'closer2' | 'closer3';
 			split: number;
+			managerEmail?: string;
+			seniorManagerEmail?: string;
 		}[];
 		dealOwnerIds: string[];
 		splits?: {
@@ -300,6 +302,8 @@ declare global {
 			seniorManagerEmail?: string;
 		}[];
 		splitAgentIds?: string[];
+		managerEmails?: string[];
+		seniorManagerEmails?: string[];
 		dealStage: 'eoi' | 'booking' | 'cancelled';
 		paymentValue: number;
 		bookingFormFile: SaleDocumentFile | null;

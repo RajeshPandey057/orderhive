@@ -2,6 +2,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { saleMatchesHierarchyEmail } from '$lib/sale-hierarchy';
 	import { isActiveSale } from '$lib/sales';
 	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
 	import SalesTable from '@/components/sales-table.svelte';
@@ -21,6 +22,7 @@
 
 		const userRole = data?.user?.role;
 		const userUid = data?.user?.uid;
+		const userEmail = data?.user?.email;
 
 		if (userRole === 'agent' && userUid) {
 			return activeSales.filter(
@@ -31,9 +33,9 @@
 		}
 
 		if ((userRole === 'manager' || userRole === 'senior-manager') && userUid) {
-			const teamIds: string[] = data?.user?.managedTeamIds ?? [];
-			const ids = [userUid, ...teamIds];
+			const ids: string[] = data?.visibleAgentIds ?? [userUid];
 			return activeSales.filter((sale) =>
+				saleMatchesHierarchyEmail(sale, userRole, userEmail) ||
 				ids.some(
 					(id) => (sale.splitAgentIds ?? []).includes(id) || (sale.dealOwnerIds ?? []).includes(id)
 				)

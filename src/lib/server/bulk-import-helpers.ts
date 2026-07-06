@@ -4,6 +4,7 @@
  * building lives here so it can be imported from multiple server endpoints.
  */
 import { FieldValue, firestore } from '$lib/server/firebase';
+import { getSaleHierarchyEmails } from '$lib/sale-hierarchy';
 import Papa from 'papaparse';
 import { z } from 'zod';
 
@@ -721,6 +722,17 @@ export async function buildSaleRecord(
 	const now = FieldValue.serverTimestamp();
 	const createdByUid = callerUser?.uid ?? group.orderId;
 	const parsedSaleDate = parseDDMmmYYYY(primary.sale_date) ?? primary.sale_date ?? null;
+	const saleSplits = dealOwners.map((o) => ({
+		agentId: o.userId,
+		agentName: o.name,
+		agentEmail: o.email,
+		agentPhotoURL: o.photoURL,
+		ownerRole: o.ownerRole,
+		percentage: o.split,
+		...(o.managerEmail && { managerEmail: o.managerEmail }),
+		...(o.seniorManagerEmail && { seniorManagerEmail: o.seniorManagerEmail })
+	}));
+	const hierarchyEmails = getSaleHierarchyEmails(saleSplits);
 
 	return {
 		status: 'pending',
@@ -745,17 +757,9 @@ export async function buildSaleRecord(
 		jointBuyers,
 		dealOwners,
 		dealOwnerIds: dealOwners.map((o) => o.userId),
-		splits: dealOwners.map((o) => ({
-			agentId: o.userId,
-			agentName: o.name,
-			agentEmail: o.email,
-			agentPhotoURL: o.photoURL,
-			ownerRole: o.ownerRole,
-			percentage: o.split,
-			...(o.managerEmail && { managerEmail: o.managerEmail }),
-			...(o.seniorManagerEmail && { seniorManagerEmail: o.seniorManagerEmail })
-		})),
+		splits: saleSplits,
 		splitAgentIds: dealOwners.map((o) => o.userId),
+		...hierarchyEmails,
 		dealStage: primary.deal_stage ?? '',
 		paymentValue: primary.payment_value ?? 0,
 		bookingFormFile: makeFileRecord(primary.booking_form_url),
