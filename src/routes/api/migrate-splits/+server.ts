@@ -1,5 +1,6 @@
 import { firestore } from '$lib/server/firebase';
 import { getSaleHierarchyEmails, normalizeHierarchyEmail } from '$lib/sale-hierarchy';
+import { employeeIdForEmail } from '$lib/server/hr';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -12,21 +13,48 @@ function sameNormalizedArray(left: unknown, right: string[]) {
 	return JSON.stringify(normalizedLeft) === JSON.stringify(normalizedRight);
 }
 
+type EmployeeHierarchy = { reportingManagerEmail: string; seniorManagerEmail: string };
+
+async function loadEmployeeHierarchyMap(): Promise<Map<string, EmployeeHierarchy>> {
+	const snap = await firestore.collection('employees').get();
+	const map = new Map<string, EmployeeHierarchy>();
+	for (const doc of snap.docs) {
+		const data = doc.data() as Record<string, unknown>;
+		const email = normalizeHierarchyEmail(data.email ?? doc.id);
+		if (!email) continue;
+		map.set(email, {
+			reportingManagerEmail: normalizeHierarchyEmail(data.reportingManagerEmail),
+			seniorManagerEmail: normalizeHierarchyEmail(data.seniorManagerEmail)
+		});
+	}
+	return map;
+}
+
 /**
  * POST /api/migrate-splits
- * One-time migration: reads all `sales` docs and writes `splits[]` + `splitAgentIds[]`
- * from the legacy `dealOwners[]` field. Safe to run multiple times (idempotent).
+ * Two-phase migration on `sales` docs:
  *
- * Protected: requires a valid session cookie with role === 'super-admin'.
+ * Phase 1 (always): backfill splits[] + splitAgentIds[] from legacy dealOwners[].
+ * Phase 2 (when ?v2=1): for splits that still lack managerEmail / seniorManagerEmail,
+ *   look the agent up in the `employees` collection and fill them in, then recompute
+ *   managerEmails[] / seniorManagerEmails[] on the sale doc.
+ *
+ * Safe to run multiple times (idempotent). Super-admin only.
  */
-export const POST: RequestHandler = async ({ locals }) => {
+export const POST: RequestHandler = async ({ locals, url }) => {
 	const user = locals.user;
 	if (!user || user.role !== 'super-admin') {
 		return json({ success: false, error: 'Unauthorized — super-admin only' }, { status: 403 });
 	}
 
+	const v2 = url.searchParams.get('v2') === '1';
+
 	try {
-		const salesSnap = await firestore.collection('sales').get();
+		const [salesSnap, employeeMap] = await Promise.all([
+			firestore.collection('sales').get(),
+			v2 ? loadEmployeeHierarchyMap() : Promise.resolve(new Map<string, EmployeeHierarchy>())
+		]);
+
 		const docs = salesSnap.docs;
 
 		let migratedCount = 0;
@@ -34,7 +62,6 @@ export const POST: RequestHandler = async ({ locals }) => {
 		let errorCount = 0;
 		const errors: string[] = [];
 
-		// Process in batches of BATCH_SIZE
 		for (let i = 0; i < docs.length; i += BATCH_SIZE) {
 			const batch = firestore.batch();
 			const chunk = docs.slice(i, i + BATCH_SIZE);
@@ -57,7 +84,7 @@ export const POST: RequestHandler = async ({ locals }) => {
 						| undefined;
 
 					const existingSplits = Array.isArray(data.splits) ? data.splits : [];
-					const splits =
+					let splits: Record<string, unknown>[] =
 						existingSplits.length > 0
 							? existingSplits
 							: Array.isArray(dealOwners) && dealOwners.length > 0
@@ -93,13 +120,52 @@ export const POST: RequestHandler = async ({ locals }) => {
 						continue;
 					}
 
+					// Phase 2: fill in missing hierarchy emails from employees lookup
+					if (v2) {
+						splits = splits.map((s) => {
+							const hasMgr = typeof s.managerEmail === 'string' && s.managerEmail.trim();
+							const hasSMgr =
+								typeof s.seniorManagerEmail === 'string' && s.seniorManagerEmail.trim();
+							if (hasMgr && hasSMgr) return s;
+
+							const agentEmail = normalizeHierarchyEmail(s.agentEmail);
+							if (!agentEmail) return s;
+
+							const emp =
+								employeeMap.get(agentEmail) ??
+								employeeMap.get(normalizeHierarchyEmail(employeeIdForEmail(agentEmail)));
+							if (!emp) return s;
+
+							return {
+								...s,
+								managerEmail: hasMgr ? s.managerEmail : emp.reportingManagerEmail,
+								seniorManagerEmail: hasSMgr ? s.seniorManagerEmail : emp.seniorManagerEmail
+							};
+						});
+					}
+
 					const splitAgentIds = splits
 						.map((s) => (typeof s.agentId === 'string' ? s.agentId : ''))
 						.filter(Boolean);
-					const hierarchyEmails = getSaleHierarchyEmails(splits);
+					const hierarchyEmails = getSaleHierarchyEmails(
+						splits as { managerEmail?: string; seniorManagerEmail?: string }[]
+					);
 					const updatePayload: Record<string, unknown> = {};
 
 					if (existingSplits.length === 0) updatePayload.splits = splits;
+					else if (
+						v2 &&
+						splits.some((s, i) => {
+							const orig = existingSplits[i] as Record<string, unknown>;
+							return (
+								s.managerEmail !== orig?.managerEmail ||
+								s.seniorManagerEmail !== orig?.seniorManagerEmail
+							);
+						})
+					) {
+						updatePayload.splits = splits;
+					}
+
 					if (!sameNormalizedArray(data.splitAgentIds, splitAgentIds)) {
 						updatePayload.splitAgentIds = splitAgentIds;
 					}
@@ -107,10 +173,7 @@ export const POST: RequestHandler = async ({ locals }) => {
 						updatePayload.managerEmails = hierarchyEmails.managerEmails;
 					}
 					if (
-						!sameNormalizedArray(
-							data.seniorManagerEmails,
-							hierarchyEmails.seniorManagerEmails
-						)
+						!sameNormalizedArray(data.seniorManagerEmails, hierarchyEmails.seniorManagerEmails)
 					) {
 						updatePayload.seniorManagerEmails = hierarchyEmails.seniorManagerEmails;
 					}
@@ -138,11 +201,12 @@ export const POST: RequestHandler = async ({ locals }) => {
 		return json({
 			success: true,
 			data: {
+				phase: v2 ? 'v2' : 'v1',
 				total: docs.length,
 				migrated: migratedCount,
 				skipped: skippedCount,
 				errors: errorCount,
-				errorDetails: errors.slice(0, 20) // cap error list
+				errorDetails: errors.slice(0, 20)
 			}
 		});
 	} catch (err) {
