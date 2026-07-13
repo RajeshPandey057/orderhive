@@ -5,7 +5,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
-	import { getEffectiveSaleRevenue, isActiveSale } from '$lib/sales';
+	import { getSaleRevenue, isActiveSale } from '$lib/sales';
 	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import AlertCircle from '~icons/lucide/alert-circle';
@@ -593,7 +593,7 @@
 											<Table.Cell
 												class="text-right text-[13px] font-semibold text-[#17213D] tabular-nums"
 											>
-												{formatNumber(getEffectiveSaleRevenue(sale))}
+												{formatNumber(getSaleRevenue(sale))}
 											</Table.Cell>
 										</Table.Row>
 									{/each}

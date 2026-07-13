@@ -160,29 +160,16 @@ export function formatAmount(amount: number): string {
 
 export function isInPeriod(
 	saleDate: string | undefined | null,
-	createdAt: unknown,
 	start: string | null,
 	end: string | null
 ): boolean {
 	if (!start && !end) return true;
 
-	let dateStr: string | null = null;
-
-	if (saleDate && /^\d{4}-\d{2}-\d{2}$/.test(saleDate)) {
-		dateStr = saleDate;
-	} else if (
-		createdAt &&
-		typeof createdAt === 'object' &&
-		'toDate' in (createdAt as object) &&
-		typeof (createdAt as { toDate: unknown }).toDate === 'function'
-	) {
-		const d = (createdAt as { toDate(): Date }).toDate();
-		dateStr = d.toISOString().slice(0, 10);
-	}
-
-	if (!dateStr) return false;
-	if (start && dateStr < start) return false;
-	if (end && dateStr > end) return false;
+	// Only the sale date counts — deals without a registered sale date are
+	// excluded from ranged periods (no fallback to punch/created date).
+	if (!saleDate || !/^\d{4}-\d{2}-\d{2}$/.test(saleDate)) return false;
+	if (start && saleDate < start) return false;
+	if (end && saleDate > end) return false;
 	return true;
 }
 
@@ -223,10 +210,19 @@ export function calculateStats(deals: Sale[]): GroupStats {
 
 	for (const deal of deals) {
 		const amount = parseAmount(deal.unitValue);
+		// Revenue is derived live from commission % × unit value; the stored
+		// revenueAchieved is only a fallback for deals without a commission %.
+		const commissionPct = deal.commissionPercentage ?? 0;
+		const revenue =
+			commissionPct > 0 && amount > 0
+				? Math.round((amount * commissionPct) / 100)
+				: (deal.revenueAchieved ?? 0);
+		const passback = deal.passbackAmount ?? 0;
+
 		totalAmount += amount;
-		totalRevenue += deal.revenueAchieved ?? 0;
-		totalPassback += deal.passbackAmount ?? 0;
-		totalProfitPostPassback += deal.revenueAfterPassback ?? 0;
+		totalRevenue += revenue;
+		totalPassback += passback;
+		totalProfitPostPassback += revenue - passback;
 
 		const stage = deal.invoiceStage ?? [];
 		if (stage.includes('first-half')) {

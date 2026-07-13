@@ -58,10 +58,10 @@
 	]);
 
 	const financials = $derived([
-		{ label: 'Total Deal Value', value: formatAmount(stats.totalAmount), highlight: 'blue' },
+		{ label: 'Total GTV', value: formatAmount(stats.totalAmount), highlight: 'blue' },
 		{ label: 'Total Revenue', value: formatAmount(stats.totalRevenue), highlight: 'green' },
-		{ label: 'Total Revenue Passback', value: formatAmount(stats.totalPassback), highlight: 'orange' },
-		{ label: 'Total Profit Post Passback', value: formatAmount(stats.totalProfitPostPassback), highlight: 'green' }
+		{ label: 'Passback', value: formatAmount(stats.totalPassback), highlight: 'orange' },
+		{ label: 'Total Revenue post Passback', value: formatAmount(stats.totalProfitPostPassback), highlight: 'green' }
 	] as const);
 
 	const highlightClass = (h: 'green' | 'red' | 'blue' | 'orange' | undefined) => {

@@ -37,7 +37,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.filter(
 			(sale) =>
 				!sale.isDeleted &&
-				isInPeriod(sale.saleDate, sale.createdAt, start, end)
+				isInPeriod(sale.saleDate, start, end)
 		);
 
 	const dashboardData: DashboardData = buildDashboardData(confirmedDeals);

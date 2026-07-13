@@ -12,7 +12,7 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { isDateWithinThisMonth } from '$lib/date-period';
 	import { SALE_DEVELOPER_OPTIONS } from '$lib/listing-options';
-	import { getEffectiveSaleRevenue } from '$lib/sales';
+	import { getSaleRevenue, getSaleRevenuePostPassback } from '$lib/sales';
 	import {
 		type ColumnDef,
 		type ColumnFiltersState,
@@ -341,7 +341,8 @@
 			}
 		},
 		{
-			accessorKey: 'commission',
+			id: 'commission',
+			accessorFn: (row) => getSaleRevenue(row),
 			header: () => {
 				const headerSnippet = createRawSnippet(() => ({
 					render: () => `
@@ -360,7 +361,7 @@
 					const formatted = wholeNumberFormatter.format(value);
 					return { render: () => `<div class="text-right font-medium">${formatted}</div>` };
 				});
-				return renderSnippet(cellSnippet, { value: getEffectiveSaleRevenue(row.original) });
+				return renderSnippet(cellSnippet, { value: getSaleRevenue(row.original) });
 			}
 		},
 		{
@@ -385,9 +386,11 @@
 					const { value } = getData();
 					return { render: () => `<div class="text-right font-medium">${value}</div>` };
 				});
-				const amt = row.original.revenueAfterPassback;
+				// Derived live (revenue − passback) so the row stays internally
+				// consistent even when the stored revenueAfterPassback is stale.
+				const amt = getSaleRevenuePostPassback(row.original);
 				return renderSnippet(cellSnippet, {
-					value: amt != null ? wholeNumberFormatter.format(amt) : '—'
+					value: wholeNumberFormatter.format(amt)
 				});
 			}
 		},
