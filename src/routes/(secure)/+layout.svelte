@@ -9,7 +9,7 @@
 </script>
 
 <AuthGuard requireAuth={true} onUnauthorized={() => goto('/')}>
-	<Sidebar.Provider open={false}>
+	<Sidebar.Provider open={true}>
 		<AppSidebar {data} />
 		<Sidebar.Inset>
 			<div class="nav-track" aria-hidden="true">

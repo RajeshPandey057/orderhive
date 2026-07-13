@@ -4,8 +4,6 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { Separator } from '$lib/components/ui/separator/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { isActiveSale } from '$lib/sales';
 	import AddSaleSheet from '@/components/add-sale-sheet.svelte';
 	import SalesTable from '@/components/sales-table.svelte';
@@ -67,8 +65,6 @@
 >
 	<div class="flex w-full items-center justify-between gap-2 px-4">
 		<div class="flex items-center gap-2 px-4">
-			<Sidebar.Trigger class="-ms-1" />
-			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 			<h1 class="text-2xl font-medium">Sales Tracker</h1>
 		</div>
 		<div class="flex items-center gap-2">

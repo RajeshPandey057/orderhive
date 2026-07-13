@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
-	import { Separator } from '$lib/components/ui/separator/index.js';
 	import {
 		BEDROOM_OPTIONS,
 		DUBAI_COMMUNITIES,
@@ -13,7 +12,6 @@
 		LISTING_DEVELOPERS,
 		UNIT_TYPES
 	} from '$lib/listing-options';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import BedDoubleIcon from '~icons/lucide/bed-double';
 	import Building2Icon from '~icons/lucide/building-2';
 	import ChevronDownIcon from '~icons/lucide/chevron-down';
@@ -251,8 +249,6 @@
 >
 	<div class="flex w-full items-center gap-2 px-4">
 		<div class="flex items-center gap-2 px-4">
-			<Sidebar.Trigger class="-ms-1" />
-			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 			<h1 class="text-2xl font-medium">View Listings</h1>
 		</div>
 		<span class="mr-4 ml-auto text-sm text-muted-foreground">

@@ -34,6 +34,11 @@
 	interface Props {
 		data: Sale[];
 		role?: Role['accessType'];
+		/**
+		 * 'compliance' swaps the revenue/passback columns for the compliance
+		 * document-status columns (passport, gov ID, AML, booking form, Go AML).
+		 */
+		columnPreset?: 'default' | 'compliance';
 	}
 
 	const wholeNumberFormatter = new Intl.NumberFormat('en-US', {
@@ -66,7 +71,44 @@
 		return DEFAULT_STATUS_BADGE;
 	}
 
-	let { data = [], role }: Props = $props();
+	let { data = [], role, columnPreset = 'default' }: Props = $props();
+
+	type StatusBadge = { label: string; className: string };
+
+	function getDocumentBadge(file: SaleDocumentFile | null | undefined): StatusBadge {
+		if (!file) return { label: 'Not Uploaded', className: 'bg-gray-100 text-gray-600' };
+
+		const status = String(file.complianceStatus ?? 'pending');
+		if (status === 'approved') return { label: 'Approved', className: 'bg-green-100 text-green-700' };
+		if (status === 'rejected') return { label: 'Rejected', className: 'bg-red-100 text-red-700' };
+		return { label: 'In Review', className: 'bg-amber-100 text-amber-700' };
+	}
+
+	function getAmlBadge(sale: Sale): StatusBadge {
+		const done = String(sale.clientDetails.amlFormFile?.complianceStatus ?? '') === 'approved';
+		return done
+			? { label: 'AML Done', className: 'bg-green-100 text-green-700' }
+			: { label: 'AML Pending', className: 'bg-red-100 text-red-700' };
+	}
+
+	function getGoAmlBadge(sale: Sale): StatusBadge {
+		if (sale.goAmlStatus === 'red-flag')
+			return { label: 'Red Flag', className: 'bg-red-100 text-red-700' };
+		if (sale.goAmlStatus === 'green-flag')
+			return { label: 'Green Flag', className: 'bg-green-100 text-green-700' };
+		return { label: 'Pending', className: 'bg-amber-100 text-amber-700' };
+	}
+
+	function renderStatusBadge(badge: StatusBadge) {
+		const cellSnippet = createRawSnippet<[StatusBadge]>((getData) => {
+			const { label, className } = getData();
+			return {
+				render: () =>
+					`<div class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap ${className}">${label}</div>`
+			};
+		});
+		return renderSnippet(cellSnippet, badge);
+	}
 
 	// State for detail sheet
 	let detailSheetOpen = $state(false);
@@ -444,6 +486,49 @@
 		}
 	];
 
+	// Compliance document-status columns — shown (after Deal Stage) only when
+	// columnPreset === 'compliance', replacing the revenue/passback columns.
+	const complianceColumns: ColumnDef<Sale>[] = [
+		{
+			id: 'passportStatus',
+			header: 'Passport Status',
+			cell: ({ row }) => renderStatusBadge(getDocumentBadge(row.original.clientDetails.passportFile))
+		},
+		{
+			id: 'govIdStatus',
+			header: 'Gov ID Status',
+			cell: ({ row }) =>
+				renderStatusBadge(getDocumentBadge(row.original.clientDetails.nationalIdFile))
+		},
+		{
+			id: 'amlStatus',
+			header: 'AML Status',
+			cell: ({ row }) => renderStatusBadge(getAmlBadge(row.original))
+		},
+		{
+			id: 'bookingForm',
+			header: 'Booking Form',
+			cell: ({ row }) => renderStatusBadge(getDocumentBadge(row.original.bookingFormFile))
+		},
+		{
+			id: 'goAmlStatus',
+			header: 'Go AML Status',
+			cell: ({ row }) => renderStatusBadge(getGoAmlBadge(row.original))
+		}
+	];
+
+	const REVENUE_COLUMN_IDS = ['commission', 'passback', 'revenuePostPassback'];
+	const activeColumns: ColumnDef<Sale>[] = $derived(
+		columnPreset === 'compliance'
+			? [
+					...columns.filter((column) => !REVENUE_COLUMN_IDS.includes(column.id ?? '')),
+					...complianceColumns
+				]
+			: columns
+	);
+
+	const tableMinWidth = $derived(columnPreset === 'compliance' ? '2200px' : '1900px');
+
 	// Table state
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
 	let sorting = $state<SortingState>([{ id: 'id', desc: true }]);
@@ -605,7 +690,9 @@
 		get data() {
 			return filteredData;
 		},
-		columns,
+		get columns() {
+			return activeColumns;
+		},
 		getCoreRowModel: getCoreRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		getSortedRowModel: getSortedRowModel(),
@@ -834,7 +921,7 @@
 		bind:this={tableScrollEl}
 		class="rounded-md border bg-card overflow-x-scroll table-scroll-hidden"
 	>
-		<Table.Root class="min-w-[1900px]">
+		<Table.Root class="min-w-(--sales-table-min-w)" style="--sales-table-min-w: {tableMinWidth}">
 			<Table.Header>
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 					<Table.Row class="border-b bg-gray-200/40">
@@ -870,7 +957,7 @@
 					{/each}
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={columns.length} class="py-12">
+						<Table.Cell colspan={activeColumns.length} class="py-12">
 							<Empty.Root>
 								<Empty.Header>
 									<Empty.Media variant="icon">
@@ -905,7 +992,7 @@
 		bind:this={externalScrollbarEl}
 		class="overflow-x-scroll external-scrollbar"
 	>
-		<div class="min-w-[1900px]" style="height: 1px;"></div>
+		<div class="min-w-(--sales-table-min-w)" style="--sales-table-min-w: {tableMinWidth}; height: 1px;"></div>
 	</div>
 
 	<!-- Pagination -->

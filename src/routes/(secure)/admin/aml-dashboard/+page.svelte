@@ -5,7 +5,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
-	import { getSaleRevenue, isActiveSale } from '$lib/sales';
+	import { isActiveSale } from '$lib/sales';
 	import { firekitCollection } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
 	import AlertCircle from '~icons/lucide/alert-circle';
@@ -126,6 +126,25 @@
 
 	function getAmlStatusLabel(sale: Sale): string {
 		return isAmlDone(sale) ? 'AML Done' : 'AML Pending';
+	}
+
+	type StatusBadge = { label: string; className: string };
+
+	function getDocumentBadge(file: SaleDocumentFile | null | undefined): StatusBadge {
+		if (!file) return { label: 'Not Uploaded', className: 'bg-gray-100 text-gray-600' };
+
+		const status = String(file.complianceStatus ?? 'pending');
+		if (status === 'approved') return { label: 'Approved', className: 'bg-green-100 text-green-700' };
+		if (status === 'rejected') return { label: 'Rejected', className: 'bg-red-100 text-red-700' };
+		return { label: 'In Review', className: 'bg-amber-100 text-amber-700' };
+	}
+
+	function getGoAmlBadge(sale: Sale): StatusBadge {
+		if (sale.goAmlStatus === 'red-flag')
+			return { label: 'Red Flag', className: 'bg-red-100 text-red-700' };
+		if (sale.goAmlStatus === 'green-flag')
+			return { label: 'Green Flag', className: 'bg-green-100 text-green-700' };
+		return { label: 'Pending', className: 'bg-amber-100 text-amber-700' };
 	}
 
 	function buildYearOptions(sales: Sale[]): string[] {
@@ -482,7 +501,7 @@
 						class="overflow-x-auto"
 						onscroll={() => syncHorizontalScroll(dealsTableScroller, dealsScrollbar)}
 					>
-						<Table.Root class="min-w-[1180px]">
+						<Table.Root class="min-w-[1600px]">
 							<Table.Header>
 								<Table.Row class="bg-[#FBF9F8]">
 									<Table.Head class="h-11 border-r border-[#EBDCCB] text-[13px] text-[#17213D]">
@@ -510,10 +529,20 @@
 										Invoicing Stage
 									</Table.Head>
 									<Table.Head class="h-11 border-r border-[#EBDCCB] text-[13px] text-[#17213D]">
+										Passport Status
+									</Table.Head>
+									<Table.Head class="h-11 border-r border-[#EBDCCB] text-[13px] text-[#17213D]">
+										Gov ID Status
+									</Table.Head>
+									<Table.Head class="h-11 border-r border-[#EBDCCB] text-[13px] text-[#17213D]">
 										AML Status
 									</Table.Head>
-									<Table.Head class="h-11 text-right text-[13px] text-[#17213D]">Revenue</Table.Head
-									>
+									<Table.Head class="h-11 border-r border-[#EBDCCB] text-[13px] text-[#17213D]">
+										Booking Form
+									</Table.Head>
+									<Table.Head class="h-11 text-[13px] text-[#17213D]">
+										Go AML Status
+									</Table.Head>
 								</Table.Row>
 							</Table.Header>
 							<Table.Body>
@@ -567,6 +596,28 @@
 												<div class="mt-1 text-[#626262]">10% + 4% paid</div>
 											</Table.Cell>
 											<Table.Cell class="border-r border-[#EBDCCB] text-[13px]">
+												{@const passportBadge = getDocumentBadge(sale.clientDetails.passportFile)}
+												<div
+													class={[
+														'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
+														passportBadge.className
+													]}
+												>
+													{passportBadge.label}
+												</div>
+											</Table.Cell>
+											<Table.Cell class="border-r border-[#EBDCCB] text-[13px]">
+												{@const govIdBadge = getDocumentBadge(sale.clientDetails.nationalIdFile)}
+												<div
+													class={[
+														'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
+														govIdBadge.className
+													]}
+												>
+													{govIdBadge.label}
+												</div>
+											</Table.Cell>
+											<Table.Cell class="border-r border-[#EBDCCB] text-[13px]">
 												<div
 													class={[
 														'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
@@ -578,16 +629,33 @@
 													{getAmlStatusLabel(sale)}
 												</div>
 											</Table.Cell>
-											<Table.Cell
-												class="text-right text-[13px] font-semibold text-[#17213D] tabular-nums"
-											>
-												{formatNumber(getSaleRevenue(sale))}
+											<Table.Cell class="border-r border-[#EBDCCB] text-[13px]">
+												{@const bookingFormBadge = getDocumentBadge(sale.bookingFormFile)}
+												<div
+													class={[
+														'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
+														bookingFormBadge.className
+													]}
+												>
+													{bookingFormBadge.label}
+												</div>
+											</Table.Cell>
+											<Table.Cell class="text-[13px]">
+												{@const goAmlBadge = getGoAmlBadge(sale)}
+												<div
+													class={[
+														'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
+														goAmlBadge.className
+													]}
+												>
+													{goAmlBadge.label}
+												</div>
 											</Table.Cell>
 										</Table.Row>
 									{/each}
 								{:else}
 									<Table.Row>
-										<Table.Cell colspan={8} class="h-24 text-center text-[13px] text-[#687976]">
+										<Table.Cell colspan={11} class="h-24 text-center text-[13px] text-[#687976]">
 											No deals found for this senior manager.
 										</Table.Cell>
 									</Table.Row>
@@ -600,7 +668,7 @@
 						class="overflow-x-scroll border-t border-[#EBDCCB] md:hidden"
 						onscroll={() => syncHorizontalScroll(dealsScrollbar, dealsTableScroller)}
 					>
-						<div class="h-4 min-w-[1180px]"></div>
+						<div class="h-4 min-w-[1600px]"></div>
 					</div>
 				</div>
 			</div>

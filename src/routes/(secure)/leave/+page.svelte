@@ -11,8 +11,6 @@
 	} from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Separator } from '$lib/components/ui/separator';
-	import * as Sidebar from '$lib/components/ui/sidebar';
 	import {
 		Table,
 		TableBody,
@@ -94,8 +92,6 @@
 
 <div class="flex flex-col gap-6 bg-white p-6 text-[#222626]">
 	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ms-1" />
-		<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 		<div>
 			<h1 class="text-2xl leading-8 font-medium">Leave Management</h1>
 			<p class="text-[13px] leading-5 text-[#687976]">

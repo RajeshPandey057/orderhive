@@ -5,8 +5,6 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
-	import * as Separator from '$lib/components/ui/separator';
-	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { firekitUser } from 'svelte-firekit';
 	import { toast } from 'svelte-sonner';
@@ -156,8 +154,6 @@
 >
 	<div class="flex w-full items-center gap-2 px-4">
 		<div class="flex items-center gap-2 px-4">
-			<Sidebar.Trigger class="-ms-1" />
-			<Separator.Root orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 			<h1 class="text-2xl font-medium">Profile</h1>
 		</div>
 	</div>

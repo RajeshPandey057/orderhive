@@ -1,7 +1,6 @@
 <script lang="ts">
 	import ListingMediaGallery from '$lib/components/listing-media-gallery.svelte';
 	import { Separator } from '$lib/components/ui/separator/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ArrowLeftIcon from '~icons/lucide/arrow-left';
 	import Building2Icon from '~icons/lucide/building-2';
 	import DollarSignIcon from '~icons/lucide/dollar-sign';
@@ -47,8 +46,6 @@
 >
 	<div class="flex w-full items-center gap-2 px-4">
 		<div class="flex items-center gap-2 px-4">
-			<Sidebar.Trigger class="-ms-1" />
-			<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 			<a
 				href="/listing/view-listings"
 				class="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

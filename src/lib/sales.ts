@@ -4,6 +4,26 @@ export function isActiveSale(sale: Pick<Sale, 'isDeleted'> | null | undefined): 
 	return !sale?.isDeleted;
 }
 
+/**
+ * A sale counts as fully documented for compliance only when every required
+ * document — passport, gov ID, AML form and booking form — is approved. The
+ * Go-AML form is deliberately excluded: it is not required for approval.
+ */
+export function areRequiredComplianceDocsApproved(
+	sale: Pick<Sale, 'clientDetails' | 'bookingFormFile'> | null | undefined
+): boolean {
+	if (!sale) return false;
+
+	const requiredDocs = [
+		sale.clientDetails?.passportFile,
+		sale.clientDetails?.nationalIdFile,
+		sale.clientDetails?.amlFormFile,
+		sale.bookingFormFile
+	];
+
+	return requiredDocs.every((doc) => String(doc?.complianceStatus ?? '') === 'approved');
+}
+
 export function getSaleRevenue(
 	sale:
 		| Pick<Sale, 'dealStage' | 'unitValue' | 'commissionPercentage' | 'revenueAchieved'>

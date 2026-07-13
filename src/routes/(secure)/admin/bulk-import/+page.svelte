@@ -3,8 +3,6 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { Separator } from '$lib/components/ui/separator/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Switch from '$lib/components/ui/switch/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import type { ImportedSale, ImportError } from '$lib/server/bulk-import-helpers';
@@ -536,8 +534,6 @@
 	class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
 >
 	<div class="flex w-full items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ms-1" />
-		<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 		<h1 class="text-2xl font-medium">Bulk Import</h1>
 	</div>
 </header>

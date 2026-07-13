@@ -68,7 +68,6 @@
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { getDefaultRoute, getMenuItems, isMenuItemActive, type AccessType } from '$lib/constants';
 	import FullLogoDark from '@/svg/full-logo-dark.svelte';
-	import LogoDark from '@/svg/logo-dark.svelte';
 	import type { ComponentProps } from 'svelte';
 	import { onMount } from 'svelte';
 	import { firekitUser } from 'svelte-firekit';
@@ -297,14 +296,18 @@
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
-				class="flex justify-center overflow-hidden px-2 py-6 group-data-[collapsible=icon]:px-0"
-				onclick={() => data?.user?.role && goto(resolve(getDefaultRoute(data.user.role)))}
+				class="flex items-center justify-between gap-2 overflow-hidden px-2 py-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 			>
 				{#if sidebar.open}
-					<FullLogoDark />
-				{:else}
-					<LogoDark />
+					<button
+						type="button"
+						class="flex items-center overflow-hidden"
+						onclick={() => data?.user?.role && goto(resolve(getDefaultRoute(data.user.role)))}
+					>
+						<FullLogoDark />
+					</button>
 				{/if}
+				<Sidebar.Trigger class="text-white hover:bg-white/10 hover:text-white" />
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 		{#if isAdminSidebarRole}
