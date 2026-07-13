@@ -371,9 +371,10 @@ const toUploadedFile = async (file: File | null | undefined, path: string) => {
 };
 
 // Generate unique predictable sale ID
-async function generateSaleId(): Promise<string> {
-	const today = new Date();
-	const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD format
+// Uses the user-entered saleDate (YYYY-MM-DD) to avoid UTC vs local timezone mismatch
+// on GCP servers in Europe when sales are punched from India/UAE.
+async function generateSaleId(saleDate: string): Promise<string> {
+	const dateStr = saleDate.slice(0, 10).replace(/-/g, ''); // YYYYMMDD from user-entered date
 	const counterDocRef = firestore.collection('counters').doc(`sale-${dateStr}`);
 
 	// Use transaction to ensure atomicity
@@ -413,8 +414,8 @@ export const createSale = form(saleSchema, async (data) => {
 	const createdByUid = data.splits[0]?.agentId ?? 'unknown';
 	const createdByEmail = data.splits[0]?.agentEmail ?? null;
 
-	// Generate predictable sale ID
-	const saleId = await generateSaleId();
+	// Generate predictable sale ID using the user-entered sale date
+	const saleId = await generateSaleId(data.saleDate);
 	const basePath = `sales/${createdByUid}/${saleId}`;
 
 	// Upload primary buyer documents
