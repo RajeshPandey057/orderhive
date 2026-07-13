@@ -403,14 +403,8 @@
 							<Table.Head class="h-9 border-r text-right text-[13px] font-normal text-[#687976]">
 								AML Done
 							</Table.Head>
-							<Table.Head class="h-9 border-r text-right text-[13px] font-normal text-[#687976]">
-								AML NOT DONE
-							</Table.Head>
-							<Table.Head class="h-9 border-r text-right text-[13px] font-normal text-[#687976]">
-								AML Done %age
-							</Table.Head>
 							<Table.Head class="h-9 text-right text-[13px] font-normal text-[#687976]">
-								AML Not Done %age
+								AML NOT DONE
 							</Table.Head>
 						</Table.Row>
 					</Table.Header>
@@ -434,20 +428,14 @@
 									<Table.Cell class="border-r text-right text-[13px] tabular-nums">
 										{row.amlDone}
 									</Table.Cell>
-									<Table.Cell class="border-r text-right text-[13px] tabular-nums">
+									<Table.Cell class="text-right text-[13px] tabular-nums">
 										{row.amlNotDone}
 									</Table.Cell>
-									<Table.Cell class="border-r text-right text-[13px] tabular-nums">
-										{row.amlDonePercentage}%
-									</Table.Cell>
-									<Table.Cell class="text-right text-[13px] tabular-nums"
-										>{row.amlNotDonePercentage}%</Table.Cell
-									>
 								</Table.Row>
 							{/each}
 						{:else}
 							<Table.Row>
-								<Table.Cell colspan={6} class="py-10">
+								<Table.Cell colspan={4} class="py-10">
 									<Empty.Root>
 										<Empty.Header>
 											<Empty.Media variant="icon">

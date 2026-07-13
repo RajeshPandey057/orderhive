@@ -168,6 +168,14 @@ const saleSchema = z
 		amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 		refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 
+		// Go AML report (optional, can be uploaded any time; status required alongside the file)
+		goAmlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		goAmlStatus: z
+			.string()
+			.optional()
+			.transform((v) => (v === '' || v === undefined ? undefined : v))
+			.pipe(z.enum(['red-flag', 'green-flag']).optional()),
+
 		// Project Details
 		invoiceStage: z
 			.array(z.enum(['first-half', 'second-half', 'full', 'not-yet-eligible']))
@@ -333,6 +341,22 @@ const saleSchema = z
 			}
 		}
 
+		const hasGoAmlFile = data.goAmlFormFile instanceof File && data.goAmlFormFile.size > 0;
+		if (hasGoAmlFile && !data.goAmlStatus) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['goAmlStatus'],
+				message: 'Please mark the Go AML form as Red Flag or Green Flag'
+			});
+		}
+		if (!hasGoAmlFile && data.goAmlStatus) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['goAmlFormFile'],
+				message: 'Please upload the Go AML form to set its status'
+			});
+		}
+
 		if (dealStage !== 'cancelled') {
 			if (!data.bookingFormFile || data.bookingFormFile.size <= 0) {
 				ctx.addIssue({
@@ -447,11 +471,13 @@ export const createSale = form(saleSchema, async (data) => {
 	);
 
 	// Upload booking and payment documents
-	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile] = await Promise.all([
-		toUploadedFile(data.bookingFormFile, `${basePath}/booking-form`),
-		toUploadedFile(data.paymentReceiptFile, `${basePath}/payment-receipt`),
-		toUploadedFile(data.refferalAgreementFile, `${basePath}/referral-agreement`)
-	]);
+	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile, goAmlFormFile] =
+		await Promise.all([
+			toUploadedFile(data.bookingFormFile, `${basePath}/booking-form`),
+			toUploadedFile(data.paymentReceiptFile, `${basePath}/payment-receipt`),
+			toUploadedFile(data.refferalAgreementFile, `${basePath}/referral-agreement`),
+			toUploadedFile(data.goAmlFormFile, `${basePath}/go-aml-form`)
+		]);
 
 	// Calculate commission and passback derived values
 	let revenueAchieved: number | undefined;
@@ -522,6 +548,8 @@ export const createSale = form(saleSchema, async (data) => {
 		bookingFormFile,
 		paymentReceiptFile,
 		refferalAgreementFile,
+		goAmlFormFile,
+		goAmlStatus: goAmlFormFile ? (data.goAmlStatus ?? null) : null,
 		saleType,
 		developer,
 		project: data.project,
@@ -616,6 +644,12 @@ const updateSaleSchema = z
 		paymentReceiptFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 		amlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
 		refferalAgreementFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		goAmlFormFile: z.custom<File>((file) => !file || file instanceof File).optional(),
+		goAmlStatus: z
+			.string()
+			.optional()
+			.transform((v) => (v === '' || v === undefined ? undefined : v))
+			.pipe(z.enum(['red-flag', 'green-flag']).optional()),
 		invoiceStage: z
 			.array(z.enum(['first-half', 'second-half', 'full', 'not-yet-eligible']))
 			.min(1, 'At least one invoice stage must be selected')
@@ -677,7 +711,8 @@ const updateSaleSchema = z
 		removeAmlFormFile: z.string().optional(),
 		removeBookingFormFile: z.string().optional(),
 		removePaymentReceiptFile: z.string().optional(),
-		removeRefferalAgreementFile: z.string().optional()
+		removeRefferalAgreementFile: z.string().optional(),
+		removeGoAmlFormFile: z.string().optional()
 	})
 	.superRefine((data, ctx) => {
 		const propertyType = normalizePropertyTypeValue(data.propertyType);
@@ -1036,26 +1071,43 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 		})
 	);
 
-	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile] = await Promise.all([
-		resolveUploadedFile(
-			data.bookingFormFile,
-			`${basePath}/booking-form`,
-			existingSale.bookingFormFile as UploadedDoc,
-			!!data.removeBookingFormFile
-		),
-		resolveUploadedFile(
-			data.paymentReceiptFile,
-			`${basePath}/payment-receipt`,
-			existingSale.paymentReceiptFile as UploadedDoc,
-			!!data.removePaymentReceiptFile
-		),
-		resolveUploadedFile(
-			data.refferalAgreementFile,
-			`${basePath}/referral-agreement`,
-			existingSale.refferalAgreementFile as UploadedDoc,
-			!!data.removeRefferalAgreementFile
-		)
-	]);
+	const [bookingFormFile, paymentReceiptFile, refferalAgreementFile, goAmlFormFile] =
+		await Promise.all([
+			resolveUploadedFile(
+				data.bookingFormFile,
+				`${basePath}/booking-form`,
+				existingSale.bookingFormFile as UploadedDoc,
+				!!data.removeBookingFormFile
+			),
+			resolveUploadedFile(
+				data.paymentReceiptFile,
+				`${basePath}/payment-receipt`,
+				existingSale.paymentReceiptFile as UploadedDoc,
+				!!data.removePaymentReceiptFile
+			),
+			resolveUploadedFile(
+				data.refferalAgreementFile,
+				`${basePath}/referral-agreement`,
+				existingSale.refferalAgreementFile as UploadedDoc,
+				!!data.removeRefferalAgreementFile
+			),
+			resolveUploadedFile(
+				data.goAmlFormFile,
+				`${basePath}/go-aml-form`,
+				existingSale.goAmlFormFile as UploadedDoc,
+				!!data.removeGoAmlFormFile
+			)
+		]);
+
+	// Go AML status only makes sense alongside the form; clear it when the file is removed
+	const existingGoAmlStatus =
+		existingSale.goAmlStatus === 'red-flag' || existingSale.goAmlStatus === 'green-flag'
+			? existingSale.goAmlStatus
+			: null;
+	const goAmlStatus = goAmlFormFile ? (data.goAmlStatus ?? existingGoAmlStatus) : null;
+	if (goAmlFormFile && !goAmlStatus) {
+		throw error(400, 'Please mark the Go AML form as Red Flag or Green Flag');
+	}
 
 	let revenueAchieved: number | undefined;
 	let revenueAfterPassback: number | undefined;
@@ -1142,6 +1194,8 @@ export const updateSale = form(updateSaleSchema, async (data) => {
 	addIfChanged('bookingFormFile', bookingFormFile, existingSale.bookingFormFile);
 	addIfChanged('paymentReceiptFile', paymentReceiptFile, existingSale.paymentReceiptFile);
 	addIfChanged('refferalAgreementFile', refferalAgreementFile, existingSale.refferalAgreementFile);
+	addIfChanged('goAmlFormFile', goAmlFormFile, existingSale.goAmlFormFile ?? null);
+	addIfChanged('goAmlStatus', goAmlStatus, existingGoAmlStatus);
 	addIfChanged('saleType', saleType, existingSale.saleType);
 	addIfChanged('developer', developer, existingSale.developer);
 	addIfChanged('project', data.project, existingSale.project);

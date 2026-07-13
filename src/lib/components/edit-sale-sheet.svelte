@@ -282,6 +282,7 @@
 		passportFile: null,
 		nationalIdFile: null,
 		amlFormFile: null,
+		goAmlFormFile: null,
 		bookingFormFile: null,
 		paymentReceiptFile: null,
 		refferalAgreementFile: null
@@ -723,10 +724,12 @@
 				passportFile: toDisplayFile(sale.clientDetails.passportFile),
 				nationalIdFile: toDisplayFile(sale.clientDetails.nationalIdFile),
 				amlFormFile: toDisplayFile(sale.clientDetails.amlFormFile),
+				goAmlFormFile: toDisplayFile(sale.goAmlFormFile ?? null),
 				bookingFormFile: toDisplayFile(sale.bookingFormFile),
 				paymentReceiptFile: toDisplayFile(sale.paymentReceiptFile),
 				refferalAgreementFile: toDisplayFile(sale.refferalAgreementFile)
 			};
+			updateSale.fields.goAmlStatus?.set(sale.goAmlStatus ?? undefined);
 		}); // end untrack
 	});
 </script>
@@ -778,6 +781,11 @@
 				value="true"
 			/>{/if}
 		{#if removedFiles.amlFormFile}<input type="hidden" name="removeAmlFormFile" value="true" />{/if}
+		{#if removedFiles.goAmlFormFile}<input
+				type="hidden"
+				name="removeGoAmlFormFile"
+				value="true"
+			/>{/if}
 		{#if removedFiles.bookingFormFile}<input
 				type="hidden"
 				name="removeBookingFormFile"
@@ -1256,6 +1264,113 @@
 									onchange={(e) => handleFileUpload('amlFormFile', e)}
 									disabled={!canUploadManually}
 								/>
+							</div>
+
+							<div class="col-span-2 flex w-full flex-col items-center gap-4">
+								<div class="flex w-full flex-row gap-4">
+									<span
+										class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+									>
+										4
+									</span>
+									<p class="text-sm font-medium">
+										Go AML Form <span class="text-muted-foreground">(Optional)</span>
+									</p>
+								</div>
+
+								{#if uploadedFiles.goAmlFormFile}
+									<div
+										class="flex w-full items-center justify-between gap-3 rounded-lg border border-muted-foreground/40 bg-background p-3"
+									>
+										<div class="flex items-center gap-3">
+											<FileText class="h-10 w-10 text-orange-500" />
+											<div class="flex flex-col">
+												<span class="text-sm font-medium">{uploadedFiles.goAmlFormFile.name}</span>
+												<span class="text-xs text-muted-foreground"
+													>{formatFileSize(uploadedFiles.goAmlFormFile.size)}</span
+												>
+											</div>
+										</div>
+										<div class="flex items-center gap-2">
+											{#if uploadedFiles.goAmlFormFile.downloadURL}
+												<a
+													href={uploadedFiles.goAmlFormFile.downloadURL}
+													target="_blank"
+													class="text-sm font-medium text-primary hover:underline"
+												>
+													Open
+												</a>
+											{/if}
+											{#if canUploadManually}
+												<button
+													type="button"
+													onclick={() => {
+														removeFile('goAmlFormFile');
+														updateSale.fields.goAmlStatus?.set(undefined);
+													}}
+													class="text-destructive hover:text-destructive/80"
+												>
+													<Trash2 class="h-5 w-5" />
+												</button>
+											{/if}
+										</div>
+									</div>
+									<div class="flex w-full items-center gap-3">
+										<span class="text-sm text-muted-foreground">Status:</span>
+										<button
+											type="button"
+											disabled={!canUploadManually}
+											class="rounded-full border px-4 py-1.5 text-sm font-medium transition disabled:pointer-events-none {updateSale.fields.goAmlStatus?.value() ===
+											'red-flag'
+												? 'border-red-600 bg-red-100 text-red-700'
+												: 'border-muted-foreground/40 text-muted-foreground hover:border-red-400 hover:text-red-600'}"
+											onclick={() => updateSale.fields.goAmlStatus?.set('red-flag')}
+										>
+											Red Flag
+										</button>
+										<button
+											type="button"
+											disabled={!canUploadManually}
+											class="rounded-full border px-4 py-1.5 text-sm font-medium transition disabled:pointer-events-none {updateSale.fields.goAmlStatus?.value() ===
+											'green-flag'
+												? 'border-green-600 bg-green-100 text-green-700'
+												: 'border-muted-foreground/40 text-muted-foreground hover:border-green-500 hover:text-green-600'}"
+											onclick={() => updateSale.fields.goAmlStatus?.set('green-flag')}
+										>
+											Green Flag
+										</button>
+									</div>
+								{:else if canUploadManually}
+									<label
+										for="goAmlFormFile"
+										class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-2 text-lg font-semibold text-foreground transition hover:border-foreground/60"
+									>
+										<Upload class="h-5 w-5 text-gray-600" />
+										<span class="text-sm font-medium">Upload Go AML form</span>
+									</label>
+								{:else}
+									<div
+										class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+									>
+										Go AML form can be uploaded by an admin at any time
+									</div>
+								{/if}
+								<Input
+									id="goAmlFormFile"
+									class="sr-only"
+									{...updateSale.fields.goAmlFormFile?.as('file')}
+									files={undefined}
+									accept="application/pdf"
+									onchange={(e) => handleFileUpload('goAmlFormFile', e)}
+									disabled={!canUploadManually}
+								/>
+								<input type="hidden" {...updateSale.fields.goAmlStatus?.as('text')} />
+								{#each updateSale.fields.goAmlFormFile?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
+								{#each updateSale.fields.goAmlStatus?.issues() ?? [] as issue, i (i)}
+									<Field.Error class="text-sm text-destructive">{issue.message}</Field.Error>
+								{/each}
 							</div>
 						</div>
 					</Field.Group>

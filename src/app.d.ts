@@ -271,6 +271,8 @@ declare global {
 			nationalIdFile: SaleDocumentFile | null;
 		};
 		refferalAgreementFile: SaleDocumentFile | null;
+		goAmlFormFile?: SaleDocumentFile | null;
+		goAmlStatus?: 'red-flag' | 'green-flag' | null;
 		jointBuyers: {
 			firstName: string;
 			lastName: string;

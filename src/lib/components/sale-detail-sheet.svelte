@@ -340,9 +340,7 @@
 				for (let i = 0; i < pathParts.length - 1; i++) {
 					target = target[pathParts[i]] as Record<string, unknown>;
 				}
-				const file = target[pathParts[pathParts.length - 1]] as
-					| Record<string, unknown>
-					| undefined;
+				const file = target[pathParts[pathParts.length - 1]] as Record<string, unknown> | undefined;
 				if (file) {
 					file[statusField] = status;
 					sale = { ...sale };
@@ -930,6 +928,58 @@
 								class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
 							>
 								No AML form document uploaded
+							</div>
+						{/if}
+					</div>
+
+					<!-- Go AML Form -->
+					<div class="space-y-3">
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-4">
+								<span
+									class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-500"
+								>
+									4
+								</span>
+								<h3 class="text-sm font-medium">Go AML Form</h3>
+							</div>
+							{#if sale?.goAmlStatus}
+								<span
+									class="rounded-full border px-3 py-1 text-xs font-semibold {sale.goAmlStatus ===
+									'red-flag'
+										? 'border-red-600 bg-red-100 text-red-700'
+										: 'border-green-600 bg-green-100 text-green-700'}"
+								>
+									{sale.goAmlStatus === 'red-flag' ? 'Red Flag' : 'Green Flag'}
+								</span>
+							{/if}
+						</div>
+						{#if sale?.goAmlFormFile}
+							<div
+								class="flex w-full items-center justify-between gap-3 rounded-lg border bg-background p-3"
+							>
+								<div class="flex items-center gap-3">
+									<FileText class="h-10 w-10 text-orange-500" />
+									<div class="flex flex-col">
+										<span class="text-sm font-medium">{sale.goAmlFormFile.name}</span>
+										<span class="text-xs text-muted-foreground"
+											>{formatFileSize(sale.goAmlFormFile.size)}</span
+										>
+									</div>
+								</div>
+								<a
+									href={sale.goAmlFormFile.downloadURL}
+									target="_blank"
+									class={buttonVariants({ variant: 'outline', size: 'sm' })}
+								>
+									View
+								</a>
+							</div>
+						{:else}
+							<div
+								class="flex w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground"
+							>
+								No Go AML form uploaded
 							</div>
 						{/if}
 					</div>

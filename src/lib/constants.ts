@@ -35,7 +35,6 @@ export type DefaultRoute =
 const EDUCATION_ACCESS_ROLES: AccessType[] = [
 	'admin',
 	'agent',
-	'compliance',
 	'finance',
 	'general',
 	'hr-assignee',
@@ -90,9 +89,9 @@ export const ROLE_ROUTES: Record<AccessType, string[]> = {
 		'/holidays'
 	],
 	compliance: [
-		'/compliance',
-		'/listing',
-		'/education',
+		'/compliance/dashboard',
+		'/compliance/pending-sales',
+		'/compliance/approved-sales',
 		'/dashboard',
 		'/profile',
 		'/my-attendance',
@@ -179,13 +178,8 @@ const roleMenuItems: Record<AccessType, MenuItem[]> = {
 	],
 	compliance: [
 		{ title: 'Compliance Dashboard', url: '/compliance/dashboard' },
-		{ title: 'Listing Management', url: '/listing/listing-management' },
-		{ title: 'View Listings', url: '/listing/view-listings' },
 		{ title: 'Pending Sales', url: '/compliance/pending-sales' },
 		{ title: 'Approved Sales', url: '/compliance/approved-sales' },
-		{ title: 'Invoices', url: '/compliance/invoices' },
-		{ title: "Next Month's Sales", url: '/compliance/next-months-sales' },
-		{ title: 'Education Module', url: '/education' },
 		{ title: 'My Attendance', url: '/my-attendance' },
 		{ title: 'My Leaves', url: '/leave' },
 		{ title: 'Holiday Calendar', url: '/holidays' }
