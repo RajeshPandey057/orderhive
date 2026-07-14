@@ -755,6 +755,14 @@ export const importBulkSales = form(bulkImportSchema, async ({ csv, lenient: len
 					createdByEmail: _createdByEmail,
 					...updatePayload
 				} = saleRecord;
+				// If the existing record was soft-deleted, clear the deletion fields so it
+				// becomes visible again after re-import.
+				if (existing.data()?.isDeleted) {
+					(updatePayload as Record<string, unknown>).isDeleted = FieldValue.delete();
+					(updatePayload as Record<string, unknown>).deletedAt = FieldValue.delete();
+					(updatePayload as Record<string, unknown>).deletedByEmail = FieldValue.delete();
+					(updatePayload as Record<string, unknown>).deletedByUid = FieldValue.delete();
+				}
 				await firestore.collection('sales').doc(saleId).update(updatePayload);
 				updatedSales.push({
 					id: saleId,
