@@ -20,10 +20,17 @@
 		parseDateInput,
 		type DateFilterPeriod
 	} from '$lib/date-period';
-	import { Download, Radio, Search } from '@lucide/svelte';
+	import { Download, Radio, Search, Trash2, Upload } from '@lucide/svelte';
 	import { collection, getFirestore, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 	import { toast } from 'svelte-sonner';
-	import { correctAttendance, reconcileAttendance, syncUnprocessed } from '../hr/hr.remote';
+	import {
+		correctAttendance,
+		deleteAttendanceForDate,
+		processAttendanceForDate,
+		reconcileAttendance,
+		syncUnprocessed,
+		uploadAttendanceCsv
+	} from '../hr/hr.remote';
 
 	let {
 		data
@@ -131,6 +138,10 @@
 	let selectedKpiFilter = $state<KpiFilter>('all');
 	let saving = $state(false);
 	let syncing = $state(false);
+	let processingDate = $state(false);
+	let importingCsv = $state(false);
+	let deletingDate = $state(false);
+	let attendanceFile = $state<File | null>(null);
 
 	// ── Period range helper ───────────────────────────────────────────────────────
 	const attendanceRecords = $derived(data.attendanceRecords ?? []);
@@ -258,6 +269,72 @@
 			toast.error(err instanceof Error ? err.message : 'Unable to sync attendance');
 		} finally {
 			syncing = false;
+		}
+	}
+
+	function handleAttendanceFileChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		attendanceFile = input.files?.[0] ?? null;
+	}
+
+	async function processSelectedDate() {
+		if (!selectedAttendanceDate) return;
+		processingDate = true;
+		try {
+			const result = await processAttendanceForDate({ date: selectedAttendanceDate });
+			toast.success(
+				`${result.date}: ${result.present} present, ${result.absent} absent, ${result.onLeave} on leave, ${result.holiday} holiday.`
+			);
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to process attendance');
+		} finally {
+			processingDate = false;
+		}
+	}
+
+	async function importSelectedDate() {
+		if (!selectedAttendanceDate || !attendanceFile) {
+			toast.error('Select an attendance date and CSV file first');
+			return;
+		}
+		if (!attendanceFile.name.toLowerCase().endsWith('.csv')) {
+			toast.error('Attendance upload must be a CSV file');
+			return;
+		}
+		importingCsv = true;
+		try {
+			const result = await uploadAttendanceCsv({
+				date: selectedAttendanceDate,
+				csvText: await attendanceFile.text()
+			});
+			toast.success(`Imported ${result.imported} attendance record(s)`);
+			attendanceFile = null;
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to import attendance CSV');
+		} finally {
+			importingCsv = false;
+		}
+	}
+
+	async function deleteSelectedDate() {
+		if (!selectedAttendanceDate) return;
+		if (
+			!window.confirm(
+				`Delete attendance logs for ${selectedAttendanceDate}? Raw biometric punches will be retained.`
+			)
+		)
+			return;
+		deletingDate = true;
+		try {
+			const result = await deleteAttendanceForDate({ date: selectedAttendanceDate });
+			toast.success(`Deleted ${result.deleted} attendance record(s)`);
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to delete attendance');
+		} finally {
+			deletingDate = false;
 		}
 	}
 
@@ -421,6 +498,66 @@
 						/>
 					</div>
 				{/if}
+			</div>
+
+			<div
+				class="flex flex-wrap items-center gap-2 rounded-md border border-[#EBEEEE] bg-[#FBF9F8] p-3"
+			>
+				<Label for="attendance-upload-date" class="text-[13px] font-medium text-[#222626]"
+					>Upload date</Label
+				>
+				<Input
+					id="attendance-upload-date"
+					type="date"
+					class="h-8 w-40 border-[#D4D9D9] bg-white text-[13px]"
+					bind:value={selectedAttendanceDate}
+					max={todayStr()}
+				/>
+				<Button
+					type="button"
+					class="h-8 text-xs"
+					onclick={processSelectedDate}
+					disabled={processingDate}
+				>
+					<Radio class="mr-1.5 h-3.5 w-3.5" />
+					{processingDate ? 'Processing...' : 'Process biometric'}
+				</Button>
+				<input
+					id="attendance-csv"
+					type="file"
+					accept=".csv,text/csv"
+					class="sr-only"
+					onchange={handleAttendanceFileChange}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-8 border-[#D4D9D9] text-xs"
+					onclick={() => document.getElementById('attendance-csv')?.click()}
+				>
+					<Upload class="mr-1.5 h-3.5 w-3.5" />
+					{attendanceFile ? attendanceFile.name : 'Choose CSV'}
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-8 border-[#D4D9D9] text-xs"
+					onclick={importSelectedDate}
+					disabled={importingCsv || !attendanceFile}
+				>
+					{importingCsv ? 'Uploading...' : 'Upload CSV'}
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-8 border-red-200 text-xs text-red-700 hover:bg-red-50"
+					onclick={deleteSelectedDate}
+					disabled={deletingDate}
+				>
+					<Trash2 class="mr-1.5 h-3.5 w-3.5" />
+					{deletingDate ? 'Deleting...' : 'Delete date'}
+				</Button>
+				<span class="text-[11px] text-[#687976]">CSV rows must use the selected date.</span>
 			</div>
 
 			<div class="grid grid-cols-2 gap-3 md:grid-cols-5">

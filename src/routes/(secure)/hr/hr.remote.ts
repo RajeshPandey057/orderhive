@@ -15,6 +15,7 @@ import {
 	holidaysCollection,
 	isEmployeeOnProbation,
 	leaveRequestsCollection,
+	listEmployeesWithAccess,
 	normalizeEmail,
 	serializeLeaveRequest,
 	SICK_LEAVE_TYPE,
@@ -22,6 +23,7 @@ import {
 } from '$lib/server/hr';
 import { error } from '@sveltejs/kit';
 import { FieldValue } from 'firebase-admin/firestore';
+import Papa from 'papaparse';
 import { z } from 'zod';
 
 const accessTypeSchema = z.enum([
@@ -37,6 +39,24 @@ const accessTypeSchema = z.enum([
 
 const optionalString = z.string().trim().optional().default('');
 const emailSchema = z.email().transform((email) => normalizeEmail(email));
+const attendanceDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
+
+function assertValidAttendanceDate(date: string) {
+	const parsed = new Date(`${date}T00:00:00Z`);
+	if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+		throw error(400, 'Invalid attendance date');
+	}
+}
+
+function dateOffset(date: string, days: number) {
+	const parsed = new Date(`${date}T00:00:00Z`);
+	parsed.setUTCDate(parsed.getUTCDate() + days);
+	return parsed.toISOString().slice(0, 10);
+}
+
+function isInLeaveRange(data: FirebaseFirestore.DocumentData, date: string) {
+	return data.startDate <= date && data.endDate >= date;
+}
 
 const employeeAccessSchema = z.object({
 	accessType: accessTypeSchema,
@@ -406,6 +426,210 @@ export const syncAttendance = command(
 		}
 		await batch.commit();
 		return { success: true, imported: rows.length };
+	}
+);
+
+const attendanceCsvStatusSchema = z.enum(['present', 'late', 'absent', 'on-leave', 'holiday']);
+
+function parseOptionalNumber(value: string | undefined, field: string, rowNumber: number) {
+	if (!value?.trim()) return undefined;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed < 0) {
+		throw error(400, `Invalid ${field} on CSV row ${rowNumber}`);
+	}
+	return parsed;
+}
+
+export const uploadAttendanceCsv = command(
+	z.object({
+		date: attendanceDateSchema,
+		csvText: z.string().trim().min(1, 'Attendance CSV file is required')
+	}),
+	async ({ date, csvText }) => {
+		requireHrAdmin();
+		assertValidAttendanceDate(date);
+
+		const parsed = Papa.parse<Record<string, string>>(csvText, {
+			header: true,
+			skipEmptyLines: true,
+			transformHeader: (header) => header.trim()
+		});
+		if (parsed.errors.length > 0) {
+			throw error(400, `CSV parse error: ${parsed.errors[0].message}`);
+		}
+		if (parsed.data.length === 0) throw error(400, 'CSV contains no attendance rows');
+
+		const rows = parsed.data.map((row, index) => {
+			const rowNumber = index + 2;
+			const employeeEmail = row.employeeEmail?.trim();
+			if (!employeeEmail) throw error(400, `employeeEmail is required on CSV row ${rowNumber}`);
+			const parsedEmail = emailSchema.safeParse(employeeEmail);
+			if (!parsedEmail.success) throw error(400, `Invalid employeeEmail on CSV row ${rowNumber}`);
+			if (row.date?.trim() !== date) {
+				throw error(400, `CSV row ${rowNumber} date must match the selected date ${date}`);
+			}
+			const status = row.status?.trim() || 'present';
+			const parsedStatus = attendanceCsvStatusSchema.safeParse(status);
+			if (!parsedStatus.success) throw error(400, `Invalid status on CSV row ${rowNumber}`);
+
+			return {
+				employeeEmail: parsedEmail.data,
+				employeeName: row.employeeName?.trim() ?? '',
+				employeeCode: row.employeeCode?.trim() ?? '',
+				date,
+				branch: row.branch?.trim() ?? '',
+				punchIn: row.punchIn?.trim() ?? '',
+				punchOut: row.punchOut?.trim() ?? '',
+				workingMinutes: parseOptionalNumber(row.workingMinutes, 'workingMinutes', rowNumber),
+				overtimeMinutes: parseOptionalNumber(row.overtimeMinutes, 'overtimeMinutes', rowNumber),
+				shortByMinutes: parseOptionalNumber(row.shortByMinutes, 'shortByMinutes', rowNumber),
+				status: parsedStatus.data
+			};
+		});
+
+		for (let index = 0; index < rows.length; index += 400) {
+			const batch = firestore.batch();
+			for (const row of rows.slice(index, index + 400)) {
+				batch.set(
+					attendanceLogsCollection.doc(attendanceLogId(row.employeeEmail, date)),
+					{ ...row, source: 'import', updatedAt: FieldValue.serverTimestamp() },
+					{ merge: true }
+				);
+			}
+			await batch.commit();
+		}
+		return { success: true, imported: rows.length };
+	}
+);
+
+export const processAttendanceForDate = command(
+	z.object({ date: attendanceDateSchema }),
+	async ({ date }) => {
+		requireHrAdmin();
+		assertValidAttendanceDate(date);
+
+		const [employees, holidaysSnap, leaveSnap, punchesSnap] = await Promise.all([
+			listEmployeesWithAccess({ forceRefresh: true }),
+			holidaysCollection.where('date', '==', date).limit(1).get(),
+			leaveRequestsCollection.where('status', '==', 'approved').get(),
+			biometricPunchesCollection.where('date', '==', date).get()
+		]);
+		const activeEmployees = employees.filter((employee) => employee.status === 'active');
+		const isHoliday = !holidaysSnap.empty;
+		const onLeaveEmails = new Set(
+			leaveSnap.docs
+				.filter((doc) => isInLeaveRange(doc.data(), date))
+				.map((doc) => normalizeEmail(doc.data().employeeEmail as string))
+		);
+		const punchedEmails = new Set(
+			punchesSnap.docs
+				.map((doc) => doc.data().employeeEmail as string | null)
+				.filter((email): email is string => Boolean(email))
+				.map(normalizeEmail)
+		);
+
+		for (const email of punchedEmails) await reconcileAttendanceForDay(email, date);
+
+		let present = 0;
+		let absent = 0;
+		let onLeave = 0;
+		let holiday = 0;
+		for (const employee of activeEmployees) {
+			const email = normalizeEmail(employee.email);
+			const logRef = attendanceLogsCollection.doc(attendanceLogId(email, date));
+			const existing = await logRef.get();
+			if (existing.exists && existing.data()?.corrected) continue;
+
+			const status = isHoliday
+				? 'holiday'
+				: onLeaveEmails.has(email)
+					? 'on-leave'
+					: punchedEmails.has(email)
+						? (existing.data()?.status ?? 'present')
+						: new Date(`${date}T00:00:00Z`).getUTCDay() === 0
+							? 'present'
+							: 'absent';
+			await logRef.set(
+				{
+					employeeEmail: email,
+					employeeName: employee.name || email,
+					employeeCode: employee.code || '',
+					date,
+					branch: employee.location || '',
+					punchIn: existing.data()?.punchIn ?? null,
+					punchOut: existing.data()?.punchOut ?? null,
+					workingMinutes: existing.data()?.workingMinutes ?? 0,
+					overtimeMinutes: existing.data()?.overtimeMinutes ?? 0,
+					shortByMinutes: existing.data()?.shortByMinutes ?? 480,
+					status,
+					source: 'biometric',
+					updatedAt: FieldValue.serverTimestamp()
+				},
+				{ merge: true }
+			);
+			if (status === 'on-leave') onLeave++;
+			else if (status === 'holiday') holiday++;
+			else if (status === 'absent') absent++;
+			else present++;
+		}
+
+		if (new Date(`${date}T00:00:00Z`).getUTCDay() === 1) {
+			const saturday = dateOffset(date, -2);
+			const sunday = dateOffset(date, -1);
+			for (const employee of activeEmployees) {
+				const email = normalizeEmail(employee.email);
+				const [saturdaySnap, mondaySnap, sundaySnap, sundayHolidaySnap, sundayLeaveSnap] =
+					await Promise.all([
+						attendanceLogsCollection.doc(attendanceLogId(email, saturday)).get(),
+						attendanceLogsCollection.doc(attendanceLogId(email, date)).get(),
+						attendanceLogsCollection.doc(attendanceLogId(email, sunday)).get(),
+						holidaysCollection.where('date', '==', sunday).limit(1).get(),
+						leaveRequestsCollection.where('status', '==', 'approved').get()
+					]);
+				const sundayLeave = sundayLeaveSnap.docs.some(
+					(doc) =>
+						normalizeEmail(doc.data().employeeEmail as string) === email &&
+						isInLeaveRange(doc.data(), sunday)
+				);
+				if (
+					saturdaySnap.data()?.status !== 'absent' ||
+					mondaySnap.data()?.status !== 'absent' ||
+					sundayHolidaySnap.size > 0 ||
+					sundayLeave ||
+					sundaySnap.data()?.corrected
+				)
+					continue;
+				await sundaySnap.ref.set(
+					{ status: 'absent', source: 'biometric', updatedAt: FieldValue.serverTimestamp() },
+					{ merge: true }
+				);
+			}
+		}
+
+		return {
+			success: true,
+			date,
+			processed: activeEmployees.length,
+			present,
+			absent,
+			onLeave,
+			holiday
+		};
+	}
+);
+
+export const deleteAttendanceForDate = command(
+	z.object({ date: attendanceDateSchema }),
+	async ({ date }) => {
+		requireHrAdmin();
+		assertValidAttendanceDate(date);
+		const logsSnap = await attendanceLogsCollection.where('date', '==', date).get();
+		for (let index = 0; index < logsSnap.docs.length; index += 400) {
+			const batch = firestore.batch();
+			for (const doc of logsSnap.docs.slice(index, index + 400)) batch.delete(doc.ref);
+			await batch.commit();
+		}
+		return { success: true, deleted: logsSnap.size };
 	}
 );
 
